@@ -115,6 +115,7 @@ CURRENTDIR=`pwd | sed 's/ /\\ /g'`
 
 echo Copying relevant script files
 cp -p $FESTVOXDIR/src/unitsel/make_mcep bin
+cp -p $FESTVOXDIR/src/unitsel/build_clunits_voice bin
 
 # General utilities
 cp -p $FESTVOXDIR/src/general/make_labs bin
@@ -150,7 +151,6 @@ cp -p $FESTVOXDIR/src/general/find_db_duration bin
 cp -p $FESTVOXDIR/src/general/prune_silence bin
 cp -p $FESTVOXDIR/src/general/prune_middle_silences bin
 cp -p $FESTVOXDIR/src/general/add_noise bin
-cp -p $FESTVOXDIR/src/unitsel/build_clunits_voice bin
 
 # We don't use sphinxtrain anymore for labeling
 #cp -p $FESTVOXDIR/src/st/sphinxtrain bin
