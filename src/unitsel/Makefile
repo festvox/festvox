@@ -37,7 +37,7 @@
 TOP=../../
 DIRNAME=src/unitsel
 SCHEMEFILES = CLUNITS_clunits.scm build_clunits.scm
-SCRIPTS = setup_clunits make_mcep build3
+SCRIPTS = setup_clunits make_mcep build3 build_clunits_voice
 OTHERS = unitsel.desc syllabic.scm
 
 FILES = Makefile $(SCRIPTS) $(SCHEMEFILES) $(OTHERS)

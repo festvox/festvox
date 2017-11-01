@@ -55,7 +55,7 @@ $FLITEDIR/tools/setup_flite
 cd flite
 make
 
-./flite_${FV_VOICENAME} "A whole joy was reaping, but they've gone south, go fetch azure mike." whole_${FV_VOICENAME}.wav
+./flite_${FV_VOICENAME} "A whole joy was reaping, but they've gone south, you should fetch azure mike." whole_${FV_VOICENAME}.wav
 
 ls -altr flite_${FV_VOICENAME}
 
