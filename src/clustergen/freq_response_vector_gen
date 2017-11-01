@@ -1,0 +1,95 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                     Carnegie Mellon University                        ##
+##                         Copyright (c) 2013                            ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Author: Prasanna Muthukumar (pmuthuku@cs.cmu.edu) Jan 2013           ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+## Generate Frequency Response Vectors                                   ##
+##                                                                       ##
+###########################################################################
+
+if [ $# = 0 ]
+then
+    echo "Usage:"
+    echo "$0 LPF SAMP_FREQ CUTOFF_FREQ"
+    echo "$0 HPF SAMP_FREQ CUTOFF_FREQ"
+    echo "$0 BPF SAMP_FREQ LOW_CUTOFF_FREQ HIGH_CUTOFF_FREQ"
+    echo
+    exit 1
+fi
+
+fil_type=$1
+samp_freq=$2
+low_cutoff_freq=$3
+high_cutoff_freq=$4
+
+num_points=128
+
+low_cutoff_point=$(echo | \
+    awk "{print int( $low_cutoff_freq / ($samp_freq/2) * $num_points )}")
+
+if [ $fil_type = "BPF" ]
+then
+    high_cutoff_point=$(echo |
+	awk "{print int( $high_cutoff_freq / ($samp_freq/2) * $num_points )}")
+fi
+
+for i in $(seq 1 $num_points)
+do
+    if [ $fil_type = "LPF" ]
+    then
+	if [ $i -le $low_cutoff_point ]
+	then
+	    echo 1
+	else
+	    echo 0
+	fi
+    elif [ $fil_type = "HPF" ]
+    then
+	if [ $i -le $low_cutoff_point ]
+	then
+	    echo 0
+	else
+	    echo 1
+	fi
+    elif [ $fil_type = "BPF" ]
+    then
+	if [ $i -ge $low_cutoff_point -a $i -le $high_cutoff_point ]
+	then
+	    echo 1
+	else
+	    echo 0
+	fi
+    fi
+done

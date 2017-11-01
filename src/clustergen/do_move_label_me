@@ -1,0 +1,285 @@
+#!/bin/sh
+###########################################################################
+##                                                                       ##
+##                   Language Technologies Institute                     ##
+##                     Carnegie Mellon University                        ##
+##                         Copyright (c) 2008                            ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##   Iteratively move the labels based on model prediction.              ##
+##                                                                       ##
+###########################################################################
+
+LANG=C; export LANG
+
+FESTIVAL=$ESTDIR/../festival/bin/festival 
+
+. etc/voice.defs
+
+echo $*
+MODELNAME=$FV_VOICENAME
+VOICENAME="(voice_"$FV_VOICENAME"_cg)"
+VOICESCM=festvox/${MODELNAME}_cg.scm
+
+if [ ! -d ml ]
+then
+   mkdir ml
+fi
+
+if [ "$SIODHEAPSIZE" = "" ]
+then
+   SIODHEAPSIZE=20000000
+   export SIODHEAPSIZE
+fi
+HEAPSIZE=$SIODHEAPSIZE
+
+PREVIOUS=0
+NUMPASSES=20
+PROMPTFILE=etc/txt.done.data
+
+if [ "$1" = "select" ]
+then
+   # call "$0 select" when finished moving labels to select best pass
+   if [ ! -f ml/summary ]
+   then
+      echo "No ml/summary file"
+      exit 1
+   fi
+   # selects best MCD score
+   if [ $# = 2 ]
+   then
+      bestpass=$2
+   else
+      # Sometimes the passes fail, so only find those with a full line 
+      # in the summary file (might not be robust enough -- but should help
+      bestpass=`awk '{if (NF == 10) print $0}' ml/summary | sort --key=6 -g | awk '{if (NR==1) print $2}'`
+   fi
+
+   if [ ! -d ml/lab${bestpass} ]
+   then
+      echo "No labels for pass $bestpass"
+      exit 1
+   fi
+
+   rm -rf f0; mkdir f0
+   rm lab
+   ln -s ml/lab${bestpass} lab 
+   if [ "$PARALLEL" = "1" ]
+   then 
+      ./bin/do_clustergen parallel build_utts ${PROMPTFILE}
+      ./bin/do_clustergen parallel f0_v_sptk ${PROMPTFILE}
+      ./bin/do_clustergen parallel combine_coeffs_me ${PROMPTFILE}
+   else
+      ./bin/do_clustergen build_utts ${PROMPTFILE}
+      ./bin/do_clustergen f0_v_sptk ${PROMPTFILE}
+      ./bin/do_clustergen combine_coeffs_me ${PROMPTFILE}
+   fi
+   cp -pr ml/model${bestpass}/* festival/trees
+
+   echo "Pass # #moves  +ve   -ve MCD    std      F0    std   TTSMCD"
+   cat ml/summary
+   echo "Selected pass $bestpass"
+   echo "Model reset to ./bin/do_clustergen cluster ${PROMPTFILE}.train from pass $bestpass"
+   echo "Ready to rebuild ./bin/do_clustergen cluster ${PROMPTFILE} if desired"
+   exit 0
+elif [ "$1" = "parallel" ]
+then
+   PARALLEL="1"
+   if [ "$2" = "select" ]
+   then
+      shift
+      $0 $*
+      exit 0
+   else
+   NUMPASSES=$2
+   fi
+elif [ "$1" = "_parallelworker" ]
+then
+    i="$2"
+    PROMPTFILE="$3"
+    INDEX="$4"
+    # Get our partition of PROMPTFILE
+    SPLITPROMPTFILE=/tmp/dobuild_parallelworker.$$.$INDEX
+    cat $PROMPTFILE | awk "NR%16==$INDEX {print \$0}" > $SPLITPROMPTFILE
+    $FESTIVAL --heap $HEAPSIZE -b $VOICESCM $VOICENAME festvox/clustergen_build.scm "(ClusterGen_move_labels '$SPLITPROMPTFILE 'ml/lab$i)" >> ml/ml.$i
+    rm $SPLITPROMPTFILE
+    exit 0
+else
+   if [ $# = 1 ]
+   then
+      NUMPASSES=$1
+   fi
+fi
+
+## When called with no arguments, moves labels for NUMPASSES iterations
+
+# I've lost the original labels a couple of times so I'm just going to 
+# save them here (not just in ml/)
+if [ ! -d lab_orig ]
+then
+   cp -pr lab lab_orig
+fi
+
+## Assume a model has been successfully built
+## Rebuild and get initial base figures
+rm -f ml/summary
+echo Pass 0
+if [ "$PARALLEL" = "1" ]
+then
+   ./bin/do_clustergen parallel cluster ${PROMPTFILE}.train 
+else
+   ./bin/do_clustergen cluster ${PROMPTFILE}.train 
+fi
+echo "Pass 0 find MCDs"
+./bin/do_clustergen parallel utt_by_utt_tts ${PROMPTFILE}.test
+rm -rf test/tts0
+mv test/all test/tts0
+#$FESTVOXDIR/src/clustergen/get_cd_dtw ${PROMPTFILE}.test wav test/tts0 >ml/tts.0
+$FESTVOXDIR/src/clustergen/cg_test mcdf0 cgp0 ${PROMPTFILE}.test >ml/mcd.0
+cp -p dur.dur.S25.out-base ml/dur.dur.S25.out.0
+printf "pass 0     0     0     0 " >ml/summary
+(
+   grep "^MCD " ml/mcd.0 | awk '{printf("%0.3f %0.3f  ",$3,$5)}'
+   grep "^F0  " ml/mcd.0 | awk '{printf("%0.3f  ",$3)}'
+   grep "^RMSE " ml/dur.dur.S25.out.0 | awk '{printf("%0.3f %0.3f  ",$2,$5)}'
+#   grep "^DTW" ml/tts.0 | awk '{printf("%0.3f %0.3f",$2,$4)}'
+  echo
+) >>ml/summary
+echo "Pass # #moves  +ve   -ve MCD    std      F0    DurE  DurC"
+cat ml/summary
+
+mv lab ml/lab0
+mkdir ml/model0
+cp -pr festival/trees/${FV_VOICENAME}* ml/model0
+
+echo $NUMPASSES |
+awk '{for (i=1; i<=$1; i++) print i;}' |
+while read i
+do
+   echo "Starting Pass $i"
+   mkdir ml/lab${i}
+   rm -f lab
+   ln -s ml/lab${PREVIOUS} lab
+
+   ## Find moves that improve the prediction model 
+   ## FIXME: should be parallelized
+   echo "Pass $i moving labels"
+   if [ "$PARALLEL" = "1" ]
+   then
+    num_cpus=$(./bin/find_num_available_cpu)
+    seq 0 15 | xargs -n 1 -P $num_cpus $0 _parallelworker $i $PROMPTFILE
+   else
+      $FESTIVAL --heap $HEAPSIZE -b $VOICESCM $VOICENAME festvox/clustergen_build.scm "(ClusterGen_move_labels '$PROMPTFILE 'ml/lab$i)" >ml/ml.$i
+   fi
+   ## Doing moves multiple times per pass doesn't help
+#    rm -f lab
+#    ln -s ml/lab${i} lab
+#    ./bin/do_build build_utts ${PROMPTFILE}
+#    $FESTIVAL -b $VOICESCM $VOICENAME $FESTVOXDIR/src/clustergen/clustergen_build.scm "(ClusterGen_move_labels '$PROMPTFILE 'ml/lab$i)" >>ml/ml.$i
+
+#    rm -f lab
+#    ln -s ml/lab${i} lab
+#    ./bin/do_build build_utts ${PROMPTFILE}
+#    $FESTIVAL -b $VOICESCM $VOICENAME $FESTVOXDIR/src/clustergen/clustergen_build.scm "(ClusterGen_move_labels '$PROMPTFILE 'ml/lab$i)" >>ml/ml.$i
+
+   ## Summarizes moves in log file
+   (
+      printf "pass $i "
+      grep "move boundary" ml/ml.$i | 
+      awk '{ if ($0 ~ /\+/) f++;
+             if ($0 ~ /\-/) m++; }
+            END {printf("%5d %5d %5d ",NR,f,m)}'
+   ) >>ml/summary
+
+   ## Rebuild parameter files with new moves
+   rm -rf f0; mkdir f0
+   rm lab
+   ln -s ml/lab${i} lab  
+
+   if [ "$PARALLEL" = "1" ]
+   then
+       ./bin/do_clustergen parallel build_utts ${PROMPTFILE}
+       ./bin/do_clustergen parallel f0_v_sptk ${PROMPTFILE}
+       ./bin/do_clustergen parallel combine_coeffs_me ${PROMPTFILE}
+   
+        ## Rebuild model with new moves
+       ./bin/do_clustergen parallel cluster ${PROMPTFILE}.train 
+   else
+      ./bin/do_clustergen build_utts ${PROMPTFILE}
+      ./bin/do_clustergen f0_v_sptk ${PROMPTFILE}
+      ./bin/do_clustergen combine_coeffs_me ${PROMPTFILE}
+   
+       ## Rebuild model with new moves
+      ./bin/do_clustergen cluster ${PROMPTFILE}.train 
+   fi
+   ./bin/do_clustergen dur ${PROMPTFILE}.train 
+   cp -p dur.dur.S25.out ml/dur.dur.S25.out.$i
+   ## This makes it run twice as fast but give very slightly worse results
+   # cat ${PROMPTFILE}.train |
+   # awk '{if (('$i' % 2) == (NR%2)) print $0}' >etc/xxx.train
+   # ./bin/do_clustergen cluster etc/xxx.train
+
+   ## Save the built model
+   mkdir ml/model$i
+   cp -pr festival/trees/${FV_VOICENAME}* ml/model$i
+
+   ## Test new model
+   echo "Pass $i find MCDs"
+   ./bin/do_clustergen parallel utt_by_utt_tts ${PROMPTFILE}.test 
+   rm -rf test/tts$i
+   mv test/all test/tts$i
+#   $FESTVOXDIR/src/clustergen/get_cd_dtw ${PROMPTFILE}.test wav test/tts$i >ml/tts.$i
+   $FESTVOXDIR/src/clustergen/cg_test mcdf0 cgp$i ${PROMPTFILE}.test >ml/mcd.$i
+
+   ## Summarize test in log file 
+   (
+      grep "^MCD " ml/mcd.$i | awk '{printf("%0.3f %0.3f  ",$3,$5)}'
+      grep "^F0  " ml/mcd.$i | awk '{printf("%0.3f  ",$3)}'
+      grep "^RMSE " ml/dur.dur.S25.out.$i | awk '{printf("%0.3f %0.3f  ",$2,$5)}'
+#      grep "^DTW" ml/tts.$i | awk '{printf("%0.3f %0.3f",$2,$4)}'
+      echo
+   ) >>ml/summary
+
+   echo "Pass # #moves  +ve   -ve MCD    std      F0    DurE  DurC"
+   cat ml/summary
+   echo "Pass $i end"
+
+   PREVIOUS=$i
+
+   # External things can stop this at a neat point 
+   if [ -f ml/stop ]
+   then
+      echo stopped
+      exit 0
+   fi
+
+done
+
+echo "To select the best model use: $0 select [PASS]"
+exit 0

@@ -1,0 +1,147 @@
+#!/bin/sh
+###########################################################################
+##                                                                       ##
+##                  Language Technologies Institute                      ##
+##                     Carnegie Mellon University                        ##
+##                         Copyright (c) 2005-2006                       ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Auto build allowables from a lexicon file                            ##
+##  This follows a statistical machine translation type of alignment     ##
+##                                                                       ##
+###########################################################################
+
+cat alllets.out |
+sort -u |
+tr -d ",.*/" >alets.out
+
+# Find global phone frequency 
+# construct p(p) and put in an awk filter
+cat allphones.out |
+awk '{ for (i=1; i<=NF; i++)
+       {
+          freq[$i]++;
+          t++;
+          if (i<NF)
+          {
+             d=sprintf("%s-%s",$i,$(i+1));
+             freq[d]++
+             t++;
+          }
+       }
+     }
+     END {printf("BEGIN {\n");
+          for (phone in freq)
+             printf("gfreq[\"%s\"] = %04f;\n", phone, (freq[phone]*1000000.0)/t);
+          printf("}\n");
+          printf("{ printf(\"%%s %%s %%f\\n\",$1,$2,$3*gfreq[$2]) }\n");
+         }' >phonefreqs.awk 
+
+# find l_p frequencies
+cat let2phones.out |
+awk '{let=$1
+      for (i=2; i<=NF; i++)
+      {
+          d=sprintf("%s_%s",$1,$i);
+          freq[d]++;
+          if (i<NF)
+          {
+             d=sprintf("%s_%s-%s",$1,$i,$(i+1));
+             freq[d]++
+          }
+      }}
+     END {
+         for (word in freq)
+         {
+             printf("%s %d\n", word, freq[word]);
+         }
+     }' | sed 's/_/ /' >letphonefreqs.out
+
+# find p(l|p)
+cat letphonefreqs.out |
+sort --key=2 |
+awk '{print $0} END {print "eof","eof",0}' |
+awk '{if ((NR > 1) && (phone != $2))
+     {
+        for (let in freq)
+        {
+            if (tp > 0)
+               printf("%s %s %f\n",let,phone,freq[let]/(1.0*tp));
+        }
+        delete freq
+        tp=0;
+    }
+
+    freq[$1] += $3;
+    phone = $2;
+    tp += $3;
+}' |
+awk -f phonefreqs.awk  >probpl.unsorted.out
+
+
+# Sort them per letter
+for i in `cat alets.out`
+do
+   cat probpl.unsorted.out |
+   awk '{if ($1 == "'"$i"'")
+         {
+            tot += $3;
+            line = sprintf("%s %s",$1,$2);
+            pair[line] = $3;
+         }}
+        END { for (line in pair)
+                printf("%s %f %f\n",line,pair[line],pair[line]/(1.0*tot))}' | 
+   sort --key=3 -gr
+done >probpl.out
+
+# probpl.out: letter phone score probability
+# sorted with highest score first
+
+cat probpl.out | 
+awk 'BEGIN { printf("(require '"'"'lts_build)\n");
+             printf("(%%%%stack-limit 10000000 nil)\n");
+             printf("(setq allowables '"'"'(\n");
+             printf("   (# #)\n"); }
+     { if ($1 != l)
+       {
+          if (NR > 1)
+             printf("   )\n");
+          printf("   (\"%s\" _epsilon_ \n",$1);
+          lc=0;
+          probmass = 0.0;
+          l = $1;
+       }
+       if ((lc < 80) || (probmass < 0.80))
+          printf("      %s\n",$2);
+       probmass += $4;
+       lc++;
+     }
+     END {if (NR > 1)
+             printf("   )\n");
+          printf("))\n")}' >allowables.scm

@@ -1,0 +1,121 @@
+#!/bin/sh
+####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                   Carnegie Mellon University and                      ##
+##                   Alan W Black and Kevin A. Lenzo                     ##
+##                      Copyright (c) 1998-2000                          ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Generate cepstrum and autolabel waveforms from prompts               ##
+##                                                                       ##
+###########################################################################
+
+LANG=C; export LANG
+
+if [ $# = 0 ]
+then
+   echo align nonsense word phone labels from prompts
+   echo "Usage: make_labs prompt-wav/*.wav"
+   echo expects the following to exist:
+   echo "prompt-wav/*.wav   The waveform prompts"
+   echo "prompt-lab/*.lab   The labels for the prompts"
+   echo "wav/*.wav          The spoken waveforms"
+   echo "cep/               Will fill this directory with cepstrum files"
+   echo "prompt-cep/        Will fill this directory with cepstrum files"
+   echo "lab/               Will fill this directory with label files"
+   exit 1
+fi
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+SIG2FV=$ESTDIR/bin/sig2fv
+# These parameters are chosen by becuase they seems vaguely right
+# and do produce reasonable results, but if you think you know better
+# you probably do, feel free to experiment
+SIG2FVPARAMS='-coefs melcep -delta melcep -melcep_order 12 -fbank_order 24 -shift 0.005 -factor 5.0 -preemph 0.97'
+
+if [ ! "$FESTVOXDIR" ]
+then
+   echo "environment variable FESTVOXDIR is unset"
+   echo "set it to your local festvox directory e.g."
+   echo '   bash$ export FESTVOXDIR=/home/awb/projects/festvox/'
+   echo or
+   echo '   csh% setenv FESTVOXDIR /home/awb/projects/festvox/'
+   exit 1
+fi
+
+PHONEALIGN=$FESTVOXDIR/src/general/phonealign
+
+# Because I've made this mistake *every* time I've run this 
+if [ `dirname $1` = "wav" ]
+then
+   echo 
+   echo "ERROR"
+   echo "aligning wav/ files to wav/ files which is not what you want"
+   echo "to do, you probably wanted to type "
+   echo "      bin/make_labs prompt-wav/*.wav"
+   echo "not"
+   echo "      bin/make_labs wav/*.wav"
+   echo
+   exit
+fi
+
+#
+#  You may want to comment out some of the following parts if
+#  you have already run them before
+#
+for i in $*
+do
+   fname=`basename $i .wav`
+   echo $fname LABELING
+   # Construct cepstrum files
+   $SIG2FV $SIG2FVPARAMS -otype est $i -o prompt-cep/$fname.cep
+   $SIG2FV $SIG2FVPARAMS -otype est_binary wav/$fname.wav -o cep/$fname.cep
+
+   # Because of a bug in the synthesis process the prompt cepstrum files
+   # may be slightly longer than necessary and have 0s in the signal
+   # This can causes NaN in the cepstrum files.  The following
+   # clips the prompt-cepstrum files with respect to the time of the
+   # last label in the prompt label file.
+   $ESTDIR/bin/ch_track -end `tail -1 prompt-lab/$fname.lab | awk '{print $1}'` prompt-cep/$fname.cep -otype est_binary -o prompt-cep/$fname.cep
+   
+   # Now the actual alignment   
+   $PHONEALIGN -itrack prompt-cep/$fname.cep -ilabel prompt-lab/$fname.lab -otrack cep/$fname.cep -olabel lab/$fname.lab
+
+done
+
+
+ 

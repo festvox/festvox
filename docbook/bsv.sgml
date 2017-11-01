@@ -1,0 +1,287 @@
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook V3.1//EN" [
+
+<!ENTITY sss SYSTEM "sss.sgml">
+<!ENTITY eval SYSTEM "eval.sgml">
+<!ENTITY concept SYSTEM "concept.sgml">
+<!ENTITY corpus SYSTEM "corpus.sgml">
+<!ENTITY deploy SYSTEM "deploy.sgml">
+<!ENTITY diphone SYSTEM "diphone.sgml">
+<!ENTITY estman SYSTEM "estman.sgml">
+<!ENTITY festival SYSTEM "festival.sgml">
+<!ENTITY festman SYSTEM "festman.sgml">
+<!ENTITY future SYSTEM "future.sgml">
+<!ENTITY install SYSTEM "install.sgml">
+<!ENTITY intro SYSTEM "intro.sgml">
+<!ENTITY grapheme SYSTEM "grapheme.sgml">
+<!ENTITY jpdiphone SYSTEM "jpdiphone.sgml">
+<!ENTITY ldom SYSTEM "ldom.sgml">
+<!ENTITY ldomfull SYSTEM "ldomfull.sgml">
+<!ENTITY nonenldom SYSTEM "nonenldom.sgml">
+<!ENTITY lexicons SYSTEM "lexicons.sgml">
+<!ENTITY machlearn SYSTEM "machlearn.sgml">
+<!ENTITY markup SYSTEM "markup.sgml">
+<!ENTITY phonetable SYSTEM "phonetable.sgml">
+<!ENTITY prosody SYSTEM "prosody.sgml">
+<!ENTITY require SYSTEM "require.sgml">
+<!ENTITY resources SYSTEM "resources.sgml">
+<!ENTITY scheme SYSTEM "scheme.sgml">
+<!ENTITY speech SYSTEM "speech.sgml">
+<!ENTITY text SYSTEM "text.sgml">
+<!ENTITY unitsel SYSTEM "unitsel.sgml">
+<!ENTITY sps SYSTEM "sps.sgml">
+<!ENTITY usukdiphone SYSTEM "usukdiphone.sgml">
+<!ENTITY waveform SYSTEM "waveform.sgml">
+<!ENTITY label SYSTEM "label.sgml">
+]>
+
+<book>
+<bookinfo>
+  <title>Building Synthetic Voices</title>
+  <authorgroup>
+  <author><firstname>Alan W</firstname><surname>Black</surname></author>
+  <author><firstname>Kevin A.</firstname><surname>Lenzo</surname></author>
+  </authorgroup>
+  <copyright>
+    <year>1999-2017</year>
+    <holder>Alan W Black &amp; Kevin A. Lenzo</holder>
+  </copyright>
+  <date>20th October 2017</date>
+  <edition>For FestVox 2.8</edition>
+  <affiliation>
+  <address>
+  Language Technologies Institute, Carnegie Mellon University
+  </address>
+  </affiliation>
+<legalnotice>
+<para>Permission to use, copy, modify and distribute
+this document for any purpose and
+without fee is hereby granted in perpetuity, provided that the above
+copyright notice and this paragraph appear in all copies.</para>
+</legalnotice>    
+</bookinfo>
+
+<part id="bsv-speech-part" label="I">
+<title>Speech Synthesis</title>
+<partintro>
+<para>
+This book is about spoken language output -- how to build a synthetic 
+voice that can express a range of concepts in a given domain, whether
+a system has a small range, and so an easily describable domain, or
+an unlimited set of possible inputs.
+</para>
+<para>
+The <ulink url="http://www.cstr.ed.ac.uk/projects/festival/">
+Festival Speech Synthesis System</ulink>, and more specifically, the
+<ulink url="http://festvox.org">FestVox voice building
+tools</ulink>, provide the framework for the discussion.  All these
+tools, Festival, and all other applications and databases given
+in examples here are available as open source and/or free software.
+</para>
+<para>
+This version is still a very early draft, it rondom changes from high
+level discussion to low level code aspects without the appropriatae
+introduction of the material.  As it stands this version is most
+useful to people with some speech processing experience who want to
+build voices in the Festival Speech Synthesis System, and have some
+patience to work through these notes.  These sections
+will become more general introductions in later versions.
+</para>
+<para>
+Over the last several years, speech technology, as well as the
+computational resources needed to carry out the necessary (or popular)
+algrithms, have advanced considerably.  We can build systems that
+interact through speech; they can listen to what was said using speech
+recognition, compute or do something, and then speak back, using
+spoken language generation.
+</para>
+<para>
+Language is a fundamental part of everyday life.  Whether we are using
+speech, sign language, or perhaps a coding system that conveys
+meaning through touch, we use language to express our thoughts,
+intentions, reactions, and experiences -- often scarcely considering
+that we are even speaking, but rather feeling as if we were engaging
+in direct manipulation of the notions with our conversation partner.
+</para>
+<para>
+The complexity of the underlying systems involved in speech rarely
+enters our minds as we go about our business, and it seems as if this
+fosters an unspoken attitude: "It's easy to talk, it should be easy to
+make a machine that talks."  By the time you finish this book, you
+should be aware of the components of the process, the relative effort
+and expertise involved in each component, and where the trade-offs lie
+in speech synthesis today.  Our hope is that you will take away, even
+with a light reading, an appreciation of the fundamental aspects of
+speech communication, and how one might, with this modality, make 
+machines more useful.
+speech.
+</para>
+<para>
+The book is organized into six major parts: Overview and Use of
+Speech Output, Building Synthetic Voices, Interfacing and Integrating,
+detailed Recipes for building voices, and our concluding remarks
+critiquing the state of the art, and discussing a number of interesting
+issues that remain open in speech science and synthesis technology.
+</para>
+<para>
+<xref linkend="bsv-speech-part">
+is a speech science and technology overview, primarily as it relates
+to speech-interactive systems, and how to use speech synthesis.  We
+will be using the Festival Speech Synthesis System throughout the
+book, and it is presented here.  If you are familiar with speech
+synthesis, you might want to skip to the discussion of Festival in
+<xref linkend="bsv-festival-ch">; if you're familiar with Festival,
+you may wish to go directly to <xref linkend="bsv-bsv-part">.
+</para>
+<para>
+In <xref linkend="bsv-intro-ch">, we start with an introduction to
+speech in general, the role of spoken language generation, and in
+particular, of the basic issues in speech synthesis: text analysis,
+prosody, and audio waveform generation; then in <xref
+linkend="bsv-speech-ch">, we discuss speech science and technology in
+greater detail, introducing the basic tools, concepts, and terms
+involved.  <xref linkend="bsv-festival-ch"> is on using the Festival
+Speech Synthesis System -- as a system, its basic use, and the modules
+and architecture.  The utterance structure we use is also discussed 
+here.
+</para>
+<para>
+<xref linkend="bsv-bsv-part">
+is on Building Synthetic Voices; here, start looking at the process of
+building a voice, and illustrate it with demonstaions and
+walk-throughs using the FestVox voice building tools.  <xref
+linkend="bsv-ldom-ch"> covers limited domain synthesis, in which high
+quality can be achieved at the expense of flexibility, if you know
+what the system is going to say in advance.  In <xref
+linkend="bsv-text-ch">, we then go into general synthesis, which
+includes Text-to-Speech (TTS); the system should be able to speak, no
+matter what it is given, with some expected level of quality -- even
+if given only a string of text.  It is in this chapter that we expose
+most of the components of a general purpose synthesizer, such as the
+text processing module, prosodic models that predict tune and timing,
+lexicons and pronunciation modeling, and issues with data collection
+and recording in order to create voices.
+</para>
+<para>
+<xref linkend="bsv-waveform-ch"> is on various techniques for audio
+waveform generation, once the system knows the final parameters of the
+utterance.  Evaluation and tuning of voices is discussed in
+<xref linkend="bsv-eval-ch">.
+</para>
+<para>
+In <xref linkend="bsv-interface-part">, we get to Interfacing and Integration issues.
+<xref linkend="bsv-markup-ch">
+covers mark-up languages, or mark-up components of
+standards, such as SABLE, JSML, and VoiceXML, and how these can be
+used and implemented for synthesis.  Then, in 
+<xref linkend="bsv-concept-ch">
+we go into some detail on Concept-to-Speech systems, and so touch on
+language generation and the benefits of coupling the language
+generation and synthesis components in terms of spoken output quality.
+<xref linkend="bsv-deploy-ch">
+is a discussion of deployment issues, such as client/server
+issues, the memory and disk footprint, runtime constraints, scaling up
+and pruning systems down to meet the available resources, and signal
+compression.
+</para>
+<para>
+Although step by step examples will be discussed in line throughout
+the various chapters, <xref linkend="bsv-recipes-part"> offers
+complete detailed walkthoughs of the actual steps involved
+in a number of larger examples.  
+<xref linkend="bsv-jpdiphone-ch"> gives a complete example of building a 
+Japanese diphone synthesizer, and <xref linkend="bsv-usukdiphone-ch">
+covers UK and US English diphone synthesizer while 
+<xref linkend="bsv-ldomfull-ch"> covers a the deisgn and executation
+of building a limited domain synthesizer for ...
+</para>
+<para>
+We follow with <xref linkend="bsv-conclude-part">, with a discussion of
+the state of the art and the future of spoken language output, and then
+a set of appendices.
+</para>
+</partintro>
+&intro;
+&speech;
+&festival;
+</part>
+
+<part id="bsv-bsv-part" label="II">
+<title>Building Synthetic Voices</title>
+<partintro>
+<para>
+</para>
+</partintro>
+&require;
+
+&ldom;
+
+<!-- to be folded into a single chapter -->
+  &text;
+  &lexicons;
+  &prosody;
+  &corpus;
+
+<!-- to be folded into a single chapter -->
+&waveform;
+  &diphone;
+  &unitsel;
+  &sps;
+
+&label;
+&eval;
+
+</part>
+
+<part id="bsv-interface-part" label="III">
+<title>Interfacing and Integration</title>
+<partintro>
+<para>
+</para>
+</partintro>
+&markup;
+&concept;
+&deploy;
+
+</part>
+
+<part id="bsv-recipes-part" label="IV">
+<title>Recipes</title>
+<partintro>
+<para>
+</para>
+</partintro>
+&grapheme;
+&jpdiphone;
+&usukdiphone;
+&ldomfull;
+&nonenldom;
+
+</part>
+
+<part id="bsv-conclude-part" label="V">
+<title>Concluding Remarks</title>
+<partintro>
+<para>
+</para>
+</partintro>
+&future;
+
+</part>
+
+<!--  Appendices -->
+
+&festman;
+&scheme;
+&estman;
+&machlearn;
+&resources;
+&install;
+&phonetable;
+
+<!--  &glossary; -->
+
+<!--  &refs; -->
+
+<!--  &index; -->
+
+</book>

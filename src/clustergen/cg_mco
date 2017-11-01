@@ -1,0 +1,174 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                     Carnegie Mellon University                        ##
+##                      Copyright (c) 2005-2006                          ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Author: Alan W Black (awb@cs.cmu.edu)                                ##
+##  Date: 25th December 2005                                             ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Model Contribution Ordering                                          ##
+##                                                                       ##
+##  orders the samples (utts) based on their contribution to the model   ##
+##                                                                       ##
+##  Takes the give set of samples (utts) and randomly spilts them into   ##
+##  two equal sets TRAIN and TEST, builds a model with TRAIN and tests   ##
+##  on TEST.  The score from TEST is assigned to each sample it TRAIN.   ##
+##  This is repeated getting more scores for different random subsets    ##
+##  after 10-20 iterations the chances of a sample always being in the   ##
+##  same partition as another becomes very low, and the average score    ##
+##  for each sample will tend to be unique.                              ##
+##                                                                       ##
+##  The intuition is to find the samples which build the best model that ##
+##  can predict a test set.  It is assumed that "bad" utterances in the  ##
+##  TRAIN set will give lower TEST score (though bad utts in the TEST    ##
+##  will lower the score too.  Maybe there should be a third IGNORE      ##
+##  group.                                                               ##
+##                                                                       ##
+##  The random number is seeded with the length of the dataset, so it    ##
+##  might give the same result on each run.  It uses rand() in awk to    ##
+##  generate the next seed, this is probably different on different      ##
+##  machines                                                             ##
+##                                                                       ##
+##  This probably works better on data with lots of noise in it          ##
+##                                                                       ##
+##  This could be applied to almost any machine learning algorithm       ##
+##  though this script is set up assuming .data files                    ##
+##                                                                       ##
+##  An earlier version was set up to generically run wagon on some set   ##
+##  set of data (called wagon_cv)                                        ##
+##                                                                       ##
+##  Cute but doesn't seem very helpful ...                               ##
+##                                                                       ##
+###########################################################################
+
+LANG=C; export LANG
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+
+fi
+
+if [ ! "$FESTVOXDIR" ]
+then
+   echo "environment variable FESTVOXDIR is unset"
+   echo "set it to your local festvox directory e.g."
+   echo '   bash$ export FESTVOXDIR=/home/awb/projects/festvox/'
+   echo or
+   echo '   csh% setenv FESTVOXDIR /home/awb/projects/festvox/'
+   exit 1
+fi
+
+# should probably be 2*n where 2^n approx equal to number samples (?)
+ITERATIONS=30
+DATASET=$1.dataset
+TRACK_START=0
+TRACK_END=6
+#./bin/traintest $1
+#cat $1.train >$DATASET
+cat $1 >$DATASET
+rm -f $DATASET.scores
+
+#SEED=`cat /dev/random | dd bs=1 count=8 2>/dev/null | perl $FESTVOXDIR/src/clustergen/d2a.pl | sed 's/-//' | awk '{printf("%s\n",substr($0,3,4))}'`
+SEED=`cat $DATASET | awk 'END { print NR%10000 }'`
+
+NUMPROMPTS=`cat $DATASET | wc -l`
+if [ $NUMPROMPTS -lt 30 ]
+then
+   ITERATIONS=0
+   awk '{print $2,1.0}' $DATASET >$DATASET.scores
+fi
+
+echo $ITERATIONS |
+awk '{for (i=1; i<=$1; i++)
+        print i}' |
+while read x
+do
+   echo Iteration" "$x
+
+   # select new random split
+   cat $DATASET |
+   awk 'BEGIN {for (i=1;i<'$SEED'; i++)
+                   randint(10)}
+        function randint(n) { return int(n * rand()) }
+        {
+           p = randint(100);
+           if (p < 50)
+              print "TRAIN",$0
+#           else if (p < 66)
+#              print "IGNORE",$0
+           else
+              print "TEST",$0
+        }
+        END { printf("SEED %02d%02d",randint(100),randint(100))}' >$DATASET.split
+   grep "^TRAIN" $DATASET.split | sed 's/^TRAIN //' >$DATASET.train
+   grep "^TEST" $DATASET.split | sed 's/^TEST //' >$DATASET.test
+#   grep "^IGNORE" $DATASET.split | sed 's/^IGNORE //' >$DATASET.ignore
+   SEED=`grep "^SEED" $DATASET.split | awk '{print $2}'`
+
+   # Use the TRAIN set to build a model
+   ./bin/do_clustergen parallel cluster $DATASET.train
+   # test on the TEST set
+   SCORE=`$FESTVOXDIR/src/clustergen/cg_test mcdf0 cv $DATASET.test | grep MCD | awk '{print $3}'`
+
+   # Save the scores
+#   cat $DATASET.ignore | 
+#   awk '{printf("%s %f %d\n",$2,20.0-'$SCORE','$x')}' >>$DATASET.scores
+   cat $DATASET.train | 
+   awk '{printf("%s %f %d\n",$2,'$SCORE','$x')}' >>$DATASET.scores
+   cp -pr $DATASET.scores.$x
+done
+
+# new line
+echo
+
+# Find best ones for training
+cat $DATASET.scores |
+awk '{ if ($2 != "nan")
+       {
+          count[$1] += 1;
+          sum[$1] += $2;
+       }
+     }
+    END { for (i in count)
+              printf("%f %s %d\n",sum[i]/count[i],i,count[i]);
+        }' | sort -n >$DATASET.order
+
+exit
+
+

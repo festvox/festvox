@@ -1,0 +1,166 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                     Carnegie Mellon University                        ##
+##                         Copyright (c) 2013                            ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Author: Alok Parlikar (aup@cs.cmu.edu) Jan 2013                      ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+## Uses SPTK for extracting Mixed Excitation Strengths                   ##
+##                                                                       ##
+###########################################################################
+
+LANG=C; export LANG
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ ! "$FESTVOXDIR" ]
+then
+   echo "environment variable FESTVOXDIR is unset"
+   echo "set it to your local festvox directory e.g."
+   echo '   bash$ export FESTVOXDIR=/home/awb/projects/festvox/'
+   echo or
+   echo '   csh% setenv FESTVOXDIR /home/awb/projects/festvox/'
+   exit 1
+fi
+
+if [ ! "$SPTKDIR" ]
+then
+    echo "environment variable SPTKDIR is unset"
+    echo "set it to your local festvox directory e.g."
+    echo '   bash$ export SPTKDIR=/usr/local/SPTK/'
+    echo or
+    echo '   csh% setenv SPTKDIR /usr/local/SPTK/'
+    exit 1
+fi
+
+F0MIN=50
+F0MAX=200
+F0MEAN=110
+
+
+X2X=$SPTKDIR/bin/x2x
+MGCEP=$SPTKDIR/bin/mcep
+LPC2LSP=$SPTKDIR/bin/lpc2lsp
+MERGE=$SPTKDIR/bin/merge
+SOPR=$SPTKDIR/bin/sopr
+NAN=$SPTKDIR/bin/nan
+MINMAX=$SPTKDIR/bin/minmax
+PITCH=$SPTKDIR/bin/pitch
+FRAME=$SPTKDIR/bin/frame
+WINDOW=$SPTKDIR/bin/window
+
+# Check that the SPTK patch has been installed by running a fake pitch
+# extraction with the right output parameter We should get 40 frames,
+# so 160 bytes. If patch is not installed, we get 10 frames and 40
+# bytes
+
+check_sptk_patch=$(head -c 1600 < /dev/urandom | \
+	$SPTKDIR/bin/x2x +sf | $SPTKDIR/bin/pitch -a 0 -H 200 -L 100 -p 80 -s 16 -o 5 | wc -c)
+
+if [ $check_sptk_patch != 160 ]
+then
+	echo $check_sptk_patch
+	echo "Verification of SPTK patch (for extracting strengths) failed."
+	echo "Please apply patch to SPTK and recompile it before running this command"
+	echo "Hint: patch -p1 < $FESTVOXDIR/src/clustergen/SPTK-3.6.patch"
+	echo
+	exit 1
+fi
+	 
+
+if [ ! -d str ]
+then
+   mkdir str
+fi
+
+if [ -f etc/f0.params ]
+then
+   . etc/f0.params
+fi
+
+
+PROMPTFILE=etc/txt.done.data
+if [ $# = 1 ]
+then
+   PROMPTFILE=$1
+fi
+
+FTMP=str_tmp.$$
+TMP=$FTMP.f
+
+# Extract filters into files
+$ESTDIR/bin/ch_track festvox/mef.track -otype ascii -o $FTMP.mef
+FORDER=$(head -1 $FTMP.mef | awk '{print NF}')
+for i in `seq 1 5`;
+do
+    head -n $i $FTMP.mef | tail -n 1 > $FTMP.h$i
+done
+
+
+cat $PROMPTFILE |
+awk '{print $2}' |
+while read i
+do
+    fname=$i
+    
+    if [ "$SAMPFREQ" = "" ]
+    then
+	    # Use the first wav file to determine sampling frequency
+	SAMPFREQ=$($ESTDIR/bin/ch_wave -info wav/$fname.wav  | grep 'Sample rate' | cut -d ' ' -f 3)
+	SAMPKHZ=$(echo $SAMPFREQ | $X2X +af | $SOPR -m 0.001 | $X2X +fa)
+	FRAMELEN=$(echo | awk "{print int(0.025*$SAMPFREQ)}")
+	FRAMESHIFT=$(echo | awk "{print int(0.005*$SAMPFREQ)}")
+
+    fi
+
+    echo $fname STR extraction with SPTK
+
+    for i in `seq 1 5`
+    do
+	$ESTDIR/bin/sigfilter -firfilter $FTMP.h$i -forder $FORDER wav/$fname.wav -otype raw | \
+	    $X2X +sf | $SPTKDIR/bin/pitch -a 0 -H $F0MAX -L $F0MIN -p $FRAMESHIFT -s $SAMPKHZ -o 5 | \
+	    $X2X +fa4 | awk '{print $4}' > $TMP.h$i.str
+    done
+    paste $TMP.h1.str $TMP.h2.str $TMP.h3.str $TMP.h4.str $TMP.h5.str > str/$fname.str
+    rm -rf $TMP.*
+done
+
+rm -rf $FTMP.*

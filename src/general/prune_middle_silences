@@ -1,0 +1,117 @@
+#!/bin/sh
+####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                     Carnegie Mellon University                        ##
+##                   Language Technologies Instutute                     ##
+##                         Copyright (c) 2013                            ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##  Remove excessive silence from within files                           ##
+##  Uses the F0 detector to find speech (approximately)                  ##
+###########################################################################
+
+# Keep up to SILMARGIN seconds of silence 
+SILMARGIN=0.1
+# Crop some silence out when silence longer than SILTHRESHOLD
+SILTHRESHOLD=0.4
+
+if [ "$PROMPTFILE" = "" ]
+then
+   if [ $# = 1 ]
+   then
+      PROMPTFILE=$1
+   else
+      PROMPTFILE=etc/txt.done.data
+   fi
+fi
+
+
+#mv wav unpruned
+#mkdir wav
+
+# Not yet tested if this is worthwhile to customize to the particular voice
+PDAPARAMS='-fmin 70 -fmax 240'
+
+if [ -d ssil ]
+then
+   if [ -d prev_ssil ]
+   then
+      mv prev_ssil x_ssil
+      mkdir prev_ssil
+      mv x_ssil prev_ssil/prev_ssil
+   fi
+   mv ssil prev_ssil
+fi
+
+mkdir ssil
+
+cat $PROMPTFILE |
+awk '{print $2}' |
+while read fname
+do
+    echo $fname
+
+    $ESTDIR/bin/pda -L $PDAPARAMS -otype est_ascii wav/$fname.wav |
+    awk 'BEGIN {id="'$fname'"; start=0.0; printf("0.0 ");}
+         {if ($1 == "EST_Header_End")
+            ofinterest=1;
+          if (ofinterest == 1)
+          {
+             if (($3 < 1.0) && (l > 1.0))
+             {
+                start=$1;
+             }
+             if (($3 > 1.0) && (l < 1.0))
+             {
+                if (($1 - start) > '$SILTHRESHOLD')
+                   printf("%f\n%f ",start+'$SILMARGIN',$1-'$SILMARGIN');
+             }
+          }
+          l=$3; lt=$1;
+         }
+         END {printf("%f\n",lt);}' >ssil/$fname.ssil
+done
+
+mv wav ssil
+mkdir wav
+
+cat $PROMPTFILE |
+awk '{print $2}' |
+while read fname
+do
+    rm -rf ssil/tmp; mkdir ssil/tmp
+    cat ssil/$fname.ssil |
+    awk '{printf("$ESTDIR/bin/ch_wave -start %f -end %f -o ssil/tmp/%04d.wav ssil/wav/%s.wav\n",$1,$2,NR,"'$fname'")}' | sh -v
+    $ESTDIR/bin/ch_wave ssil/tmp/*.wav -o wav/$fname.wav
+done
+
+
+
+
+
+

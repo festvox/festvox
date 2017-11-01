@@ -1,0 +1,468 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                    Carnegie Mellon University 
+##                        Copyright (c) 2005                             ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Given a set of text data find "nice" utterances for recording        ##
+##  based on word frequencies                                            ##
+##                                                                       ##
+###########################################################################
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ ! "$FESTVOXDIR" ]
+then
+   echo "environment variable FESTVOXDIR is unset"
+   echo "set it to your local festvox directory e.g."
+   echo '   bash$ export FESTVOXDIR=/home/awb/projects/festvox/'
+   echo or
+   echo '   csh% setenv FESTVOXDIR /home/awb/projects/festvox/'
+   exit 1
+fi
+
+LANG=C; export LANG
+
+DBNAME=data
+FVLANG=fv
+
+SIODHEAPSIZE=10000000
+export SIODHEAPSIZE
+
+if [ $# = 0 ]
+then
+cat <<EOF
+Scripts for finding a nice set of prompts.  Given a large set of text 
+data find a balanced subset of "nice" prompts that can be recorded.
+
+In all case the generated files (and potentially intermediate files)
+will be made in the current directory.  As distributed this scripts in
+latin script friendly.
+
+make_nice_prompts TYPE ARG0 ARG1 ...
+
+make_nice_prompts find_freq DATA0.txt DATA1.txt ...
+   Find a word frequency table for all of the data.  Result in data.wc
+make_nice_prompts find_freq_asis DATA0.txt DATA1.txt ...
+   Find a word frequency table for all of the data.  Result in data.wc
+   Doesn't assume latin character set and does no case folding
+make_nice_prompts make_freq_lex [5000]
+   Build a festival lexicon of the top n (5000) words in data.wc
+make_nice_prompts find_nice DATA0.txt DATA1.txt ...
+   Find nice utterances in the given dataset.  This can take some time
+   to run (one or more hours).  By default it finds the first 10000
+   sentences, that are between 4 and 10 words long, and all in the freq
+   lex (and some other nice constraints).  Result in data_nice.data,
+   as a datafile (with uttnames and parentheses).
+make_nice_prompts synth_seg
+   Synthesize the utterances in data_nice.data to data_nice_seg.data.
+make_nice_prompts select_seg
+   Select nice utts with phonetic balance
+make_nice_prompts select_letter
+   Select nice utts with letter balance (useful when no phonetic infromation
+   is available).  Output in data.done.data
+make_nice_prompts select_letter_n [1000]
+   Find around N nice sentences from data_nice.data by doing multiple calls
+   to select_letter.  Output in data.done.data
+make_nice_prompts find_vocab
+   Output data.vocab file from data.done.data
+make_nice_prompts find_vocab_asis
+   Output data.vocab file from data.done.data
+make_nice_prompts do_all DATA0.txt DATA1.txt ...
+   do find_freq make_freq_lex find_nice select_letter find_vocab
+make_nice_prompts do_all_asis DATA0.txt DATA1.txt ...
+   do find_freq_asis make_freq_lex find_nice select_letter find_vocab_asis
+EOF
+   exit
+fi
+
+if [ "$1" = "do_all" ]
+then
+    shift
+    $0 find_freq $*
+    $0 make_freq_lex
+    $0 find_nice $*
+    $0 select_letter_n
+    $0 find_vocab
+    exit
+fi
+
+if [ "$1" = "do_all_asis" ]
+then
+    shift
+    $0 find_freq_asis $*
+    $0 make_freq_lex_asis 
+    $0 find_nice_asis $*
+    $0 select_letter_n
+    $0 find_vocab_asis
+    exit
+fi
+
+if [ "$1" = "find_freq" ]
+then
+    echo "Finding word frequencies in text data"
+    # this bit is latin alphabet centric
+    shift
+    for i in $*
+    do
+       sed 's/[^A-ZÀ…» ¬Œ¿≈∆‘”ÿ€«œŸƒ÷ﬂ‹a-z‡·‚„‰ÂÊÁËÈÍÎÏÌÓÔÒÚÛÙıˆ¯˘˙˚¸˝˛ˇ'"'"']/ /g' $i
+    done |
+    awk '{for (i=1; i<=NF; i++)
+          printf("%s\n",$i);}' |
+    grep '^[A-ZÀ…» ¬Œ¿≈∆‘”ÿ€«œŸƒ÷ﬂ‹a-z‡·‚„‰ÂÊÁËÈÍÎÏÌÓÔÒÚÛÙıˆ¯˘˙˚¸˝˛ˇ'"'"'][a-z‡·‚„‰ÂÊÁËÈÍÎÏÌÓÔÒÚÛÙıˆ¯˘˙˚¸˝˛ˇ'"'"']*' | # Nice Words only
+    tr "A-Z¬¿¡ƒ≈∆«À…» ŒÕœ—‘”÷ÿ€⁄Ÿ‹" "a-z‚‡·‰ÂÊÁÎÈËÍÓÌÔÒÙÛˆ¯˚˙˘¸" |
+    grep -v "^'" |
+    grep -v "'$" |
+    awk '{
+            for (i = 1; i <= NF; i++)
+                freq[$i]++
+          }
+         END {
+            for (word in freq)
+                printf "%s\t%d\n", word, freq[word]
+         }' | sort --key=2 -gr >$DBNAME.wc
+    echo "INFO Number of tokens "`cat $* | wc -w`
+    echo "INFO Number of words "`cat $DBNAME.wc | wc -l`
+    echo "INFO Occurrence of 1000th word "`cat $DBNAME.wc | awk '{if (NR==1000) print $0}'`
+    echo "INFO Occurrence of 5000th word "`cat $DBNAME.wc | awk '{if (NR==5000) print $0}'`
+    exit
+fi
+
+if [ "$1" = "find_freq_asis" ]
+then
+    echo "Finding word frequencies in text data"
+    # this is the non-latin case, no-case folding
+    shift
+    for i in $*
+    do
+       cat $i
+    done |
+    awk '{for (i=1; i<=NF; i++)
+          printf("%s\n",$i);}' | 
+    grep -v "^'" |
+    grep -v '"' |
+    grep -v "'$" |
+    awk '{
+            for (i = 1; i <= NF; i++)
+                freq[$i]++
+          }
+         END {
+            for (word in freq)
+                printf "%s\t%d\n", word, freq[word]
+         }' | sort --key=2 -gr >$DBNAME.wc
+    echo "INFO Number of tokens "`cat $* | wc -w`
+    echo "INFO Number of words "`cat $DBNAME.wc | wc -l`
+    echo "INFO Occurrence of 1000th word "`cat $DBNAME.wc | awk '{if (NR==1000) print $0}'`
+    echo "INFO Occurrence of 5000th word "`cat $DBNAME.wc | awk '{if (NR==5000) print $0}'`
+    exit
+fi
+
+if [ "$1" = "make_freq_lex" ]
+then
+   if [ $# = 2 ]
+   then
+      VOCAB=$2
+   else
+      VOCAB=5000
+   fi
+   echo Building frequency lex for top $VOCAB words
+   cat $DBNAME.wc |
+   sed 's/\\/\\\\/g;s/"/\\"/g' |
+   awk -v count=$VOCAB 'BEGIN {t=0;}
+     {if (t < count)
+      {
+         if (($1 ~ /[A-Z][A-Z]/) ||
+             ($1 ~ /[0-9]/) ||
+             ($1 ~ /[-.,:;%/<>(){}_]/))
+            t = t;
+         else
+         {
+            printf("( \"%s\" nil ( ",$1);
+            printf(") )\n");
+            t += 1;
+         }
+       }
+     }' >$DBNAME"_entries.scm"
+
+   # Make phoneset 
+   #cat $LEXDIR/$LEXNAME"_entries.scm" |
+   #tr -d "()" |
+   #awk '{for (i=2; i<=NF; i++)
+   #        printf("%s\n",$i);}' |
+   #sort -u |
+
+   $ESTDIR/../festival/bin/festival -b '(lex.compile "'$DBNAME'_entries.scm" "'$DBNAME'_entries.out")'
+
+   echo "(lex.create \""$DBNAME"\")" >$DBNAME.scm
+   echo "(lex.set.compile.file \""$DBNAME"_entries.out""\")" >>$DBNAME.scm
+   echo "(lex.select \""$DBNAME"\")" >>$DBNAME.scm
+
+   exit
+fi
+
+if [ "$1" = "make_freq_lex_asis" ]
+then
+   if [ $# = 2 ]
+   then
+      VOCAB=$2
+   else
+      VOCAB=5000
+   fi
+   echo Building frequency lex for top $VOCAB words
+   cat $DBNAME.wc |
+   sed 's/\\/\\\\/g;s/"/\\"/g' |
+   awk -v count=$VOCAB 'BEGIN {t=0;}
+     {if (t < count)
+      {
+            printf("( \"%s\" nil ( ",$1);
+            printf(") )\n");
+            t += 1;
+       }
+     }' >$DBNAME"_entries.scm"
+
+   # Make phoneset 
+   #cat $LEXDIR/$LEXNAME"_entries.scm" |
+   #tr -d "()" |
+   #awk '{for (i=2; i<=NF; i++)
+   #        printf("%s\n",$i);}' |
+   #sort -u |
+
+   $ESTDIR/../festival/bin/festival -b '(lex.compile "'$DBNAME'_entries.scm" "'$DBNAME'_entries.out")'
+
+   echo "(lex.create \""$DBNAME"\")" >$DBNAME.scm
+   echo "(lex.set.compile.file \""$DBNAME"_entries.out""\")" >>$DBNAME.scm
+   echo "(lex.select \""$DBNAME"\")" >>$DBNAME.scm
+
+   exit
+fi
+
+if [ "$1" = "find_nice_asis" ]
+then
+   echo "Finding nice utterances in database"
+   shift
+   $FESTVOXDIR/src/promptselect/text2utts -upto 100000 -onlynice -eval $DBNAME.scm -dbname $DBNAME -o  $DBNAME"_nice.data" $*
+   $0 find_nice_asis_from_data $DBNAME"_nice.data"
+   exit
+fi
+
+if [ "$1" = "find_nice_asis_from_data" ]
+then
+   echo "Finding nice utterances in database"
+   shift
+
+   # If the data has the same nice sentence multiple times it will appear
+   # in X_nice.data multiple times, so we remove the duplcates.
+   cat $* |
+   awk '{ s="";
+          for (i=3; i < NF; i++)
+             s = sprintf("%s %s",s,$i);
+          if (done[s] != 1)
+          {
+             done[s] = 1;
+             print $0;
+          }}' >$DBNAME"_nice.data.tmp"
+   mv $DBNAME"_nice.data.tmp" $DBNAME"_nice.data"
+
+   exit
+fi
+
+if [ "$1" = "find_nice_asis_data" ]
+then
+   echo "Finding nice utterances in database"
+   shift
+   $FESTVOXDIR/src/promptselect/text2utts -upto 100000 -onlynice -eval $DBNAME.scm -dbname $DBNAME -o  $DBNAME"_nice.data" -itype data $*
+
+   # If the data has the same nice sentence multiple times it will appear
+   # in X_nice.data multiple times, so we remove the duplcates.
+   cat $DBNAME"_nice.data" |
+   awk '{ s="";
+          for (i=3; i < NF; i++)
+             s = sprintf("%s %s",s,$i);
+          if (done[s] != 1)
+          {
+             done[s] = 1;
+             print $0;
+          }}' >$DBNAME"_nice.data.tmp"
+   mv $DBNAME"_nice.data.tmp" $DBNAME"_nice.data"
+
+   exit
+fi
+
+if [ "$1" = "find_nice" ]
+then
+   echo "Finding nice utterances in database"
+   shift
+   $FESTVOXDIR/src/promptselect/text2utts -upto 100000 -onlynicelatin -eval $DBNAME.scm -dbname $DBNAME -o $DBNAME"_nice.data" $*
+
+   # If the data has the same nice sentence multiple times it will appear
+   # in X_nice.data multiple times, so we remove the duplcates.
+   cp -p  $DBNAME"_nice.data"  $DBNAME"_nice.data.keep"
+   cat $DBNAME"_nice.data" |
+   awk '{ s="";
+          for (i=3; i < NF; i++)
+             s = sprintf("%s %s",s,$i);
+          if (done[s] != 1)
+          {
+             done[s] = 1;
+             print $0;
+          }}' >$DBNAME"_nice.data.tmp"
+   mv $DBNAME"_nice.data.tmp" $DBNAME"_nice.data"
+   exit
+fi
+
+if [ "$1" = "synth_seg" ]
+then
+    echo "Synthesizing "$DBNAME"_nice.data to segments"
+    $FESTVOXDIR/src/promptselect/text2utts -o $DBNAME"_seg.data" -itype data -level Segment $DBNAME"_nice.data"
+    exit
+fi
+
+if [ "$1" = "select_seg" ]
+then
+    $0 synth_seg 
+    $FESTVOXDIR/src/promptselect/dataset_select $DBNAME"_seg.data"
+    $FESTVOXDIR/src/promptselect/dataset_subset $DBNAME"_nice.data" $DBNAME"_seg.data.selected" >$DBNAME".done.data"
+    exit
+fi
+
+if [ "$1" = "select_letter" ]
+then
+    if [ $# = 2 ]
+    then
+        NICEDATA=$2
+    else
+        NICEDATA=$DBNAME"_nice.data"
+    fi
+    cat $NICEDATA |
+    awk '{printf("( %s ",$2);
+          for (i=3; i<NF; i++)
+          {
+             for (j=1; j<=length($i); j++)
+             {
+                if (substr($i,j,1) == "\\")
+                {
+                   printf("%s ",substr($i,j,2));
+                   j=j+1;
+                }
+                else
+                   printf("%s ",substr($i,j,1));
+             }
+             printf(" ");
+          }
+          printf(")\n");
+         }' >$DBNAME"_let.data"
+    $FESTVOXDIR/src/promptselect/dataset_select $DBNAME"_let.data"
+    $FESTVOXDIR/src/promptselect/dataset_subset $NICEDATA $DBNAME"_let.data.selected" >$DBNAME".done.data"
+    echo "INFO "$DBNAME".done.data is "`cat $DBNAME.done.data | wc -l`
+    exit
+fi
+
+if [ "$1" = "select_letter_n" ]
+then
+    if [ $# = 3 ]
+    then
+       NICEDATA=$2
+       REQUIRE_N=$3
+    else
+       NICEDATA=$DBNAME"_nice.data"
+       REQUIRE_N=1000
+    fi
+    GOT_N=0;
+    PASS=1;
+    cp -p $NICEDATA $NICEDATA.$PASS
+    rm -f $NICEDATA.all
+    while [ $GOT_N -lt $REQUIRE_N ]
+    do
+       $0 select_letter $NICEDATA.$PASS
+       # rename selected prompts ??
+       NPASS=`echo $PASS | awk '{printf("%d",$1+1)}'`
+       mv $DBNAME.done.data $DBNAME.$PASS.done.data
+       cat $DBNAME.$PASS.done.data >>$NICEDATA.all
+       $FESTVOXDIR/src/promptselect/dataset_minus $NICEDATA.$PASS $DBNAME.$PASS.done.data >$NICEDATA.$NPASS
+       GOT_NEW_N=`cat $DBNAME.$PASS.done.data | wc -l`
+       GOT_N=`echo $GOT_N $GOT_NEW_N | awk '{printf("%d",$1+$2)}'`
+       echo "end of pass $PASS found $GOT_NEW_N prompts, totaling $GOT_N"
+       if [ $GOT_NEW_N = 0 ]   # in case we've used up all the data
+       then
+          GOT_N=$REQUIRE_N
+       fi
+       PASS=$NPASS
+    done
+    mv $NICEDATA.all $DBNAME.done.data
+    rm -f $DBNAME.[1-9]*.done.data $NICEDATA.[1-9]*
+    echo "INFO multipass "$DBNAME".done.data is "`cat $DBNAME.done.data | wc -l`
+    exit
+fi
+
+if [ "$1" = "find_vocab" ]
+then
+    cat $DBNAME.done.data |
+    sed 's/^[^"]*"//g;s/"[ ].*)[ ]*$//' |
+    sed 's/[,.]/ /g' |
+    tr "A-Z¬¿¡ƒ«À…» ŒÕœ—‘”÷€⁄Ÿ‹" "a-z‚‡·‰ÁÎÈËÍÓÌÔÒÙÛˆ˚˙˘¸" |
+    awk '{
+           for (i = 1; i <= NF; i++)
+                freq[$i]++
+         }
+     END {
+         for (word in freq)
+             printf "%s\t%d\n", word, freq[word]
+     }' | sort --key=2 -gr >$DBNAME.vocab
+    exit
+fi
+
+if [ "$1" = "find_vocab_asis" ]
+then
+    cat $DBNAME.done.data |
+    sed 's/^[^"]*"//g;s/"[ ].*)[ ]*$//' |
+    sed 's/[,.]/ /g' |
+    awk '{
+           for (i = 1; i <= NF; i++)
+                freq[$i]++
+         }
+     END {
+         for (word in freq)
+             printf "%s\t%d\n", word, freq[word]
+     }' | sort --key=2 -gr >$DBNAME.vocab
+    exit
+fi
+
+echo make_nice_prompts: unknown options $*
+$0 
+exit 1
+

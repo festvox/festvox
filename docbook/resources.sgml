@@ -1,0 +1,183 @@
+<chapter><title>Resources</title>
+
+<para>
+In this chapter we will try to list some of the important resources 
+available that you may need when building a voice in Festival. This 
+list cannot be complete and comprehensive but we will to give references 
+to meta-resources as well as direct references to information code, data 
+that may be of use to you. 
+</para>
+<para>
+This document itself will be updated occasionally and it is worth 
+checking to ensure that you have the latest copy. 
+</para>
+<para>
+Updates, new databases, new language support etc will happen 
+intermittently, new voices will be released which may help you 
+develop your own new voices. 
+<blockquote><literallayout>
+<ulink url="http://festvox.org">http://festvox.org</ulink>
+</literallayout></blockquote>
+has been set up as a resource center for voices in Festival offering 
+databases, examples and repository for voice distribution. Checking 
+that site regularly is a good thing to do. 
+</para>
+<para>
+Specifically 
+<variablelist>
+<varlistentry>
+<term><ulink url="http://festvox.org/examples/cmu_us_kal_diphone/">
+http://festvox.org/examples/cmu_us_kal_diphone/</ulink></term>
+<listitem><para>
+Offers a complete example US English diphone databes as built using the 
+walkthough in <xref linkend="bsv-usukdiphone-ch">. The originally 
+recorded diphone databases is also available as is, at 
+<ulink url="http://festvox.org/databases/cmu_us_kal_diphone/">
+http://festvox.org/databases/cmu_us_kal_diphone/</ulink>. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><ulink url="http://festvox.org/examples/cmu_time_awb_ldom/">
+http://festvox.org/examples/cmu_time_awb_ldom/</ulink></term>
+<listitem><para>
+Offers a complete example limited domain synthesis database as 
+build using the walkthroughs in <xref linkend="bsv-ldom-ch">. 
+</para></listitem></varlistentry>
+</variablelist>
+Other databases, lexicons etc will be installed on festvox.org as 
+they become available. 
+</para>
+<para>
+There is also a mailing-list <filename>festvox-talk@festvox.org</filename> for 
+discussing aspects of building voices. See 
+<ulink url="http://festvox.org/maillist.html">
+http://festvox.org/maillist.html</ulink> for details of joining it 
+and the archive of messages already sent. Also, while traffic is low, 
+feel free to mail the authors <filename>awb@cs.cmu.edu</filename> or 
+<filename>lenzo@cs.cmu.edu</filename> and we will try to help where we can. 
+</para>
+<sect1><title>Festival resources</title>
+
+<para>
+The Festival home page <ulink
+url="http://www.cstr.ed.ac.uk/projects/festival/">
+http://www.cstr.ed.ac.uk/projects/festival/</ulink> It is updated
+regularly as new developments happen.
+</para>
+<para>
+The Festival Speech Synthesis System code and the Edinburgh Speech 
+Tools library and related programs are available from 
+<blockquote><literallayout>
+<ulink url="ftp://ftp.cstr.ed.ac.uk/pub/festival/">
+ftp://ftp.cstr.ed.ac.uk/pub/festival/</ulink>
+</literallayout></blockquote>
+or in the US at 
+<blockquote><literallayout>
+<ulink url="http://www.festvox.org/festival/downloads.html">
+http://www.festvox.org/festival/downloads.html
+</ulink>
+</literallayout></blockquote>
+Note that precompiled versions of the system are also available 
+from that site, though at time of writing only Linux binaries are 
+available. 
+</para>
+<para>
+Festival comes with its own manual and html, postscript and 
+GNU info format. It and a less comprehensive Speech Tools 
+manual are pre-built in <filename>festdoc-1.4.1.tar.gz</filename>. The 
+manuals are also available on line at 
+<blockquote><literallayout>
+<ulink url="http://www.festvox.org/docs/manual-1.4.2/festival_toc.html">
+http://www.festvox.org/docs/manual-1.4.2/festival_toc.html</ulink>
+<ulink url="http://www.festvox.org/docs/speech_tools-1.2.0/book1.html">
+http://www.festvox.org/docs/speech_tools-1.2.0/book1.htm
+</ulink>
+</literallayout></blockquote>
+You will likely need to reference these manuals often. 
+</para>
+<para>
+It will also be useful to have access to other voices development 
+in Festival as seeing how others solve problems may make 
+things clearer. 
+</para>
+<para>
+In addition to Festival itself a number of other projects throughout 
+the world use Festival and have also released resources. The 
+<quote><emphasis>Related Projects</emphasis></quote> links give urls to other organizations 
+which you may find useful. 
+</para>
+<para>
+<indexterm><primary> US English voices </primary></indexterm>
+<indexterm><primary> Mexican Spanish </primary></indexterm>
+<indexterm><primary> OGI </primary></indexterm>
+It is worth mentioning Oregon Graduate Institute here who have done a 
+lot of work with the system and release other voices for it (US English 
+and Mexican Spanish). See <ulink url="http://cslu.cse.ogi.edu/tts/">
+http://cslu.cse.ogi.edu/tts/</ulink> for more 
+details. 
+</para>
+<para>
+<indexterm><primary> MBROLA </primary></indexterm>
+A second project worth mention, is the MBROLA project <citation>dutoit96</citation> 
+<ulink url="http://tcts.fpms.ac.be/synthesis/mbrola.html">
+http://tcts.fpms.ac.be/synthesis/mbrola.html</ulink>, they offer a 
+waveform synthesis technique <citation>dutoit93</citation> and a number of diphone 
+database for lots of different languages. MBROLA itself doesn't offer a 
+front end, just phone, duration and F0 target to waveform synthesis. 
+(However the do offer a full French TTS system too.) Their diphone 
+databases complement Festival well and a number of projects use MBROLA 
+databases for their waveform synthesis and Festival as the front end. 
+If you lack resources to record and build diphone databases this is a 
+good place to check for existing diphone databases for languages. Most 
+of their databases have some use/distribution restrictions but they 
+usually allow any non-commercial use. 
+</para>
+</sect1>
+
+<sect1><title>General speech resources</title>
+
+<para>
+The network is a vast resource of information but it is 
+not always easy to find what you are looking for. 
+</para>
+<para>
+<indexterm><primary> comp.speech </primary></indexterm>
+Indexes to speech related information are available. The <filename>comp.speech</filename> 
+frequently asked questions maintain by Andrew Hunt, is an excellent 
+constantly updated list of information and resrouces available for 
+speech recognition and synthesis. It is available in html format from 
+<blockquote><literallayout>
+Australia: <ulink url="http://www.speech.su.oz.au/comp.speech/">http://www.speech.su.oz.au/comp.speech/</ulink>
+UK: <ulink url="http://svr-www.eng.cam.ac.uk/comp.speech/">http://svr-www.eng.cam.ac.uk/comp.speech/</ulink>
+Japan: <ulink url="http://www.itl.atr.co.jp/comp.speech/">http://www.itl.atr.co.jp/comp.speech/</ulink>
+USA: <ulink url="http://www.speech.cs.cmu.edu/comp.speech/">
+http://www.speech.cs.cmu.edu/comp.speech/</ulink>
+</literallayout></blockquote>
+</para>
+<para>
+<indexterm><primary> LDC </primary></indexterm>
+<indexterm><primary> Linguistics Data Consortium </primary></indexterm>
+<indexterm><primary> ELRA </primary></indexterm>
+<indexterm><primary> Speech databases </primary></indexterm>
+<indexterm><primary> OGI </primary></indexterm>
+<indexterm><primary> Oregon Graduate Institute </primary></indexterm>
+The Linguistics Data Consortium (LDC), although expensive, offers many 
+speech resources including lexicons and databases suitable for 
+synthesis work. There web page is <ulink url="http://www.ldc.upenn.edu">
+http://www.ldc.upenn.edu</ulink>
+A similar organization is the European Language Resources 
+Association <ulink url="http://www.icp.grenet.fr/ELRA/home.html">
+http://www.icp.grenet.fr/ELRA/home.html</ulink> which 
+is based in Europe. Both these home pages have 
+links to other potential resources. 
+</para>
+<blockquote><literallayout>
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+to be added:
+  recording and EGG information
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+</literallayout></blockquote>
+
+</sect1>
+
+
+</chapter>

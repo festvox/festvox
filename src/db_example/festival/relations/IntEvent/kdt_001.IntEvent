@@ -1,0 +1,15 @@
+#
+0.40000 26 sil ; tilt_start_f0 0.0000 ;
+0.85000 26 c ; tilt_start_f0 120.5340 ;
+1.05000 26 a ; tilt_start_f0 108.7760 ; tilt_amplitude 25.2180 ; tilt_duration 0.2000 ; tilt_tilt 1.0000 ; tilt_peak_pos 0.0000 ; syllink "4" ;
+1.19000 26 c ; tilt_start_f0 133.9940 ;
+1.44000 26 fb ; tilt_start_f0 138.3480 ; tilt_amplitude 32.0580 ; tilt_duration 0.2500 ; tilt_tilt -0.5270 ; tilt_peak_pos 0.0000 ; syllink "5" ;
+1.54000 26 c ; tilt_start_f0 111.0020 ;
+1.75000 26 a ; tilt_start_f0 108.1920 ; tilt_amplitude 16.2360 ; tilt_duration 0.2100 ; tilt_tilt 1.0000 ; tilt_peak_pos 0.0000 ; syllink "7.1" ;
+1.85000 26 c ; tilt_start_f0 124.4280 ;
+2.17000 26 a ; tilt_start_f0 124.5030 ; tilt_amplitude 18.5080 ; tilt_duration 0.3200 ; tilt_tilt -0.1820 ; tilt_peak_pos 0.0000 ; syllink "8.1" ;
+2.44000 26 c ; tilt_start_f0 114.2880 ;
+2.72500 26 m ; tilt_start_f0 98.0190 ; tilt_amplitude 17.0610 ; tilt_duration 0.2850 ; tilt_tilt 0.9840 ; tilt_peak_pos 0.0000 ; syllink "9" ;
+2.96000 26 fb ; tilt_start_f0 114.5310 ; tilt_amplitude 24.0620 ; tilt_duration 0.2350 ; tilt_tilt -0.7970 ; tilt_peak_pos 0.0000 ; syllink "10" ;
+3.04000 26 c ; tilt_start_f0 91.0170 ;
+3.14000 26 sil ; tilt_start_f0 89.8740 ;

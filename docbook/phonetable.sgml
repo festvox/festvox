@@ -1,0 +1,539 @@
+<chapter><title>English phone lists</title>
+
+
+<para>
+Relating phonemes to sounds is not obvious as people think. Even when 
+one is familar with phone sets its easy to make mistakes when reading 
+lists of phones alone. This is particularly true in reading diphone 
+nonsense words. The table provided here are intended for both the 
+experienced and inexperienced reader of phones, to help you decide 
+on the pronunciation. 
+</para>
+<para>
+These tables are not supposed to be a substitute for a good phonetics 
+course, they are intended to give people a basic idea of the 
+pronunciation of the phone sets used in the particaulr examples in this 
+document. Many simplifying assumptions have been made, and often aren't 
+even mentioned. To the phoneticians out there I apologise, as much as 
+the assumptions are wrong we are here listing atomic discrete phones 
+which we have found useful in building practical systems, even though 
+better sets probably exist. 
+</para>
+<sect1 id="bsv-usphoneset-sect">
+<title>US phoneset</title>
+
+<para>
+Inspite of everyone telling you that there is one and only one US 
+phoneset, when it comes to actually using one you quickly discover there 
+are actually many standard one used by lots of different pieces of 
+software, often the difference betwen them is trivial (e.g. case 
+folding) but computers being fundamentally dumb can't take 
+these trivial differences into account. Here we list the 
+<emphasis>radio</emphasis> phoneset which is used by standard US voices in 
+festival. The definition is in <filename>festival/lib/radio_phones.scm</filename>. 
+This list was based on those phones that appear in the Boston 
+University FM radio corpus with minor modifications. The 
+list here is exactly those phones which appear in the diphone 
+nonses words as used in the example explained in 
+<xref linkend="bsv-usukdiphone-ch">.
+<variablelist>
+<varlistentry>
+<term><emphasis>aa</emphasis></term>
+<listitem><para>
+fAther, wAshington 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>ae</emphasis></term>
+<listitem><para>
+fAt, bAd 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>ah </emphasis></term>
+<listitem><para>
+bUt, hUsh 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>ao</emphasis></term>
+<listitem><para>
+lAWn, dOOr, mAll 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>aw</emphasis></term>
+<listitem><para>
+hOW, sOUth, brOWser 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>ax</emphasis></term>
+<listitem><para>
+About, cAnoe 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>ay</emphasis></term>
+<listitem><para>
+hIde, bIble 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>eh</emphasis></term>
+<listitem><para>
+gEt, fEAther 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>el</emphasis></term>
+<listitem><para>
+tabLE, usabLE 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>em</emphasis></term>
+<listitem><para>
+systEM, communisM 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>en</emphasis></term>
+<listitem><para>
+beatEN 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>er</emphasis></term>
+<listitem><para>
+fERtile, sEARch, makER 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>ey</emphasis></term>
+<listitem><para>
+gAte, Ate 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>ih</emphasis></term>
+<listitem><para>
+bIt, shIp 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>iy</emphasis></term>
+<listitem><para>
+bEAt, shEEp 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>ow</emphasis></term>
+<listitem><para>
+lOne, nOse 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>oy</emphasis></term>
+<listitem><para>
+tOY, OYster 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>uh</emphasis></term>
+<listitem><para>
+fUll, wOOd 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>uw</emphasis></term>
+<listitem><para>
+fOOl, fOOd 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>b</emphasis></term>
+<listitem><para>
+Book, aBrupt 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>ch </emphasis></term>
+<listitem><para>
+CHart, larCH 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>d</emphasis></term>
+<listitem><para>
+Done, baD 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>dh</emphasis></term>
+<listitem><para>
+THat, faTHer 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>f</emphasis></term>
+<listitem><para>
+Fat, lauGH 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>g</emphasis></term>
+<listitem><para>
+Good, biGGer 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>hh</emphasis></term>
+<listitem><para>
+Hello, loopHole 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>jh</emphasis></term>
+<listitem><para>
+diGit, Jack 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>k</emphasis></term>
+<listitem><para>
+Camera, jaCK, Kill 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>l</emphasis></term>
+<listitem><para>
+Late, fuLL 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>m</emphasis></term>
+<listitem><para>
+Man, gaMe 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>n</emphasis></term>
+<listitem><para>
+maN, New 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>ng</emphasis></term>
+<listitem><para>
+baNG, sittiNG 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>p</emphasis></term>
+<listitem><para>
+Pat, camPer 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>r</emphasis></term>
+<listitem><para>
+Reason, caR, 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>s</emphasis></term>
+<listitem><para>
+Sit, maSS 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>sh</emphasis></term>
+<listitem><para>
+SHip, claSH 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>t</emphasis></term>
+<listitem><para>
+Tap, baT 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>th</emphasis></term>
+<listitem><para>
+THeatre, baTH 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>v</emphasis></term>
+<listitem><para>
+Various, haVe 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>w</emphasis></term>
+<listitem><para>
+Water, cobWeb 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>y</emphasis></term>
+<listitem><para>
+Yellow, Yacht 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>z</emphasis></term>
+<listitem><para>
+Zero, quiZ, boyS 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>zh</emphasis></term>
+<listitem><para>
+viSion, caSual 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>pau</emphasis></term>
+<listitem><para>
+short silence 
+</para></listitem></varlistentry>
+</variablelist>
+In addition to the phone sthemselves the nonsense word generated by 
+the diphone schema also have some other notations to denote different 
+type of phone. 
+</para>
+<para>
+The use of <emphasis>-</emphasis> (hyphen) in the nonsense word itself is used to denot 
+an explicit syllable boundary. Thus <varname>pau t aa n - k aa pau</varname> 
+is used to state that the word should be pronounced as <varname>tan ka</varname> 
+rather than <varname>tank ah</varname>. Where no explicit syllable boundary 
+is given the pronunciation should be pronounce naturally without 
+any boundary (which is probably too underspecified in some cases). 
+</para>
+<para>
+The use of <emphasis>_</emphasis> (underscore) in phone names is used to denote 
+consonant clusters. That is <varname>t_-_r</varname> is the /tr/ as found 
+in <varname>trip</varname> not that in <varname>cat run</varname>. 
+</para>
+</sect1>
+
+<sect1 id="bsv-ukphoneset-sect">
+<title>UK phoneset</title>
+
+<para>
+This phoneset developed at CSTR a number of years ago is for 
+Southern UK English (RP, "received pronunciation"). Its 
+definition is in <filename>festival/lib/mrpa_phones.scm</filename>. 
+<variablelist>
+<varlistentry>
+<term><emphasis>uh</emphasis></term>
+<listitem><para>
+cUp, dOne 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>e</emphasis></term>
+<listitem><para>
+bEt, chEck 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>a</emphasis></term>
+<listitem><para>
+cAt, mAtch 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>o</emphasis></term>
+<listitem><para>
+cOttage, hOt 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>i</emphasis></term>
+<listitem><para>
+bIt, shIp 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>u</emphasis></term>
+<listitem><para>
+pUll, fOOt, bOOk 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>ii</emphasis></term>
+<listitem><para>
+bEAt, shEEp 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>uu</emphasis></term>
+<listitem><para>
+pOOl, bOOt 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>oo</emphasis></term>
+<listitem><para>
+AUthor, cOURt 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>aa</emphasis></term>
+<listitem><para>
+ARt, hEARt 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>@@</emphasis></term>
+<listitem><para>
+sEARch, bURn 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>ai</emphasis></term>
+<listitem><para>
+bIte, mIght, lIke 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>ei</emphasis></term>
+<listitem><para>
+Ate, mAIl 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>oi</emphasis></term>
+<listitem><para>
+tOY, OYster 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>au</emphasis></term>
+<listitem><para>
+sOUth, hOW 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>ou</emphasis></term>
+<listitem><para>
+hOle, cOAt 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>e@</emphasis></term>
+<listitem><para>
+AIR, bARE, chAIR 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>i@</emphasis></term>
+<listitem><para>
+EAR, bEER 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>u@</emphasis></term>
+<listitem><para>
+sUre, jUry 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>@</emphasis></term>
+<listitem><para>
+About, arlAs, equipmEnt 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>p</emphasis></term>
+<listitem><para>
+Pat, camPer 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>t</emphasis></term>
+<listitem><para>
+Tap, baT 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>k</emphasis></term>
+<listitem><para>
+Camera, jaCK, Kill 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>b</emphasis></term>
+<listitem><para>
+Book, aBrupt 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>d</emphasis></term>
+<listitem><para>
+Done, baD 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>g</emphasis></term>
+<listitem><para>
+Good, biGGer 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>s</emphasis></term>
+<listitem><para>
+Sit, maSS 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>z</emphasis></term>
+<listitem><para>
+Zero, quiZ, boyS 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>sh</emphasis></term>
+<listitem><para>
+SHip, claSH 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>zh</emphasis></term>
+<listitem><para>
+viSion, caSual 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>f</emphasis></term>
+<listitem><para>
+Fat, lauGH 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>v</emphasis></term>
+<listitem><para>
+Various, haVe 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>th</emphasis></term>
+<listitem><para>
+THeatre, baTH 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>dh</emphasis></term>
+<listitem><para>
+THat, faTHer 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>ch </emphasis></term>
+<listitem><para>
+CHart, larCH 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>jh</emphasis></term>
+<listitem><para>
+diGit, Jack 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>h</emphasis></term>
+<listitem><para>
+Hello, loopHole 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>m</emphasis></term>
+<listitem><para>
+Man, gaMe 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>n</emphasis></term>
+<listitem><para>
+maN, New 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>ng</emphasis></term>
+<listitem><para>
+baNG, sittiNG 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>l</emphasis></term>
+<listitem><para>
+Late, bLack 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>y</emphasis></term>
+<listitem><para>
+Yellow, Yacht 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>r</emphasis></term>
+<listitem><para>
+Reason, caReer, 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>w</emphasis></term>
+<listitem><para>
+Water, cobWeb 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>#</emphasis></term>
+<listitem><para>
+short silence 
+</para></listitem></varlistentry>
+</variablelist>
+</para>
+<para>
+In addition to the phone sthemselves the nonsense word generated by 
+the diphone schema also have some other notations to denote different 
+type of phone. 
+</para>
+<para>
+The use of <emphasis>-</emphasis> (hyphen) in the nonsense word itself is used to denot 
+an explicit syllable boundary. Thus <varname>pau t aa n - k aa pau</varname> 
+is used to state that the word should be pronounced as <varname>tan ka</varname> 
+rather than <varname>tank ah</varname>. Where no explicit syllable boundary 
+is given the pronunciation should be pronounce naturally without 
+any boundary (which is probably too underspecified in some cases). 
+</para>
+<para>
+The use of <emphasis>_</emphasis> (underscore) in phone names is used to denote 
+consonant clusters. That is <varname>t_-_r</varname> is the /tr/ as found 
+in <varname>trip</varname> not that in <varname>cat run</varname>. 
+</para>
+<para>
+
+</para>
+</sect1>
+
+
+</chapter>

@@ -1,0 +1,150 @@
+#!/bin/bash
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                     Carnegie Mellon University                        ##
+##                         Copyright (c) 2014                            ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Author: Alan W Black (awb@cs.cmu.edu) Nov 2014                       ##
+##                                                                       ##
+###########################################################################
+##
+##  Reduce the number of senones in a spectral model.
+##  We borrow the term senone from CMU Sphinx.  Here we call the 
+##  gaussians at the leafs of the tree "senones".  They consist of means
+##  and standard deviations of each coefficient.  Here we are trying to
+##  share these sets of gaussians over different leafs of the tree to make
+##  the model smaller.  
+##
+##  This is primarily for reducing the number of numbers in a flite
+##  voice but it can also reduce the number of numbers in a festival voice
+##
+##  Usage:
+##    reduce_param_frames cmu_us_rms_mcep.tree cmu_us_rms_mcep.params
+##    will replace given arguments to reduced new ones, old ones will be
+##    places in XXX.orig
+## 
+##  But this isn't good enough to actually use.  It give better results than
+##  halfing the amount of data used in training, but the quality goes down
+##  too much.
+## 
+###########################################################################
+LANG=C; export LANG
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ ! "$FESTVOXDIR" ]
+then
+   echo "environment variable FESTVOXDIR is unset"
+   echo "set it to your local festvox directory e.g."
+   echo '   bash$ export FESTVOXDIR=/home/awb/projects/festvox/'
+   echo or
+   echo '   csh% setenv FESTVOXDIR /home/awb/projects/festvox/'
+   exit 1
+fi
+
+if [ "$SIODHEAPSIZE" = "" ]
+then
+   SIODHEAPSIZE=20000000
+   export SIODHEAPSIZE
+fi
+
+TREES=$1
+PARAMS=$2
+
+## Prefix for intermediate files
+RPF=rpf_$$
+
+## Find the reduce set, with wagon and the stop list
+## We reduce the number by about 10 percent
+echo "Use Wagon to find param reductions"
+echo "   Prepare params as input features to wagon"
+$ESTDIR/bin/ch_track $2 |
+awk '{printf("%d %s\n",NR-1,$0)}' >$RPF.data
+num_frames=`cat $RPF.data | awk 'END {printf NR}'`
+
+# So it'll run faster while debugging
+#traintest $RPF.data
+#mv $RPF.data.test $RPF.data
+
+## Maybe you want to optimize on minimizing only the means distances
+## (or maybe the variances distances ??)
+awk '{if (NR == 1) print NF}' $RPF.data |
+awk '{printf("(\n") 
+      printf("( occurid vector)\n")
+      for (i=2; i<=$1; i++)
+      {
+           printf("( param_%d float)\n",i);
+      }
+      printf(")\n")}' >$RPF.desc
+STOP=2
+echo "   Data has $num_frames will use stop value $STOP"
+
+# We don't care about train/test, this is for compression of a closed dataset
+echo "   Calling wagon to find best clusters (may take sometime)"
+$ESTDIR/bin/wagon -track_feats 2,4,6,8,10,12,14,16,18,20,22,24 -desc $RPF.desc -data $RPF.data -stop $STOP -track $PARAMS -output $RPF.tree
+
+grep "((((" $RPF.tree | awk 'END {printf("   found %s new leafs (stop '$STOP')\n", NR)}'
+
+echo "Process tree to number the new senones"
+## Create the NEWPARAMS file (and its numbering)
+$ESTDIR/../festival/bin/festival -b --heap $SIODHEAPSIZE $FESTVOXDIR/src/clustergen/clustergen_build.scm '(rpf_dump_tree "'$RPF.tree'" "'$RPF.newtree'" "'$RPF.newrawparams'")'
+
+## Building mapping table from old param number to new param number
+echo "Build mapping table"
+$ESTDIR/bin/wagon_test -desc $RPF.desc -tree $RPF.newtree -predict -data $RPF.data | tr -d "()" | awk '{printf("( %d %d )\n",NR-1,$1)}' >$RPF.map
+
+## Relabel the TREES mapped to the NEWPARAMS
+echo "Relabel trees with mapped param number"
+$ESTDIR/../festival/bin/festival -b --heap $SIODHEAPSIZE $FESTVOXDIR/src/clustergen/clustergen_build.scm '(rpf_map_trees "'$TREES'" "'$RPF.newtrees'" "'$RPF.map'")'
+
+## Save old versions
+mv $TREES $TREES.orig
+mv $PARAMS $PARAMS.orig
+
+mv $RPF.newtrees $TREES
+cat $RPF.newrawparams |
+awk '{for (i=1; i<=NF; i+=2)
+         printf("%s ",$i);
+      printf("\n")}' |
+$ESTDIR/bin/ch_track -itype ascii -otype est_binary -s 0.005 -o $PARAMS
+
+rm -f $RPF.*
+
+exit 0
+
+

@@ -1,0 +1,42 @@
+#+TITLE: How to build a phrasyn model for festvox voices
+#+AUTHOR: Alok Parlikar
+#+DATE: <2011-09-29 Thu>
+ 
+* Preparation Steps
+  1. Build a full clustergen voice first. Make sure it works.
+  2. If you are using a language other than US, make sure that the
+     INST_LANG_VOX_tagger.scm contains tags called pos_0, ..., pos_15
+     which will be used as the gpos tags for that language.
+
+* Building the Model
+  The basic command to build the phrasyn model is:
+
+  $FESTVOXDIR/src/phrasyn/do_phrasyn do_all etc/txt.done.data \
+     $MODE $NTCOUNT $STOPVAL
+
+  For English voices, use MODE = pos
+  For Non-English voices, use MODE = gpos
+  
+  NTCOUNT is the number of non-terminals in the SCFG. 10 is a
+  reasonable number. 
+
+  STOPVAL is the stop value for CART training. Use 5--50 depending on
+  the size of the data. 
+
+* Configuring the Model  
+  Edit festvox/clustergen.scm, and set all the cg:phrasyn variables to
+  the appropriate value.
+
+* Testing the Model
+  You can test your model if you have:
+  - festival/utts
+  - prompt-utt
+
+    
+  Run this:
+
+  $FESTVOXDIR/src/phrasyn/test_phrasyn etc/txt.done.data.test
+
+  This will print F1 measures of:
+  a) prompt-utt vs festival/utts (baseline performance)
+  b) synthsized utts vs festival/utts (model performance)

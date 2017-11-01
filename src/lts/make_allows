@@ -1,0 +1,102 @@
+#!/bin/sh
+###########################################################################
+##                                                                       ##
+##                  Language Technologies Institute                      ##
+##                     Carnegie Mellon University                        ##
+##                         Copyright (c) 2005-2006                       ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Auto build allowables from a lexicon file                            ##
+##                                                                       ##
+###########################################################################
+
+cat alllets.out |
+sort -u |
+tr -d ",.*/" >alets.out
+
+echo "(require 'lts_build)"
+echo "(%%stack-limit 10000000 nil)"
+echo "(setq allowables '("
+echo "(# #)"
+
+# Find global phone frequency 
+cat allphones.out |
+awk '{ for (i=1; i<=NF; i++)
+       {
+          freq[$i]++;
+          t++;
+          if (i<NF)
+          {
+             d=sprintf("%s-%s",$i,$(i+1));
+             freq[d]++
+             t++;
+          }
+       }
+     }
+     END {printf("'"'"'BEGIN {\n");
+          for (word in freq)
+             printf("gfreq[\"%s\"] = %04f;\n", word, (freq[word]*1.0)/t);
+          printf("}'"'"'\n");
+         }' >phonefreqs.out
+
+for i in `cat alets.out`
+do
+   echo "( \"$i\""
+   echo _epsilon_
+   cat let2phones.out |
+   awk '{if ($1 == "'"$i"'")
+         {
+           for (i=2; i<=NF; i++)
+           {
+              freq[$i]++;
+              if (i<NF)
+              {
+                 d=sprintf("%s-%s",$i,$(i+1));
+                 freq[d]++
+              }
+           }}}
+     END {
+         for (word in freq)
+         {
+             printf("%s %d\n", word, freq[word]);
+         }
+     }' |
+     awk '{freq[$1] = $2; t+=$2}
+         END {for (word in freq)
+                printf("%s %f\n",word,freq[word]/(t*1.0));
+             }' | sort --key=2 -gr |
+     awk '{t += $2;
+           if (NR < 3)
+              printf("%s\n",$1);
+           else if (t < 0.8)
+              printf("%s\n",$1);}'
+   echo ")"
+done
+echo "))"
+

@@ -1,0 +1,49 @@
+ACKNOWLEDGEMENTS
+
+This document was originally written with KAL when AWB was a visiting
+scientist at the Robotics Institute at Carnegie Mellon University
+(Fall 98).  Later versions were done after AWB moved to LTI at CMU,
+which include substantial new content.
+
+Thanks goes to
+
+Suresh Bazaj/Hear2Read for continuing funding the INDIC support
+Richard Sproat (UIUC)
+   Who contributed unitrans for translating unicode characters into
+   probably phoneme sequences, used in the grapheme based builds
+   Their work is released under an apache free software license.
+Alok Parlikar
+   parallel support, Indic support
+Sunayana Sitaram
+   Indic support and grapheme support
+Gopala Anumanchipalli
+   SPAM prosody modeling
+Kishore Prahallad
+   ehmm and other fixes
+Raj Reddy:
+   for inviting AWB to CMU to allow him to work with KAL
+CMU:
+   for funding AWB's original visit (he liked it so much he came back)
+Edinburgh University:
+   For releasing Festival and the Speech Tools as free software, and
+   making it well-designed, stable and portable.  Also for the basic
+   config setup (which RJC wrote).  
+Cepstral, LLC (www.cepstral.com)
+   Who have provided bug fixes, corrections and improvements, in early
+   versions of this work.
+US National Science Foundation
+   Who funded part of the work on automatic labelling, and evaluation
+   protocols
+OGI:
+   for hosting a workshop in June 98 to build a German voice in Festival
+   which showed the need for a document/tools such as this.
+Maria Wolters, Borja Etxebarria, Mike Macon, Argyris Biris, 
+Stephen Robert Norris, Karin Mueller, Bettina Saeuberlich, 
+Horst Meyer, Gregor Moehler, Mark Breitenbuech, Dominika Oliver, 
+Tae-Yeoub Jang and Weonhee Yun:
+   Who persevered in building voices in Festival without this document,
+   asking questions and finding problems that made it easier to decide
+   what should be included here.  We apologise to them as with this
+   documentation their projects would have been much easier.
+VA Linux (http://www.valinux.com):
+   For donating hardware that hosted the original festvox.org.

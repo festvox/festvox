@@ -1,0 +1,735 @@
+<chapter id="bsv-lexicons-ch"><title>Lexicons</title>
+
+<para>
+This chapter covers method for finding the pronunciation of 
+a word. This is either by a lexicon (a large list of words 
+and their pronunciations) or by some method of letter to 
+sound rules. 
+</para>
+<sect1><title>Word pronunciations</title>
+
+<para>
+A pronunciation in Festival requires not just a list of 
+phones but also a syllabic structure. In some languages the 
+syllabic structure is very simple and well defined and 
+can be unambiguously derived from a phone string. In English 
+however this may not always be the case (compound nouns 
+being the difficult case). 
+</para>
+<para>
+The lexicon structure that is basically available in Festival takes both 
+a word and a part of speech (and arbitrary token) to find the given 
+pronunciation. For English this is probably the optimal form, although 
+there exist homographs in the language, the word itself and a fairly 
+broad part of speech tag will mostly identify the proper pronunciation. 
+</para>
+<para>
+An example entry is 
+<blockquote><literallayout>
+("photography"
+ n
+ (((f @ ) 0) ((t o g) 1) ((r @ f) 0) ((ii) 0)))
+</literallayout></blockquote>
+Not that in addition to explicit marking of syllables a stress 
+value is also given (0 or 1). In some languages lexical is 
+fully predictable, in others highly irregular. In some this 
+field may be more appropriately used for an other purpose, 
+e.g. tone type in Chinese. 
+</para>
+<para>
+There may be other languages which require a more complex (less 
+complex) format and the decision to use some other format rather 
+than this one is up to you. 
+</para>
+<para>
+<indexterm><primary> morphology </primary></indexterm>
+Currently there is only residual support for morphological analysis in 
+Festival. A finite state transducer based analyzer for English based on 
+the work in <citation>ritchie92</citation> is included in 
+<filename>festival/lib/engmorph.scm</filename> and 
+<filename>festival/lib/engmorphsyn.scm</filename>. But this should be considered 
+experimental at best. Give the lack of such an analyzer our lexicons 
+need to list not only based forms of words but also all their 
+morphological variants. This is (more or less) acceptable in languages 
+such as English or French but which languages with richer morphology 
+such as German it may seem an unnecessary requirement. Agglutenative 
+languages such as Finnish and Turkish this appears to be even more a 
+restriction. This is probably true but this current restriction 
+not necessary hopeless. We have successfully build very good 
+letter-to-sound rules for German, a language with a rich morphology 
+which allows the system to properly predict pronunciations of 
+morphological variants of root words it has not seen before. 
+We have not yet done any experiments with Finnish or Turkish 
+but see this technique would work, (though of course developing 
+a properly morphological analyzer would be better). 
+</para>
+</sect1>
+
+<sect1><title>Lexicons and addenda</title>
+
+<para>
+The basic assumption in Festival is that you will have a large lexicon, 
+tens of thousands of entries, that is a used as a standard part of an 
+implementation of a voice. Letter-to-sound rules are used as back up 
+when a word is not explicitly listed. This view is based on how English 
+is best dealt with. However this is a very flexible view, An explicit 
+lexicon isn't necessary in Festival and it may be possible to do much of 
+the work in letter-to-sound rules. This is how we have implemented 
+Spanish. However even when there is strong relationship between the 
+letters in a word and their pronunciation we still find the a lexicon 
+useful. For Spanish we still use the lexicon for symbols such as 
+<quote><emphasis>$</emphasis></quote>, <quote><emphasis>%</emphasis></quote>, individual letters, as well as irregular 
+pronunciations. 
+</para>
+<para>
+In addition to a large lexicon Festival also supports a smaller list 
+called an <emphasis>addenda</emphasis> this is primarily provided to allow specific 
+applications and users to add entries that aren't in the existing 
+lexicon. 
+</para>
+</sect1>
+
+<sect1><title>Out of vocabulary words</title>
+
+<para>
+Because its impossible to list all words in a natural language for 
+general text-to-speech you will need to provide something to pronounce 
+out of vocabulary words. In some languages this is easy but in other's 
+it is very hard. No matter what you do you <emphasis>must</emphasis> provide 
+something even if it is simply replacing the unknown word with the word 
+<quote><emphasis>unknown</emphasis></quote> (or its local language equivalent). By default a lexicon 
+in Festival will throw an error if a requested word isn't found. To 
+change this you can set the <varname>lts_method</varname>. Most usefully you can 
+reset this to the name of function, which takes a word and a part of 
+speech specification and returns a word pronunciation as described above. 
+</para>
+<para>
+For example is we are always going to return the 
+word <varname>unknown</varname> but print a warning the the word is being 
+ignored a suitable function is 
+<blockquote><literallayout>
+(define (mylex_lts_function word feats)
+"Deal with out of vocabulary word."
+  (format t "unknown word: %s\n" word)
+  '("unknown" n (((uh n) 1) ((n ou n) 1))))
+</literallayout></blockquote>
+Note the pronunciation of <quote><emphasis>unknown</emphasis></quote> must be in the appropriate 
+phone set. Also the syllabic structure is required. You need to 
+specify this function for your lexicon as follows 
+<blockquote><literallayout>
+(lex.set.lts.method 'mylex_lts_function)
+</literallayout></blockquote>
+</para>
+<para>
+At one level above merely identifying out of vocabulary words, they can 
+be spelled, this of course isn't ideal but it will allow the basic 
+information to be passed over to the listener. This can be done 
+with the out of vocabulary function, as follows. 
+<blockquote><literallayout>
+(define (mylex_lts_function word feats)
+"Deal with out of vocabulary words by spelling out the letters in the
+word."
+ (if (equal? 1 (length word))
+     (begin
+       (format t "the character %s is missing from the lexicon\" word)
+       '("unknown" n (((uh n) 1) ((n ou n) 1))))
+     (cons
+      word
+      'n
+      (apply
+       append
+       (mapcar
+        (lambda (letter)
+         (car (cdr (cdr (lex.lookup letter 'n)))))
+        (symbolexplode word))))))
+</literallayout></blockquote>
+A few point are worth noting in this function. This recursively calls 
+the lexical lookup function on the characters in a word. Each letter 
+should appear in the lexicon with its pronunciation (in isolation). 
+But a check is made to ensure we don't recurse for ever. The 
+<varname>symbolexplode</varname> function assumes that that letters are single 
+bytes, which may not be true for some languages and that function would 
+need to be replaced for that language. Note that we append the 
+syllables of each of the letters in the word. For long words this might 
+be too naive as there could be internal prosodic structure in such a 
+spelling that this method would not allow for. In that case you would 
+want letters to be words thus the symbol explosion to happen at the 
+token to word level. Also the above function assumes that the part of 
+speech for letters is <varname>n</varname>. This is only really important where 
+letters are homographs in languages so this can be used to distinguish 
+which pronunciation you require (cf. <quote><emphasis>a</emphasis></quote> in English or <quote><emphasis>y</emphasis></quote> in 
+French). 
+</para>
+</sect1>
+
+<sect1><title>Building letter-to-sound rules by hand</title>
+
+<para>
+<indexterm><primary> letter-to-sound rules by hand
+</primary></indexterm> <indexterm><primary> LTS </primary></indexterm>
+For many languages there is a systematic relationship between the
+written form of a word and its pronunciation. For some languages this
+can be fairly easy to write down, by hand. In Festival there is a
+letter to sound rule system that allows rules to be written, but we
+also provided a method for building rule sets automatically which will
+often be more useful.  The choice of using hand-written or
+automatically trained rules depends on the language you are dealing
+with and the relationship it has between its orthography and its phone
+set.
+</para>
+<para>
+For well defined languages like Spanish and Croatian writting rules by
+hand can be more simple than training.  Training requires an existing
+set of lexical entries to train from and that may be your decision
+criteria.  Hand written letter to sound rules are context dependent
+re-write rules which are applied in sequence mapping strings letters
+to string of phones (though the system does not explicitly care what
+the types of the strings actually will be used for.
+</para>
+<para>
+The basic form of the rules is
+<blockquote><literallayout>
+( LC [ alpha ] RC => beta )
+</literallayout></blockquote>
+Which is interpreter as <varname>alpha</varname>, a string
+of one or more symbols on the input tape is written to 
+<varname>beta</varname>, a string of zero or more symbols on
+the output tape, when in the presence of <varname>LC</varname>,
+a left context of zero or more input symbols, and <varname>RC</varname>
+a right context on zero or more input symbols.  Note the input
+tape and the output tape are different, allthough the input and
+output alphabets need not be distinct the left hand
+side of a rule only can refer to the input tape and never to anything
+that has been produce by a right hand side.  Thus 
+rules within a ruleset cannot "feed" or "bleed" themselves.  It is
+possible to cascade multiple rule sets, but we will discuss that
+below.
+</para>
+<para>
+For example to desl with the pronunciation of the letters "ch" 
+word initially in English we may right two rules like this
+<blockquote><literallayout>
+( # [ c h ] r => k )
+( # [ c h ] => ch )
+</literallayout></blockquote>
+To deal with words like "christmas", and "chair".  Note the
+<varname>#</varname> symbol is special and used to denote
+a word boundary.  LTS rule may refer to word boundary but cannot refer
+to prevous or following words, you would need to do this with
+some form of post-lexical rule (See <xref linkend="bsv-postlexical-sect">)
+where the word is within some context.  In the above rules we are
+mapping <emphasis>two</emphasis> letters <emphasis>c</emphasis>
+and <emphasis>h</emphasis> to a single phone <emphasis>k</emphasis>
+or <emphasis>ch</emphasis>.  Also note the order of these rules.
+The first rule is more specific than the second.  This is should
+appear first to deal with the specific case.  In the order were
+reversed <varname>k</varname> could never apply as the <varname>ch</varname>
+would cover that case too.
+</para>
+<para>
+Thus LTS rules should be written with the most specific cases first
+and typically end in a default case.  Their should be a default
+case for all individual letters in the language's alphabet without
+and context restrictions mapping to some default phone.  Therefore
+following the above rules there would be other <varname>c</varname>
+rules with various contexts but the final one should probably be
+<blockquote><literallayout>
+( [ c ] => k )
+</literallayout></blockquote>
+</para>
+<para>
+As it is a common error in writting these rules, it is worth
+repeating.  If a rule set is to be universally applicable
+<emphasis>all</emphasis> letters in the input alphabet must have at a
+rule mapping them to some phone.
+</para>
+<para>
+The section to be mapped (within square brackets) and the section it
+is mapped into (after the "=>") must be items in the input and output
+alphabets and may not include sets or regular expression operators.
+This does mean more rules need to be explicitly written than you
+might like, but that will also help you not forget some rules
+that are required.
+</para>
+<para>
+For some languages it is conveninet to write a number of rules sets.
+For example, one to map the input in lower case, and maybe deal with
+alternate treatments of accent characters e.g. re-write the ASCII "e'"
+as <comment>AWB: e acute</comment>.  Also we have used rule tests to
+post process the generated phone string to add stress and syllable
+breaks.
+</para>
+<para>
+Finally some people have stressed that writing good letter to sound
+rules is hard.  We would disagree with this, from our experience
+writing good letter to sound rules by hand is
+<emphasis>very</emphasis> hard and <emphasis>very</emphasis> skilled
+and <emphasis>very</emphasis> laborious.  For anything but the
+simplest of languages writting rules by hand requires much more
+time that people typically have, and will still contain errors (even
+with an exception list).  However hand rules sets may be ideal
+in some circumstances.
+</para>
+</sect1>
+
+<sect1><title>Building letter-to-sound rules automatically</title>
+
+<para>
+For some languages the writing of a rule system is too difficult. 
+Although there have been many valiant attempts to do so for languages 
+like English life is basically too short to do this. Therefore we also 
+include a method for automatically building LTS rules sets for a lexicon 
+of pronunciations. This technique has successfully been used from 
+English (British and American), French and German. The difficulty and 
+appropriateness of using letter-to-sound rules is very language 
+dependent, 
+</para>
+<para>
+The following outlines the processes involved in building a letter to 
+sound model for a language given a large lexicon of pronunciations. 
+This technique is likely to work for most European languages (including 
+Russian) but doesn't seem particularly suitable for very language 
+alphabet languages like Japanese and Chinese. The process described 
+here is not (yet) fully automatic but the hand intervention required is 
+small and may easily be done even by people with only a very little 
+knowledge of the language being dealt with. 
+</para>
+<para>
+The process involves the following steps 
+<itemizedlist mark=bullet>
+<listitem><para>
+
+Pre-processing lexicon into suitable training set 
+</para></listitem>
+<listitem><para>
+
+Defining the set of allowable pairing of letters to phones. (We intend 
+to do this fully automatically in future versions). 
+</para></listitem>
+<listitem><para>
+
+Constructing the probabilities of each letter/phone pair. 
+</para></listitem>
+<listitem><para>
+
+Aligning letters to an equal set of phones/_epsilons_. 
+</para></listitem>
+<listitem><para>
+
+Extracting the data by letter suitable for training. 
+</para></listitem>
+<listitem><para>
+
+Building CART models for predicting phone from letters (and context). 
+</para></listitem>
+<listitem><para>
+
+Building additional lexical stress assignment model (if necessary). 
+</para></listitem>
+</itemizedlist>
+All except the first two stages of this are fully automatic. 
+</para>
+<para>
+Before building a model its wise to think a little about what you want 
+it to do. Ideally the model is an auxiliary to the lexicon so only 
+words not found in the lexicon will require use of the letter-to-sound 
+rules. Thus only unusual forms are likely to require the rules. More 
+precisely the most common words, often having the most non-standard 
+pronunciations, should probably be explicitly listed always. It is 
+possible to reduce the size of the lexicon (sometimes drastically) by 
+removing all entries that the training LTS model correctly predicts. 
+</para>
+<para>
+Before starting it is wise to consider removing some entries from the 
+lexicon before training, I typically will remove words under 4 letters 
+and if part of speech information is available I remove all function 
+words, ideally only training from nouns verbs and adjectives as these 
+are the most likely forms to be unknown in text. It is useful to have 
+morphologically inflected and derived forms in the training set as it is 
+often such variant forms that not found in the lexicon even though their 
+root morpheme is. Note that in many forms of text, proper names are the 
+most common form of unknown word and even the technique presented here 
+may not adequately cater for that form of unknown words (especially if 
+they unknown words are non-native names). This is all stating that this 
+may or may not be appropriate for your task but the rules generated by 
+this learning process have in the examples we've done been much better 
+than what we could produce by hand writing rules of the form described 
+in the previous section. 
+</para>
+<para>
+First preprocess the lexicon into a file of lexical entries to be used 
+for training, removing functions words and changing the head words to 
+all lower case (may be language dependent). The entries should be of 
+the form used for input for Festival's lexicon compilation. Specifically 
+the pronunciations should be simple lists of phones (no 
+syllabification). Depending on the language, you may wish to remove the 
+stressing---for examples here we have though later tests suggest that we 
+should keep it in even for English. Thus the training set should look 
+something like 
+<blockquote><literallayout>
+("table" nil (t ei b l))
+("suspicious" nil (s @ s p i sh @ s))
+</literallayout></blockquote>
+It is best to split the data into a training set and a test set 
+if you wish to know how well your training has worked. In our 
+tests we remove every tenth entry and put it in a test set. Note this 
+will mean our test results are probably better than if we removed 
+say the last ten in every hundred. 
+</para>
+<para>
+The second stage is to define the set of allowable letter to phone 
+mappings irrespective of context. This can sometimes be initially done 
+by hand then checked against the training set. Initially construct a 
+file of the form 
+<blockquote><literallayout>
+(require 'lts_build)
+(set! allowables 
+      '((a _epsilon_)
+        (b _epsilon_)
+        (c _epsilon_)
+        ...
+        (y _epsilon_)
+        (z _epsilon_)
+        (# #)))
+</literallayout></blockquote>
+All letters that appear in the alphabet should (at least) map to 
+<varname>_epsilon_</varname>, including any accented characters that appear in that 
+language. Note the last two hashes. These are used by to denote 
+beginning and end of word and are automatically added during training, 
+they must appear in the list and should only map to themselves. 
+</para>
+<para>
+To incrementally add to this allowable list run festival as 
+<blockquote><literallayout>
+festival allowables.scm 
+</literallayout></blockquote>
+and at the prompt type 
+<blockquote><literallayout>
+festival> (cummulate-pairs "oald.train")
+</literallayout></blockquote>
+with your train file. This will print out each lexical entry 
+that couldn't be aligned with the current set of allowables. At the 
+start this will be every entry. Looking at these entries add 
+to the allowables to make alignment work. For example if the 
+following word fails 
+<blockquote><literallayout>
+("abate" nil (ah b ey t)) 
+</literallayout></blockquote>
+Add <varname>ah</varname> to the allowables for letter <varname>a</varname>, <varname>b</varname> to 
+<varname>b</varname>, <varname>ey</varname> to <varname>a</varname> and <varname>t</varname> to letter <varname>t</varname>. After 
+doing that restart festival and call <varname>cummulate-pairs</varname> again. 
+Incrementally add to the allowable pairs until the number of failures 
+becomes acceptable. Often there are entries for which there is no real 
+relationship between the letters and the pronunciation such as in 
+abbreviations and foreign words (e.g. "aaa" as "t r ih p ax l ey"). For 
+the lexicons I've used the technique on less than 10 per thousand fail 
+in this way. 
+</para>
+<para>
+It is worth while being consistent on defining your set of allowables. 
+(At least) two mappings are possible for the letter sequence 
+<varname>ch}---havin</varname> letter <varname>c</varname> go to phone <varname>ch</varname> and letter 
+<varname>h</varname> go to <varname>_epsilon_</varname> and also letter <varname>c</varname> go to phone 
+<varname>_epsilon_</varname> and letter <varname>h</varname> goes to <varname>ch</varname>. However only 
+one should be allowed, we preferred <varname>c</varname> to <varname>ch</varname>. 
+</para>
+<para>
+It may also be the case that some letters give rise to more than one 
+phone. For example the letter <varname>x</varname> in English is often pronounced as 
+the phone combination <varname>k</varname> and <varname>s</varname>. To allow this, use the 
+multiphone <varname>k-s</varname>. Thus the multiphone <varname>k-s</varname> will be predicted 
+for <varname>x</varname> in some context and the model will separate it into two 
+phones while it also ignoring any predicted <varname>_epsilons_</varname>. Note that 
+multiphone units are relatively rare but do occur. In English, letter 
+<varname>x</varname> give rise to a few, <varname>k-s</varname> in <varname>taxi</varname>, <varname>g-s</varname> in 
+<varname>example</varname>, and sometimes <varname>g-zh</varname> and <varname>k-sh</varname> in 
+<varname>luxury</varname>. Others are <varname>w-ah</varname> in <varname>one</varname>, <varname>t-s</varname> in 
+<varname>pizza</varname>, <varname>y-uw</varname> in <varname>new</varname> (British), <varname>ah-m</varname> in 
+<varname>-ism</varname> etc. Three phone multiphone are much rarer but may exist, they 
+are not supported by this code as is, but such entries should probably 
+be ignored. Note the <varname>-</varname> sign in the multiphone examples is 
+significant and is used to identify multiphones. 
+</para>
+<para>
+The allowables for OALD end up being 
+<blockquote><literallayout>
+(set! allowables 
+       '
+      ((a _epsilon_ ei aa a e@ @ oo au o i ou ai uh e)
+       (b _epsilon_ b )
+       (c _epsilon_ k s ch sh @-k s t-s)
+       (d _epsilon_ d dh t jh)
+       (e _epsilon_ @ ii e e@ i @@ i@ uu y-uu ou ei aa oi y y-u@ o)
+       (f _epsilon_ f v )
+       (g _epsilon_ g jh zh th f ng k t)
+       (h _epsilon_ h @ )
+       (i _epsilon_ i@ i @ ii ai @@ y ai-@ aa a)
+       (j _epsilon_ h zh jh i y )
+       (k _epsilon_ k ch )
+       (l _epsilon_ l @-l l-l)
+       (m _epsilon_ m @-m n)
+       (n _epsilon_ n ng n-y )
+       (o _epsilon_ @ ou o oo uu u au oi i @@ e uh w u@ w-uh y-@)
+       (p _epsilon_ f p v )
+       (q _epsilon_ k )
+       (r _epsilon_ r @@ @-r)
+       (s _epsilon_ z s sh zh )
+       (t _epsilon_ t th sh dh ch d )
+       (u _epsilon_ uu @ w @@ u uh y-uu u@ y-u@ y-u i y-uh y-@ e)
+       (v _epsilon_ v f )
+       (w _epsilon_ w uu v f u)
+       (x _epsilon_ k-s g-z sh z k-sh z g-zh )
+       (y _epsilon_ i ii i@ ai uh y @ ai-@)
+       (z _epsilon_ z t-s s zh )
+       (# #)
+       ))
+</literallayout></blockquote>
+Note this is an exhaustive list and (deliberately) says nothing 
+about the contexts or frequency that these letter to phone pairs appear. 
+That information will be generated automatically from the training 
+set. 
+</para>
+<para>
+Once the number of failed matches is significantly low enough 
+let <varname>cummulate-pairs</varname> run to completion. This counts the number 
+of times each letter/phone pair occurs in allowable alignments. 
+</para>
+<para>
+Next call 
+<blockquote><literallayout>
+festival> (save-table "oald-")
+</literallayout></blockquote>
+with the name of your lexicon. This changes the cumulation 
+table into probabilities and saves it. 
+</para>
+<para>
+Restart festival loading this new table 
+<blockquote><literallayout>
+festival allowables.scm oald-pl-table.scm
+</literallayout></blockquote>
+Now each word can be aligned to an equally-lengthed string of phones, 
+epsilon and multiphones. 
+<blockquote><literallayout>
+festival> (aligndata "oald.train" "oald.train.align")
+</literallayout></blockquote>
+Do this also for you test set. 
+</para>
+<para>
+This will produce entries like 
+<blockquote><literallayout>
+aaronson _epsilon_ aa r ah n s ah n
+abandon ah b ae n d ah n
+abate ah b ey t _epsilon_
+abbe ae b _epsilon_ iy
+</literallayout></blockquote>
+</para>
+<para>
+The next stage is to build features suitable for <filename>wagon</filename> to 
+build models. This is done by 
+<blockquote><literallayout>
+festival> (build-feat-file "oald.train.align" "oald.train.feats")
+</literallayout></blockquote>
+Again the same for the test set. 
+</para>
+<para>
+Now you 
+need to construct a description file for <filename>wagon</filename> for 
+the given data. The can be done using the script <filename>make_wgn_desc</filename> 
+provided with the speech tools 
+</para>
+<para>
+Here is an example script for building the models, you will need 
+to modify it for your particular database but it shows the basic 
+processes 
+<blockquote><literallayout>
+for i in a b c d e f g h i j k l m n o p q r s t u v w x y z 
+do
+   # Stop value for wagon
+   STOP=2
+   echo letter $i STOP $STOP
+   # Find training set for letter $i
+   cat oald.train.feats |
+    awk '{if ($6 == "'$i'") print $0}' >ltsdataTRAIN.$i.feats
+   # split training set to get heldout data for stepwise testing
+   traintest ltsdataTRAIN.$i.feats
+   # Extract test data for letter $i
+   cat oald.test.feats |
+    awk '{if ($6 == "'$i'") print $0}' >ltsdataTEST.$i.feats
+   # run wagon to predict model
+   wagon -data ltsdataTRAIN.$i.feats.train -test ltsdataTRAIN.$i.feats.test \
+          -stepwise -desc ltsOALD.desc -stop $STOP -output lts.$i.tree
+   # Test the resulting tree against
+   wagon_test -heap 2000000 -data ltsdataTEST.$i.feats -desc ltsOALD.desc \
+              -tree lts.$i.tree
+done
+</literallayout></blockquote>
+The script <filename>traintest</filename> splits the given file <filename>X</filename> into <filename>X.train</filename> 
+and <filename>X.test</filename> with every tenth line in <filename>X.test</filename> and the rest 
+in <filename>X.train</filename>. 
+</para>
+<para>
+This script can take a significant amount of time to run, about 6 hours 
+on a Sun Ultra 140. 
+</para>
+<para>
+Once the models are created the must be collected together into 
+a single list structure. The trees generated by <filename>wagon</filename> 
+contain fully probability distributions at each leaf, at this time 
+this information can be removed as only the most probable will 
+actually be predicted. This substantially reduces the size of the 
+tress. 
+<blockquote><literallayout>
+(merge_models 'oald_lts_rules "oald_lts_rules.scm" allowables)
+</literallayout></blockquote>
+(<filename>merge_models</filename> is defined within 
+<filename>lts_build.scm</filename> 
+The given file will contain a <varname>set!</varname> for the given variable 
+name to an assoc list of letter to trained tree. Note the above 
+function naively assumes that the letters in the alphabet are 
+the 26 lower case letters of the English alphabet, you will need 
+to edit this adding accented letters if required. Note that 
+adding "'" (single quote) as a letter is a little tricky in scheme 
+but can be done---the command <varname>(intern "'")</varname> will give you 
+the symbol for single quote. 
+</para>
+<para>
+To test a set of lts models load the saved model and call 
+the following function with the test align file 
+<blockquote><literallayout>
+festival oald-table.scm oald_lts_rules.scm
+festival> (lts_testset "oald.test.align" oald_lts_rules)
+</literallayout></blockquote>
+The result (after showing all the failed ones), will be a table showing 
+the results for each letter, for all letters and for complete words. 
+The failed entries may give some notion of how good or bad the result 
+is, sometimes it will be simple vowel differences, long versus short, 
+schwa versus full vowel, other times it may be who consonants missing. 
+Remember the ultimate quality of the letter sound rules is how adequate 
+they are at providing <emphasis>acceptable</emphasis> pronunciations rather than 
+how good the numeric score is. 
+</para>
+<para>
+<indexterm><primary> stress assignment </primary></indexterm>
+<indexterm><primary> predicting stress </primary></indexterm>
+For some languages (e.g. English) it is necessary to also find a 
+stress pattern for unknown words. Ultimately for this to work well 
+you need to know the morphological decomposition of the word. 
+At present we provide a CART trained system to predict stress 
+patterns for English. If does get 94.6% correct for an unseen test 
+set but that isn't really very good. Later tests suggest that 
+predicting stressed and unstressed phones directly is actually 
+better for getting whole words correct even though the models 
+do slightly worse on a per phone basis <citation>black98b</citation>. 
+</para>
+<para>
+<indexterm><primary> compressing the lexicon </primary></indexterm>
+<indexterm><primary> reducing the lexicon </primary></indexterm>
+<indexterm><primary> lexicon compression </primary></indexterm>
+As the lexicon may be a large part of the system we have also 
+experimented with removing entries from the lexicon if the letter to 
+sound rules system (and stress assignment system) can correct predict 
+them. For OALD this allows us to half the size of the lexicon, it could 
+possibly allow more if a certain amount of fuzzy acceptance was allowed 
+(e.g. with schwa). For other languages the gain here can be very 
+significant, for German and French we can reduce the lexicon by over 90%. 
+The function <varname>reduce_lexicon</varname> in <filename>festival/lib/lts_build.scm</filename> 
+was used to do this. A discussion of using the above technique as a 
+dictionary compression method is discussed in <citation>pagel98</citation>. A 
+morphological decomposition algorithm, like that described in 
+<citation>black91</citation>, may even help more. 
+</para>
+<para>
+The technique described in this section and its relative merits with 
+respect to a number of languages/lexicons and tasks is discussed more 
+fully in <citation>black98b</citation>. 
+</para>
+</sect1>
+
+<sect1 id="bsv-postlexical-sect"><title>Post-lexical rules</title>
+
+<para>
+<indexterm><primary> post-lexical rules </primary></indexterm>
+In fluent speech word boundaries are often degraded in a way that causes 
+co-articulation across boundaries. A lexical entry should normally 
+provide pronunciations as if the word is being spoken in isolation. It 
+is only once the word has been inserted into the the context in which 
+it is going to spoken can co-articulary effects be applied. 
+</para>
+<para>
+Post lexical rules are a general set of rules which can modify the 
+segment relation (or any other part of the utterance for that matter), 
+after the basic pronunciations have been found. In Festival 
+post-lexical rules are defined as functions which will be applied 
+to the utterance after intonational accents have been assigned. 
+</para>
+<para>
+<indexterm><primary> r deletion </primary></indexterm>
+For example in British English word final /r/ is only produced when the 
+following word starts with a vowel. Thus all other word final /r/s need 
+to be deleted. A Scheme function that implements this is as follows 
+<blockquote><literallayout>
+(define (plr_rp_final_r utt)
+  (mapcar
+   (lambda (s)
+    (if (and (string-equal "r" (item.name s))  ;; this is an r
+             ;; it is syllable final
+             (string-equal "1" (item.feat s "syl_final"))
+             ;; the syllable is word final
+             (not (string-equal "0" 
+                   (item.feat s "R:SylStructure.parent.syl_break")))
+             ;; The next segment is not a vowel
+             (string-equal "-" (item.feat s "n.ph_vc")))
+        (item.delete s)))
+   (utt.relation.items utt 'Segment)))
+</literallayout></blockquote>
+<indexterm><primary> possessive </primary></indexterm>
+In English we also use post-lexical rules for phenomena 
+such as vowel reduction and schwa deletion in the possessive <quote><emphasis>'s</emphasis></quote>. 
+</para>
+</sect1>
+
+<sect1><title>Building lexicons for new languages</title>
+
+<para>
+Traditionally building a new lexicon for a language was a significant
+piece of work taking several expert phonologists perhaps several years
+to construct a lexicon with reasonable coverage.  However we include a
+method here that can cut this time significantly using the basic
+technology provided with this documentation.
+</para>
+<para>
+The basic idea is add the most common words to a lexicon, expclitly
+giving their pronunciation by hand, then automatically build letter to
+sound rules from the initial data.  Then finding the most common words
+submit them to the system and check their correctness.  If wrong they
+are corrected and added to the lexicon, if correct they are added to
+the lexicon as is.  Over multiple passes the lexicon and letter to
+sound rules will improve.  As each pass the letter to sound rules are
+re-generate with the new data making them more correct.
+</para>
+<para>
+This tecynique has been proved succesful for a number of language
+cutting the amount to time and effort to perhaps checking thousands of
+words rather than tens of thousands of words.  It also is a structured
+method that requires only knowledge of the basic language to carry
+out.  Good lexicons can be generated in as little as a coupld of
+weeks, though to get greater than 95% correctness of words in a
+language could still take several months work.
+</para>
+<para>
+As stated above you can never list all the words in a language, but
+having grateter than 95% coverage with letter to sound rule accuracy
+grater than 75% you will have a lexicon that is competitive with those
+that take many year build.  In fact because you can build a lexicon in
+a shorter time it more likely to be consistent and there better for
+synthesis.
+</para>
+<para>
+
+
+
+</para>
+</sect1>
+
+
+</chapter>

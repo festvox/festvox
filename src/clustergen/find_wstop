@@ -1,0 +1,129 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                     Carnegie Mellon University                        ##
+##                         Copyright (c) 2012                            ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Author: Alan W Black (awb@cs.cmu.edu) Aug 2012                       ##
+##                                                                       ##
+###########################################################################
+##  Find optimal wagon stop values in built cg voice                     ##
+###########################################################################
+
+LANG=C; export LANG
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ ! "$FESTVOXDIR" ]
+then
+   echo "environment variable FESTVOXDIR is unset"
+   echo "set it to your local festvox directory e.g."
+   echo '   bash$ export FESTVOXDIR=/home/awb/projects/festvox/'
+   echo or
+   echo '   csh% setenv FESTVOXDIR /home/awb/projects/festvox/'
+   exit 1
+fi
+
+if [ ! -d ws ]
+then
+   mkdir ws
+fi
+
+if [ $# = 0 ]
+then
+   $0 do_wsearch_all
+   exit 0
+fi
+
+if [ $1 = "do_wsearch_all" ]
+then
+    # Use do_clustergen to get the parallel calls
+    ./bin/do_clustergen parallel do_wsearch_part festival/disttabs/unittypes
+
+    for i in `cat festival/disttabs/unittypes`
+    do
+       head -1 ws/${i}.out
+    done |
+    awk '{print "(",$4,$3,")"}' >festvox/unittype_stop_values.scm
+
+    exit 0
+fi
+
+if [ $1 = "do_wsearch_part" ]
+then
+   UNITTYPELIST=$2
+
+   for unittype in `cat $UNITTYPELIST`
+   do
+      echo $unittype
+      datasize=`cat festival/feats/${unittype}.feats | wc -l`
+      rm -f ws.lo.$unittype ws.loo.$unittype
+      for i in 10 15 20 25 30 35 40 45 50 55 60 65 70 75 80 85 90
+      do 
+         rm -f ws.looo.$unittype
+         for s in 1 2 3 4 5
+         do
+            cat festival/feats/${unittype}.feats |
+            awk 'BEGIN {datasize=1.0*'$datasize'; tt='$s'; psize=1.0/5}
+                 { if ((NR/datasize > (tt-1)*psize) && (NR/datasize < tt*psize)) print $0; }' >festival/feats/${unittype}.feats.test
+
+            cat festival/feats/${unittype}.feats |
+            awk 'BEGIN {datasize=1.0*'$datasize'; tt='$s'; psize=1.0/5;}
+                 { if ((NR/datasize < (tt-1)*psize) || (NR/datasize > tt*psize)) print $0; }' >festival/feats/${unittype}.feats.train
+
+            $ESTDIR/bin/wagon  -track_feats 1-50 -vertex_output mean -desc festival/clunits/mcep.desc -data 'festival/feats/'$unittype'.feats.train' -test 'festival/feats/'$unittype'.feats.test' -balance 0 -track 'festival/disttabs/'${unittype}'.mcep' -stop $i -output 'festival/trees/'${unittype}'_mcep.tree' >ws.lo.$unittype
+
+            rc=`grep RMSE ws.lo.$unittype | awk '{print $2,$5}'`
+            echo $rc $i $unittype >>ws.looo.$unittype
+         done
+         nrc=`cat ws.looo.$unittype | awk '{r+=$1; c+=$2} END {printf("%f %f\n",r/NR,c/NR)}'`
+         echo $nrc $i $unittype >>ws.loo.$unittype
+      done
+      sort -g ws.loo.$unittype >ws/$unittype.out
+      rm -f ws.*.$unittype
+   done
+   exit 0
+fi
+
+if [ $1 = "rebuild" ]
+then
+   ./bin/do_clustergen parallel cluster etc/txt.done.data.train
+   ./bin/do_clustergen cg_test mcdf0 cgp_ws etc/txt.done.data.test >mcd-ws.out
+
+   exit 0
+fi

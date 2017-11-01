@@ -1,0 +1,9 @@
+<chapter id="bsv-deploy-ch">
+<title>Deployment</title>
+
+<para>
+client/server access, footprint, scaling up, backoff
+strategies, signal commpression.
+</para>
+
+</chapter>

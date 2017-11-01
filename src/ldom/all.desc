@@ -1,0 +1,236 @@
+(
+( occurid cluster )
+( p.name
+    0 "aa" "ae" "ah" "ao" "aw" "ax" "axr" "ay" "b" "brth" "ch" "d" "dh"
+    "dx" "eh" "el" "em" "en" "er" "ey" "f" "g" "h#" "hh" "hv" "ih" "iy"
+    "jh" "k" "l" "m" "n" "ng" "nx" "ow" "oy" "p" "pau" "r" "s" "sh" "t"
+    "th" "uh" "uw" "v" "w" "y" "z" "zh"
+)
+( p.ph_vc
++
+-
+0
+)
+( p.ph_ctype
+0
+a
+f
+l
+n
+r
+s
+)
+( p.ph_vheight
+0
+1
+2
+3
+)
+( p.ph_vlng
+0
+a
+d
+l
+s
+)
+( p.ph_vfront
+0
+1
+2
+3
+)
+( p.ph_vrnd
++
+-
+0
+)
+( p.ph_cplace
+0
+a
+b
+d
+g
+l
+p
+v
+)
+( p.ph_cvox
++
+-
+0
+)
+( n.name
+    0 "aa" "ae" "ah" "ao" "aw" "ax" "axr" "ay" "b" "brth" "ch" "d" "dh"
+    "dx" "eh" "el" "em" "en" "er" "ey" "f" "g" "h#" "hh" "hv" "ih" "iy"
+    "jh" "k" "l" "m" "n" "ng" "nx" "ow" "oy" "p" "pau" "r" "s" "sh" "t"
+    "th" "uh" "uw" "v" "w" "y" "z" "zh"
+)
+( n.ph_vc
++
+-
+0
+)
+( n.ph_ctype
+0
+a
+f
+l
+n
+r
+s
+)
+( n.ph_vheight
+0
+1
+2
+3
+)
+( n.ph_vlng
+0
+a
+d
+l
+s
+)
+( n.ph_vfront
+0
+1
+2
+3
+)
+( n.ph_vrnd
++
+-
+0
+)
+( n.ph_cplace
+0
+a
+b
+d
+g
+l
+p
+v
+)
+( n.ph_cvox
++
+-
+0
+)
+( segment_duration float)
+( seg_pitch float )
+( p.seg_pitch float )
+( n.seg_pitch float )
+( R:SylStructure.parent.stress
+0
+1
+)
+( seg_onsetcoda
+coda
+onset
+)
+( n.seg_onsetcoda
+0
+coda
+onset
+)
+( p.seg_onsetcoda
+0
+coda
+onset
+)
+( R:SylStructure.parent.accented
+0
+1
+)
+( pos_in_syl
+0
+1
+2
+3
+4
+)
+( syl_initial
+0
+1
+)
+( syl_final
+0
+1
+)
+( R:SylStructure.parent.syl_break
+0
+1
+3
+4
+)
+( R:SylStructure.parent.R:Syllable.p.syl_break
+0
+1
+3
+4
+)
+( pp.name
+    0 "aa" "ae" "ah" "ao" "aw" "ax" "axr" "ay" "b" "brth" "ch" "d" "dh"
+    "dx" "eh" "el" "em" "en" "er" "ey" "f" "g" "h#" "hh" "hv" "ih" "iy"
+    "jh" "k" "l" "m" "n" "ng" "nx" "ow" "oy" "p" "pau" "r" "s" "sh" "t"
+    "th" "uh" "uw" "v" "w" "y" "z" "zh"
+)
+( pp.ph_vc
++
+-
+0
+)
+( pp.ph_ctype
+0
+a
+f
+l
+n
+r
+s
+)
+( pp.ph_vheight
+0
+1
+2
+3
+)
+( pp.ph_vlng
+0
+a
+d
+l
+s
+)
+( pp.ph_vfront
+0
+1
+2
+3
+)
+( pp.ph_vrnd
++
+-
+0
+)
+( pp.ph_cplace
+0
+a
+b
+d
+g
+l
+p
+v
+)
+( pp.ph_cvox
++
+-
+0
+)
+( R:SylStructure.parent.parent.R:Word.word_out float )
+( R:SylStructure.parent.syl_in float )
+( R:SylStructure.parent.syl_out float )
+)

@@ -1,0 +1,87 @@
+Program for Converting Covariance Matrices to Diagonal Covariance Vectors
+* FOR LITTLE ENDIAN
+
+usage: cov2dia [options...] [infile] [outfile]
+options:
+        -dim dim[24]                    : dimension of vector
+        -dia2cov                        : change diagonal vectors into diagonal
+matrices
+        -sd                             : standard deviation
+        -nmsg                           : no message
+        -help                           : display this message
+
+The input file is a binary file of covariance matrices. The output
+file is a binary file of diagonal covariance vectors. The size of
+covariance matrices is [dimension x class]-by-[dimension], and the
+size of diagonal covariance vectors is [class]-by-[dimension]. If -sd
+is used, the output is standard deviation vectors.
+
+The number of dimensions is changed by -dim.
+
+An inverse process, i.e., converting diagonal covariance vectors
+into covariance matrices, is performed by -dia2cov.
+
+Binary data has double-type format.
+
+Some messages are printed while executing this program. If you
+don't need those messages, use -nmsg.
+
+
+<EXAMPLE>
+% cov2dia \
+	-dim 29 \
+	-sd \
+	-nmsg \
+	input.cov \
+	output.sd
+
+
+Tomoki Toda (tomoki@ics.nitech.ac.jp)
+
+
+==================================================
+The current copyright is
+
+/*********************************************************************/
+/*                                                                   */
+/*            Nagoya Institute of Technology, Aichi, Japan,          */
+/*       Nara Institute of Science and Technology, Nara, Japan       */
+/*                                and                                */
+/*             Carnegie Mellon University, Pittsburgh, PA            */
+/*                      Copyright (c) 2003-2004                      */
+/*                        All Rights Reserved.                       */
+/*                                                                   */
+/*  Permission is hereby granted, free of charge, to use and         */
+/*  distribute this software and its documentation without           */
+/*  restriction, including without limitation the rights to use,     */
+/*  copy, modify, merge, publish, distribute, sublicense, and/or     */
+/*  sell copies of this work, and to permit persons to whom this     */
+/*  work is furnished to do so, subject to the following conditions: */
+/*                                                                   */
+/*    1. The code must retain the above copyright notice, this list  */
+/*       of conditions and the following disclaimer.                 */
+/*    2. Any modifications must be clearly marked as such.           */
+/*    3. Original authors' names are not deleted.                    */
+/*                                                                   */    
+/*  NAGOYA INSTITUTE OF TECHNOLOGY, NARA INSTITUTE OF SCIENCE AND    */
+/*  TECHNOLOGY, CARNEGIE MELLON UNIVERSITY, AND THE CONTRIBUTORS TO  */
+/*  THIS WORK DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,  */
+/*  INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, */
+/*  IN NO EVENT SHALL NAGOYA INSTITUTE OF TECHNOLOGY, NARA           */
+/*  INSTITUTE OF SCIENCE AND TECHNOLOGY, CARNEGIE MELLON UNIVERSITY, */
+/*  NOR THE CONTRIBUTORS BE LIABLE FOR ANY SPECIAL, INDIRECT OR      */
+/*  CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM   */
+/*  LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,  */
+/*  NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN        */
+/*  CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.         */
+/*                                                                   */
+/*********************************************************************/
+/*                                                                   */
+/*          Author :  Tomoki Toda (tomoki@ics.nitech.ac.jp)          */
+/*          Date   :  June 2004                                      */
+/*                                                                   */
+/*-------------------------------------------------------------------*/
+/*                                                                   */
+/*  Converting Covariance Matrices to Diagonal Covariance Vectors    */
+/*                                                                   */
+/*-------------------------------------------------------------------*/

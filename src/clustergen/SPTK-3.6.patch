@@ -1,0 +1,81 @@
+diff -rupN SPTK-3.6/bin/pitch/snack/jkGetF0.c SPTK-3.6-cp/bin/pitch/snack/jkGetF0.c
+--- SPTK-3.6/bin/pitch/snack/jkGetF0.c	2012-12-09 09:56:16.000000000 -0500
++++ SPTK-3.6-cp/bin/pitch/snack/jkGetF0.c	2013-01-11 15:43:27.000000000 -0500
+@@ -1868,7 +1868,7 @@ void rapt(float_list *input, int length,
+   int count = 0;
+   int startpos = 0, endpos = -1;
+ #else
+-  float *tmp, *unvoiced, *buf;
++  float *tmp, *unvoiced, *acpeak, *rmse, *buf;
+   int count = 0;
+   int startpos = 0, endpos = -1;
+   long max;
+@@ -1918,6 +1918,13 @@ void rapt(float_list *input, int length,
+   unvoiced = (float *) malloc(sizeof(float)
+                               * (5 + length / frame_shift));
+ 
++  rmse = (float *) malloc(sizeof(float)
++                          * (5 + length / frame_shift));
++
++  acpeak = (float *) malloc(sizeof(float)
++                                * (5 + length / frame_shift));
++
++  
+   for (i = 0, tmpf = input; tmpf != NULL; i++, tmpf = tmpf->next) {
+       buf[i] = tmpf->f;
+   }
+@@ -2073,6 +2080,8 @@ void rapt(float_list *input, int length,
+         for (i = vecsize - 1; i >= 0; i--) {
+             tmp[count] = f0p[i];
+             unvoiced[count] = vuvp[i];
++            rmse[count] = rms_speech[i];
++            acpeak[count] = acpkp[i];
+             count++;
+         }
+ 
+@@ -2116,20 +2125,26 @@ void rapt(float_list *input, int length,
+ #else
+   for (i = 0; i < fnum; i++) {
+       switch (otype) {
+-      case 1:                   /* f0 */
++        case 1:                   /* f0 */
+           fwrite(tmp + i, sizeof(float), 1, stdout);
+           break;
+-      case 2:                   /* log(f0) */
++        case 2:                   /* log(f0) */
+           if (tmp[i] != 0.0) {
+-              tmp[i] = log(tmp[i]);
++            tmp[i] = log(tmp[i]);
+           } else {
+-              tmp[i] = -1.0E10;
++            tmp[i] = -1.0E10;
+           }
+           fwrite(tmp + i, sizeof(float), 1, stdout);
+           break;
+-      default:                  /* pitch */
++        case 5:                   /* f0, voicing and acpeak */
++          fwrite(tmp + i, sizeof(float), 1, stdout);
++          fwrite(unvoiced + i, sizeof(float), 1, stdout);
++          fwrite(rmse + i, sizeof(float), 1, stdout);
++          fwrite(acpeak + i, sizeof(float), 1, stdout);
++          break;
++        default:                  /* pitch */
+           if (tmp[i] != 0.0) {
+-              tmp[i] = sample_freq / tmp[i];
++            tmp[i] = sample_freq / tmp[i];
+           }
+           fwrite(tmp + i, sizeof(float), 1, stdout);
+           break;
+@@ -2140,6 +2155,12 @@ void rapt(float_list *input, int length,
+ 
+   free((void *) par);
+ 
++  free((void *) buf);
++  free((void *) tmp);
++  free((void *) unvoiced);
++  free((void *) rmse);
++  free((void *) acpeak);
++  
+   free_dp_f0();
+ 
+ #endif /* 0 */

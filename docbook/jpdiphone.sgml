@@ -1,0 +1,421 @@
+<chapter id="bsv-jpdiphone-ch">
+<title>A Japanese Diphone Voice</title>
+
+<para>
+In this chapter we work through a full example of creating a 
+voice given that most of the basic construction work (model 
+building) has been done. Pariticularly this discusses the scheme 
+files, and conventions for keeping a voices together and how 
+you can go about packaging it for general use. 
+</para>
+<para>
+Ultimately a voice in Festival will consist of a diphone database, a 
+lexicon (and lts rules) and a number of scheme files that offer the 
+complete voice. When people other than the developer of a voice wish to 
+use your newly developed voice it is only that small set of files that 
+are required and need to be distributed (freely or otherwise). By convention 
+we have distributed diphone group files, a single file holding the index, 
+and diphone data itself, and a set scheme files that describe the voice 
+(and its necessary models). 
+</para>
+<para>
+Basic skeleton files are included in the festvox distribution. 
+If you are unsure how to go about building the basic files it 
+is recommended you follow this schema and modify these to your 
+particular needs. 
+</para>
+<para>
+By convention a voice name consist of an institution name (like 
+<emphasis>cmu</emphasis>, <emphasis>cstr</emphasis>, etc), if you don't have an insitution 
+just use <emphasis>net</emphasis>. Second you need to identify the language, 
+there is an ISO two letter standard for it fails to distinguish 
+dialects (such as US and UK English) so it need not be strictly 
+followed. However a short identifier for the language is probably 
+prefered. Third you identify the speaker, we have typically used 
+three letter initials which are the initials of the person speaker but 
+any name is reasonable. If you are going to build a US or UK English 
+voice you should look <xref linkend="bsv-usukdiphone-ch">.
+</para>
+<para>
+The basic processes you will need to address 
+<itemizedlist mark=bullet>
+<listitem><para>
+construct basic template files
+</para></listitem>
+<listitem><para>
+generate phoneset definition
+</para></listitem>
+<listitem><para>
+generate diphone schema file
+</para></listitem>
+<listitem><para>
+generate prompts
+</para></listitem>
+<listitem><para>
+record speaker
+</para></listitem>
+<listitem><para>
+label nonsense words
+</para></listitem>
+<listitem><para>
+extract picthmarks and LPC coeffcient
+</para></listitem>
+<listitem><para>
+test phone synthesis
+</para></listitem>
+<listitem><para>
+add lexicon/LTS support
+</para></listitem>
+<listitem><para>
+add tokenization
+</para></listitem>
+<listitem><para>
+add prosody (phrasing, durations and intonation)
+</para></listitem>
+<listitem><para>
+test and evaluate voice
+</para></listitem>
+<listitem><para>
+package for distribution
+</para></listitem>
+</itemizedlist>
+</para>
+<para>
+As with all parts of <filename>festvox</filename>: you must set the following 
+enviroment variables to where you have installed versions of 
+the Edinburgh Speech Tools and the festvox distribution 
+<blockquote><literallayout>
+export ESTDIR=/home/awb/projects/speech_tools
+export FESTVOXDIR=/home/awb/projects/festvox
+</literallayout></blockquote>
+</para>
+<para>
+In this example we will build a Japanese voice based on awb (a gaijin). 
+First create a directory to hold the voice. 
+<blockquote><literallayout>
+mkdir ~/data/cmu_ja_awb_diphone
+cd ~/data/cmu_ja_awb_diphone
+</literallayout></blockquote>
+You will need in the regions of 500M of space to build a voice. 
+Actually for Japanese its probably considerably less, but you must 
+be aware that voice building does require disk space. 
+</para>
+<para>
+Construct the basic directory structure and skeleton files 
+with the command 
+<blockquote><literallayout>
+$FESTVOXDIR/src/diphones/setup_diphone cmu ja awb
+</literallayout></blockquote>
+The three arguments are, institution, language and speaker name. 
+</para>
+<para>
+The next stage is define the phoneset in 
+<filename>festvox/cmu_ja_phones.scm</filename>. In many cases the phoneset for a 
+language has been defined, and it is wise to follow convention when it 
+exists. Note that the default phonetic features in the skeleton file 
+may need to be modified for other languages. For Japanese, there are 
+standards and here we use a set similar to the ATR phoneset used by many 
+in Japan for speech processing. (This file is included, but <emphasis>not</emphasis> 
+automatically installed, in <filename>$FESTVOXDIR/src/vox_diphone/japanese</filename> 
+</para>
+<para>
+Now you must write the code that generates the diphone schema file. 
+You can look at the examples in <filename>festvox/src/diphones/*_schema.scm</filename>. 
+This stage is actually the first <emphasis>difficult</emphasis> part, getting 
+thsi right can be tricky. Finding all possible phone-phone in a language 
+isn't as easy as it seems (especially as many possible ones 
+don't actually exist). The file <filename>festvox/ja_schema.scm</filename> is created 
+providing the function <varname>diphone-gen-list</varname> which returns 
+a list of nonsense words, each consisting of a list of, list of diphones 
+and a list of phones in the nonsense word. For example 
+<blockquote><literallayout>
+festival> (diphone-gen-list)
+((("k-a" "a-k") (pau t a k a k a pau))
+ (("g-a" "a-g") (pau t a g a g a pau))
+ (("h-a" "a-h") (pau t a h a h a pau))
+ (("p-a" "a-p") (pau t a p a p a pau))
+ (("b-a" "a-b") (pau t a b a b a pau))
+ (("m-a" "a-m") (pau t a m a m a pau))
+ (("n-a" "a-n") (pau t a n a n a pau))
+ ...)
+</literallayout></blockquote>
+In addition to generating the diphone schema the <filename>ja_schema.scm</filename> 
+also should provied the functions <varname>Diphone_Prompt_Setup</varname>, which 
+is called before generating the prompts, and <varname>Diphone_Prompt_Word</varname>, 
+which is called before waveform synthesis of each nonsense word. 
+</para>
+<para>
+<varname>Diphone_Prompt_Setup</varname>, should be used to select a speaker to 
+generate the prompts. Note even though you may not use the prompts when 
+recording they are necessary for labeling the spoken speech, so you 
+still need to generate them. If you haeva synthesizer already int eh 
+language use ti to generate the prompts (assuming you can get it to 
+generate from phone lists also generate label files). Often the MBROLA 
+project already has a waveform synthesizer for the language so you can 
+use that. In this case we are going to use a US English voice 
+(kal_diphone) to generate the prompts. For Japanese that's probably ok 
+as the Japanese phoneset is (mostly) a subset of the English phoneset, 
+though using the generated prompts to prompt the user is probably not a 
+good idea. 
+</para>
+<para>
+The second function <varname>Diphone_Prompt_Word</varname>, is used to map the 
+Japanese phone set to the US English phone set so that waveform 
+synthesis will work. In this case a simple map of Japanese phone 
+to one or more English phones is given and the code simple 
+changes the phone name in the segment relation (and adds a new 
+new segment in the multi-phone case). 
+</para>
+<para>
+Now we can generate the diphone schema list. 
+<blockquote><literallayout>
+festival -b festvox/diphlist.scm festvox/ja_schema.scm \
+     '(diphone-gen-schema "ja" "etc/jadiph.list")'
+</literallayout></blockquote>
+Its is worth checking <filename>etc/jadiph.list</filename> by hand to you are sure it 
+contains all the diphone you wish to use. 
+</para>
+<para>
+The diphone schema file, in this case <filename>etc/jadiph.list</filename>, is a 
+fundamentally key file for almost all the following scripts. Even if 
+you generate the diphone list by some method other than described above, 
+you should generate a schema list in exactly this format so that 
+everything esle will work, modifying the other scripts for some other 
+format is almost certainly a waste of your time. 
+</para>
+<para>
+The schema file has the following format 
+<blockquote><literallayout>
+( ja_0001 "pau t a k a k a pau"  ("k-a" "a-k"))
+( ja_0002 "pau t a g a g a pau"  ("g-a" "a-g") )
+( ja_0003 "pau t a h a h a pau"  ("h-a" "a-h") )
+( ja_0004 "pau t a p a p a pau"  ("p-a" "a-p") )
+( ja_0005 "pau t a b a b a pau"  ("b-a" "a-b") )
+( ja_0006 "pau t a m a m a pau"  ("m-a" "a-m") )
+( ja_0007 "pau t a n a n a pau"  ("n-a" "a-n") )
+( ja_0008 "pau t a r a r a pau"  ("r-a" "a-r") )
+( ja_0009 "pau t a t a t a pau"  ("t-a" "a-t") )
+...
+</literallayout></blockquote>
+In this case it has 297 nonsense words. 
+</para>
+<para>
+<indexterm><primary> nonsense word prompts </primary></indexterm>
+Next we can generate the prompts and their label files with the 
+following command 
+The to synthesize the prompts 
+<blockquote><literallayout>
+festival -b festvox/diphlist.scm festvox/ja_schema.scm \
+      '(diphone-gen-waves "prompt-wav" "prompt-lab" "etc/jadiph.list")'
+</literallayout></blockquote>
+Occasionally when you are building the prompts some diphones requested 
+in the prompt voice don't actually exists (especially when you are 
+doing cross-language prompting). Thus the generated prompt has some 
+default diphone (typically silence-silence added). This is mostly 
+ok, as long as its not happening multiple times in the same nonsence 
+word. The speaker just should be aware that some prompts aren't actually 
+correct (which of course is going to be true for all prompts in the 
+cross-language prompting case). 
+</para>
+<para>
+The stage is to record the prompts. See <xref linkend="bsv-recording-sect">
+for 
+details on how to do this under Unix (and in fact other techniques too). 
+This can done with the command 
+<blockquote><literallayout>
+bin/prompt_them etc/jadiph.list
+</literallayout></blockquote>
+Depending on whether you want the prompts actually to be played or 
+not, you can edit <filename>bin/prompt_them</filename> to comment out the playing 
+of the prompts. 
+</para>
+<para>
+Note a third argument can be given to state which nonse word to begin 
+prompting from. This if you have already recorded the first 100 you 
+can continue with 
+<blockquote><literallayout>
+bin/prompt_them etc/jadiph.list 101
+</literallayout></blockquote>
+</para>
+<para>
+<indexterm><primary> autolabeling nonsense words </primary></indexterm>
+The recorded prompts can the be labeled by 
+<blockquote><literallayout>
+bin/make_labs prompt-wav/*.wav
+</literallayout></blockquote>
+And the diphone index may be built by 
+<blockquote><literallayout>
+bin/make_diph_index etc/awbdiph.list dic/awbdiph.est
+</literallayout></blockquote>
+</para>
+<para>
+<indexterm><primary> pitchmarks from waveforms </primary></indexterm>
+If no EGG signal has been collected you can extract the 
+pitchmarks by 
+<blockquote><literallayout>
+bin/make_pm_wave wav/*.wav
+</literallayout></blockquote>
+If you do have an EGG signal then use the following instead 
+<blockquote><literallayout>
+bin/make_pm lar/*.lar
+</literallayout></blockquote>
+A program to move the predicted pitchmarks to the nearest 
+peak in the waveform is also provided. This is almost always 
+a good idea, even for EGG extracted pitch marks 
+<blockquote><literallayout>
+bin/make_pm_fix pm/*.pm
+</literallayout></blockquote>
+Getting good pitchmarks is important to the quality of the synthesis, 
+see <xref linkend="bsv-pitchmarks-sect"> for more discussion. 
+</para>
+<para>
+Because there is often a power mismatch through a set of diphone 
+we provided a simple method for finding what general power difference 
+exist between files. This finds the mean power for each vowel in 
+each file and calculates a factor with respect to the overal mean 
+vowel power. A table of power modifiers for each file can 
+be calculated by 
+<blockquote><literallayout>
+bin/find_powerfactors lab/*.lab
+</literallayout></blockquote>
+The factors cacluated by this are saved in <filename>etc/powfacts</filename>. 
+</para>
+<para>
+Then build the pitch-synchronous LPC coefficients, which used 
+the power factors if they've been calculated. 
+<blockquote><literallayout>
+bin/make_lpc wav/*.wav
+</literallayout></blockquote>
+</para>
+<para>
+<indexterm><primary> testing a generated voice </primary></indexterm>
+This should get you to the stage where you can test the basic waveform 
+synthesizer. There is still much to do but initial tests (and correction 
+of labeling errors etc) can start now. Start festival as 
+<blockquote><literallayout>
+festival festvox/cmu_ja_awb_diphone.scm "(voice_cmu_ja_awb_diphone)"
+</literallayout></blockquote>
+and then enter string of phones 
+<blockquote><literallayout>
+festival> (SayPhones '(pau k o N n i ch i w a pau))
+</literallayout></blockquote>
+</para>
+<para>
+In addition to the waveform generate part you must also provide text 
+analysis for your language. Here, for the sake of simplicity we assume 
+that the Japanese is provided in romanized form with spaces between each 
+word. This is of course not the case for normal Japanese (and we are 
+working on a proper Japanese front end). But at present this shows the 
+general idea. Thus we edit <filename>festvox/cmu_ja_token.scm</filename> and add 
+(simple) support for numbers. 
+</para>
+<para>
+As the relationship between romaji (romanized Japanese) and phones 
+is almost trivial we write a set of letter-to-sound rules, by hand 
+that expand words into their phones. This is added to 
+<filename>festvox/cmu_ja_lex.scm</filename>. 
+</para>
+<para>
+For the time being we just use the default intonation model, though 
+simple rule drive improvements are possible. See 
+<filename>festvox/cmu_ja_awb_int.scm</filename>. For duration, we add a mean value 
+for each phone in the phoneset to <filename>fextvox/cmu_ja_awb_dur.scm</filename>. 
+</para>
+<para>
+These three japanese specific files are included in the distribution 
+in <filename>festvox/src/vox_diphone/japanese/</filename>. 
+</para>
+<para>
+Now we have a basic synthesizer, although there is much to 
+do, we can now type (romanized) text to it. 
+<blockquote><literallayout>
+festival festvox/cmu_ja_awb_diphone.scm "(voice_cmu_ja_awb_diphone)"
+...
+festival> (SayText "boku wa gaijin da yo.")
+</literallayout></blockquote>
+</para>
+<para>
+The next part is to test and improve these various initial subsystems, 
+lexicons, text analysis prosody, and correct waveform synthesis problem. 
+This is ane endless task but you should spend significantly more time on 
+it that we have done for this example. 
+</para>
+<para>
+Once you are happy with the completed voice you can package it for 
+distribution. The first stage is to generate a group file 
+for the diphone database. This extracts the subparts of the nonsense words 
+and puts them into a single file offering something smaller and quicker to 
+access. The groupfile can be built as follows. 
+<blockquote><literallayout>
+festival festvox/cmu_ja_awb_diphone.scm "(voice_cmu_ja_awb_diphone)"
+...
+festival (us_make_group_file "group/awblpc.group" nil)
+...
+</literallayout></blockquote>
+The <varname>us_</varname> in the function names stands for <varname>UniSyn</varname> 
+(the unit concatenation subsystem in Festival) and nothing to 
+do with US English. 
+</para>
+<para>
+To test this edit <filename>festvox/cmu_ja_awb_diphone.scm</filename> and 
+change the choice of databases used from separate to grouped. This 
+is done by commenting out the line (around line 81) 
+<blockquote><literallayout>
+(set! cmu_ja_awb_db_name (us_diphone_init cmu_ja_awb_lpc_sep))
+</literallayout></blockquote>
+and uncommented the line (around line 84) 
+<blockquote><literallayout>
+(set! cmu_ja_awb_db_name (us_diphone_init cmu_ja_awb_lpc_group))
+</literallayout></blockquote>
+<indexterm><primary> adding a voice to festival </primary></indexterm>
+The next stage is to integrate this new voice so that festival may find it 
+automatically. To do this you should add a symbolic link 
+from the voice directory of Festival's English voices to the 
+directory containing the new voice. Frist cd to 
+festival's voice directory (this will vary depending on where your 
+version of festival is installed) 
+<blockquote><literallayout>
+cd /home/awb/projects/festival/lib/voices/japanese/
+</literallayout></blockquote>
+creating the language directory if it does not already exists. 
+Add a symbolic link back to where your voice was built 
+<blockquote><literallayout>
+ln -s /home/awb/data/cmu_ja_awb_diphone
+</literallayout></blockquote>
+Now this new voice will be available for anyone runing that version festival 
+started from any directory, without the need for any explicit arguments 
+<blockquote><literallayout>
+festival
+...
+festival> (voice_cmu_ja_awb_diphone)
+...
+festival> (SayText "ohayo gozaimasu.")
+...
+</literallayout></blockquote>
+<indexterm><primary> building a voice distribution </primary></indexterm>
+The final stage is to generate a distribution file so the voice may 
+be installed on other's festival installations. Before you do 
+this you must add a file <filename>COPYING</filename> to the directory you 
+built the diphone database in. This should state the terms and conditions 
+in which people may use, distribute and modify the voice. 
+</para>
+<para>
+Generate the distribution tarfile in the directory above the festival 
+installation (the one where <filename>festival/</filename> and <filename>speech_tools/</filename> 
+directory is). 
+<blockquote><literallayout>
+cd /home/awb/projects/
+tar zcvf festvox_cmu_ja_awb_lpc.tar.gz \
+  festival/lib/voices/japanese/cmu_ja_awb_diphone/festvox/*.scm \
+  festival/lib/voices/japanese/cmu_ja_awb_diphone/COPYING \
+  festival/lib/voices/japanese/cmu_ja_awb_diphone/group/awblpc.group
+</literallayout></blockquote>
+</para>
+<para>
+<indexterm><primary> diphone example </primary></indexterm>
+The completed files from building this crude Japanese example 
+are available at <ulink url="http://festvox.org/examples/cmu_ja_awb_diphone/">
+http://festvox.org/examples/cmu_ja_awb_diphone/</ulink>. 
+</para>
+
+</chapter>

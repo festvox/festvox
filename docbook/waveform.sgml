@@ -1,0 +1,163 @@
+<chapter id="bsv-waveform-ch">
+<title>Waveform Synthesis</title>
+
+<para>
+This part of the book discusses the techniques required to actually 
+create the speech waveform from a complete phonetic and prosodic 
+description.
+</para>
+<para>
+Traditionally we can identify four different methods that are 
+used for creating waveforms from such descriptions. 
+</para>
+<para>
+<emphasis>Articulatory synthesis</emphasis> is a method where the human vocal tract, 
+tongue, lips, etc are modeled in a computer. This method can produce 
+very natural sounding samples of speech but at present it requires too 
+much computational power to be used in pratical systems. 
+</para>
+<para>
+<emphasis>Formant synthesis</emphasis> is a technique where the speech
+signal is broken down into iverlapping parts, such as formats (hence
+the name), voicing, asperation, nasality etc. The output of individual
+generators are then composed from streams of parameters describing the
+each sub-part of the speech. With carefully tuned parameters the
+quality of the speech can be close to that of natural speech, showing
+that this encoiding is sufficient to represent human speech. However
+automatic prediction of these parameters is harder and the typical
+quality of synthesizers based on this technology can be very
+understandable but still have a distinct no-human or robotic
+quality. Format synthesizers are best typified MITalk, the work of
+Dennis Klatt, and what was later commercialised as DECTalk. DECTalk is
+at present probably the most familar form of speech synthesis to the
+world. Dr Stephen Hawkins, Lucindian Professor of Mathematics at
+Cambridge University, has lost the use of his voice and uses a formant
+synthesizer for his speech.
+</para>
+<para>
+<emphasis>Concatenative synthesis</emphasis> is the third form
+which we will spend the some time on.  Here waveforms are created by 
+concatenating parts of natural speech recording from humans.
+</para>
+<para>
+<emphasis>Statistical parametric synthesis</emphasis> is the fourth form
+which we will also spend some one.  Here waveforms are created by 
+building generative models by "average" data from natural speech
+recordings from humans.
+</para>
+<para>
+In the search for more natural synthesis there has been a move to use 
+recorded human speech rather than techniques to construct it from its 
+fundamental parts. The potential for using recorded speech has in some 
+sense been made possible by the increase in power of computer and 
+storage media. Format synthesizers require a relatively small amount of 
+data but concatenative speech synthesizer typically require much more disk 
+space to contain the inventory of speech sounds. And more recently 
+the size databases used has grown further as there is some relationhip 
+between voice quality and database size. 
+</para>
+<para>
+The techniques described here and the following chapters are concerned 
+solely of concatenative synthesis. Concatenative synthesis techniques 
+not only give the most natural sounding speech synthesis, it also is 
+the most accessible to the general user in that it is quite easy for us 
+to record speech and the technique used here to analyse it are, to the 
+most part, automatic. 
+</para>
+<para>
+The area of concatenative systems can be viewed as a complex continunium, 
+as there are many choices in selecting unit type, size etc. We have 
+included examples and techniques from the most conservative (i.e. most 
+likely to work) to the forefront of the art of voice building. It is 
+important to understand the space of possible synthesis techniques in 
+order to select the best one for your particular application. The 
+resources required to develop each of the basic types of concatenative 
+synthesizers varies greatly. It is possible to get a general speech 
+synthesizer working in English in under an hour, though its quality 
+isn't very good (though can be understandable). At the other extreme, 
+in the area of speech synthesis we have yet to develop a system that is 
+both natural and flexible to satisfy all synthesis requirements so the 
+task of building a voice may take a lifetime. However the following 
+chapter outline techniques which can be completed by an interest person 
+in as little a day or at most a week which can produce high, natural 
+sounding voices suitable for a wide range of computer speech 
+applications. 
+</para>
+<para>
+In order for synthesis of any piece of text we need to have examples of 
+every unit in the language to be synthesized. At some extreme this 
+would mean you'd need recordings of every sentence (or even paragraph) 
+of everything that needs to be said. This of course is impractical and 
+defeats the whole purpose of a having a synthesizer. Thus we need to 
+make some simplifying assumptions. The simplest (and most extreme) 
+is to assume that speech is made of up strings of discrete phonemes. 
+US English has (by one definiton) 43 different phonemes. That is 
+the fundamental sounds in the language, thus the word, "bit" is 
+made up of three phones /B/ /IH/ and /T/. The word "beat" however 
+is made up of the phonemes /B/ /IY/ and /T/. 
+</para>
+<para>
+In the following chapter we consider the absolute simplest waveform
+synthesizer that consists of recording each phone int he language and
+the resequencing them to form new words. Although this is a easy and
+quick synthesizer to build it is immediately obvious that it is not of
+very good quality. The reason being thate human speech just doesn't
+consist of isloated phonemes concatenated to gether but that there are
+articulatory effects that cross over multiple phones
+(co-articulation). Thus the more practical technique is to build a
+<emphasis>diphone</emphasis> synthesizer where we record each phoneme
+in the context of each other phoneme.
+</para>
+<para>
+However speech is more varied than that although we can modify the 
+selected diphones to obtain the desired prosody, such modification is 
+not as good as if it were actual spoken by a human. Thus the area of 
+general <emphasis>unit selection</emphasis> synthesis has grown where the datbases we 
+select from has many more examples of speech, in more contexts and not 
+just one example of each phoneme-phoneme transition in the language. 
+The size and design of a databases most suitable for unit selection is 
+difficult and we discuss this in the following chapter. The techniques 
+required to find the most approrpiate unit, taking into account, 
+phonetic context, word position, phrase position as well prosodic 
+context is important but finding the right palance of these features 
+is still something of an art. In <xref linkend="bsv-unitsel-ch"> we present 
+a number techniques and experiments to build such synthesizers. 
+</para>
+<para>
+Although <emphasis>unit selection</emphasis> synthesizer clear offer the best quality 
+synthesis, their databases are substantial piece of work. They must be 
+preoperly labeled and although we include automatic alignment 
+techniques there will always be mistakes and hand correction is 
+certainly both desirable and worthwhile. But that takes time and 
+certain skills to do. When the unit selection is bad due to bad labels 
+inappropriate weight of features or just simply not enough good examples 
+int he dtaabase to choose from the quality can be serverely worse than 
+diphones so the work in tuning a unit selection synthesizer is as much 
+avoiding the bad examples as improving the good ones. The third chapter 
+on waveform syntehsizers offers a very rpactical compramise between 
+diphone (safe) synthesizers and unit selection (exciting) synthesizers. 
+In <xref linkend="bsv-ldom-ch"> on limited domain synthesis, we discuss how to target your recorded 
+database to a particular application and get the benefits of the high 
+quality of unit selection synthesis without the requirement of very 
+carefully labeled databases. In many case this thrid option is the 
+most practical. 
+</para>
+<para>
+Of course it is possible to combine approaches. This requries more care 
+in the design but sometimes offers the best of all techniques. Having a 
+targeted limited domain synthesizer which can cover most of the desired 
+language will be good but falling back on good unit selection 
+synthesizer for unknown words may be a real posibility. 
+</para>
+<blockquote><literallayout>
+Key choices:
+  size, type, prosodic modification, number of occurrences
+Key positions in the space  
+  uniphones, diphones
+  unit selection, limited domain vs open
+
+Need diagram for space of synthesizers
+</literallayout></blockquote>
+
+
+</chapter>

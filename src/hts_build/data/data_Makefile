@@ -1,0 +1,56 @@
+# UNIX HTS-demo_CSTR-TIMIT-KED MAKEFILE
+#
+# This makefile will build various files for demonstraition of 
+# HMM-based speech synthesis (training data, label files, etc.).
+#
+# When invoked it expects to have the following environment variables
+# set
+#      SPTKBINDIR     - set to the directory which includes SPTK executable
+#      FESTIVALDIR    - set to the directory where you installed festival
+#                      ( not ..../festival/bin, please set ..../festival)
+#
+# WARNING
+#  This demonstraition assumes to be executed on little endien.
+#
+
+CURRENTDIR=.
+PWDDIR=$(shell pwd)
+
+# HTS is set up share dbs in the same build environment so wants
+# distinct dataset/speaker names, we don't need this
+SPEAKER     = v
+DATASET     = db
+
+all:	init data label list
+
+init:
+	sed 's:CURRENTDIR:'${PWDDIR}':g' ${CURRENTDIR}/labels/mono.mlf | \
+	sed 's:SPEAKER:'${SPEAKER}':g' | \
+	sed 's:DATASET:'${DATASET}':g' > ${CURRENTDIR}/labels/mono_${SPEAKER}.mlf
+	sed 's:CURRENTDIR:'${PWDDIR}':g' ${CURRENTDIR}/labels/full.mlf | \
+        sed 's:SPEAKER:'${SPEAKER}':g' | \
+        sed 's:DATASET:'${DATASET}':g' > ${CURRENTDIR}/labels/full_${SPEAKER}.mlf
+	sed 's:CURRENTDIR:'${PWDDIR}':g' ${CURRENTDIR}/scripts/mkdata.pl | \
+	sed 's:SPTKDIR:'${SPTKBINDIR}':g' > ${CURRENTDIR}/scripts/mkdata_${DATASET}_${SPEAKER}.pl
+	sed 's:CURRENTDIR:'${PWDDIR}':g' ${CURRENTDIR}/scripts/utt2lab.sh | \
+	sed 's:FESTIVALDIR:'${FESTIVALDIR}':g' | \
+        sed 's:SPEAKER:'${SPEAKER}':g' > ${CURRENTDIR}/scripts/utt2lab_${DATASET}_${SPEAKER}.sh
+
+data:
+	perl ${CURRENTDIR}/scripts/mkdata_${DATASET}_${SPEAKER}.pl
+
+label:
+	mkdir -p ${CURRENTDIR}/labels/monophone/${SPEAKER}
+	mkdir -p ${CURRENTDIR}/labels/fullcontext/${SPEAKER}
+	tcsh ${CURRENTDIR}/scripts/utt2lab_${DATASET}_${SPEAKER}.sh
+
+list:
+	find ${CURRENTDIR}/labels/fullcontext/${SPEAKER} -name \*.lab -exec cat \{\} \; | \
+        sed -e "s/ *[0-9]* //g" | \
+        sort -u > ${CURRENTDIR}/lists/full_${SPEAKER}.list
+	sort -u ${CURRENTDIR}/lists/full_${SPEAKER}.list \
+	 > ${CURRENTDIR}/lists/full_${SPEAKER}_all.list
+	find ${CURRENTDIR}/labels/monophone/${SPEAKER} -name \*.lab -exec cat \{\} \; | \
+	awk '{print $$3}' | \
+	sort -u > ${CURRENTDIR}/lists/mono_${SPEAKER}.list
+	ls cmp/${DATASET}_${SPEAKER}*.cmp | sed 's+^+'`pwd`'/+' > ${CURRENTDIR}/lists/data_${DATASET}_${SPEAKER}.scp

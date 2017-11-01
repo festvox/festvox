@@ -1,0 +1,202 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                     Carnegie Mellon University                        ##
+##                         Copyright (c) 2005                            ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Setup the current directory for building a clustergen synth          ##
+##                                                                       ##
+###########################################################################
+
+LANG=C; export LANG
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ ! "$FESTVOXDIR" ]
+then
+   echo "environment variable FESTVOXDIR is unset"
+   echo "set it to your local festvox directory e.g."
+   echo '   bash$ export FESTVOXDIR=/home/awb/projects/festvox/'
+   echo or
+   echo '   csh% setenv FESTVOXDIR /home/awb/projects/festvox/'
+   exit 1
+fi
+
+if [ $# = 0 ]
+then
+    echo "Build dirs, and setup scripts and scm files for a clustergen voice "
+    echo "Usage: setup_cg INST LANG VOX"
+    echo "INST is the institute building the language, e.g. cmu, cstr, ogi"
+    echo "     if there isn't an appropriate institute use, net."
+    echo "LANG is the language, e.g. us, indic, grapheme, fr etc"
+    echo "SPEAKER is speaker/style identifier e.g kal, awb, golem"
+    echo "You can extend the VOX with a dataset e.g. awb_arctic"
+    echo "Arguments must match \"^[A-Za-z][A-Za-z0-9_]*\$\""
+    exit 1
+fi
+
+FV_INST=$1
+FV_LANG=$2
+FV_VOX=$3
+
+check=`echo $FV_INST | grep "^[A-Za-z][A-Za-z0-9_]*$"`
+if [ "$check" = "" ]
+then
+    echo "Invalid INST name, not matching \"^[A-Za-z][A-Za-z0-9_]*\$\""
+    exit 1
+fi
+check=`echo $FV_LANG | grep "^[A-Za-z][A-Za-z0-9_]*$"`
+if [ "$check" = "" ]
+then
+    echo "Invalid LANG name, not matching \"^[A-Za-z][A-Za-z0-9_]*\$\""
+    exit 1
+fi
+check=`echo $FV_VOX | grep "^[A-Za-z][A-Za-z0-9_]*$"`
+if [ "$check" = "" ]
+then
+    echo "Invalid VOX name, not matching \"^[A-Za-z][A-Za-z0-9_]*\$\""
+    exit 1
+fi
+
+if [ ! -f festvox/build_clunits.scm ]
+then
+   $FESTVOXDIR/src/unitsel/setup_clunits $*
+   $FESTVOXDIR/src/prosody/setup_prosody
+fi
+
+if [ "$CLUSTERGENDIR" = "" ]
+then
+    CLUSTERGENDIR=$FESTVOXDIR/src/clustergen
+fi
+
+if [ "$FESTVOXTEMPLATEDIR" = "" ]
+then
+    FESTVOXTEMPLATEDIR=$FESTVOXDIR/src/vox_files
+fi
+
+# We have a basic clunits voice at this time so only add the clustergen
+# support
+
+# This is way too specific for the particular feature set
+if [ -f $FESTVOXTEMPLATEDIR/$FV_LANG/mcep.desc ]
+then
+   cp -p $FESTVOXTEMPLATEDIR/$FV_LANG/mcep.desc festival/clunits/mcep.desc
+else
+   cp -p $CLUSTERGENDIR/mcep.desc festival/clunits/mcep.desc
+fi
+
+if [ -f $FESTVOXTEMPLATEDIR/$FV_LANG/mceptraj.desc ]
+then
+   cp -p $FESTVOXTEMPLATEDIR/$FV_LANG/mceptraj.desc festival/clunits/mceptraj.desc
+else
+   cp -p $CLUSTERGENDIR/mceptraj.desc festival/clunits/mceptraj.desc
+fi
+
+if [ -d $$FESTVOXTEMPLATEDIR/$FV_LANG ]
+then
+   FV_LANG_SKELS=$FV_LANG
+else
+   FV_LANG_SKELS=general
+fi
+
+if [ ! -d festival/utts_hmm ]
+then
+   mkdir festival/utts_hmm
+fi
+if [ ! -d ccoefs ]
+then
+   mkdir ccoefs
+fi
+
+echo "FV_INST=$FV_INST" >etc/voice.defs
+echo "FV_LANG=$FV_LANG" >>etc/voice.defs
+echo "FV_NAME=$FV_VOX" >>etc/voice.defs
+echo "FV_TYPE=cg" >>etc/voice.defs
+echo "FV_VOICENAME=\$FV_INST\"_\"\$FV_LANG\"_\"\$FV_NAME" >>etc/voice.defs
+echo "FV_FULLVOICENAME=\$FV_VOICENAME\"_\"\$FV_TYPE" >>etc/voice.defs
+
+cp -p $CLUSTERGENDIR/do_clustergen bin
+cp -p $CLUSTERGENDIR/make_dur_model_mcep bin
+cp -p $CLUSTERGENDIR/make_dur_model_mcep_rf bin
+cp -p $CLUSTERGENDIR/build_rfs bin
+cp -p $CLUSTERGENDIR/wagon_rf bin
+cp -p $CLUSTERGENDIR/wagon_rf_f0 bin
+cp -p $CLUSTERGENDIR/rf_post_build bin
+cp -p $CLUSTERGENDIR/build_cg_voice bin
+cp -p $CLUSTERGENDIR/build_cg_rfs_voice bin
+cp -p $CLUSTERGENDIR/do_move_label bin
+cp -p $CLUSTERGENDIR/do_move_label_me bin
+cp -p $CLUSTERGENDIR/make_voicing bin
+cp -p $CLUSTERGENDIR/get_str_sptk bin
+cp -p $CLUSTERGENDIR/find_nstates bin
+cp -p $CLUSTERGENDIR/find_wstop bin
+cp -p $CLUSTERGENDIR/find_dg bin
+cp -p $CLUSTERGENDIR/statedur.feats festival/dur/etc
+if [ -f $FESTVOXTEMPLATEDIR/$FV_LANG/statedur.feats ]
+then
+   cp -p $FESTVOXTEMPLATEDIR/$FV_LANG/statedur.feats festival/dur/etc
+else
+   cp -p $CLUSTERGENDIR/statedur.feats festival/dur/etc
+fi
+cp -p $CLUSTERGENDIR/clustergen.scm festvox
+# Added Aug 20th 2011 to allow more localized building
+# this used to always be used from the source directory
+cp -p $CLUSTERGENDIR/clustergen_build.scm festvox
+
+echo Generating additional clustergen specific voice and build files
+for i in $CLUSTERGENDIR/CLUSTERGEN_cg.scm \
+         $CLUSTERGENDIR/CLUSTERGEN_statenames.scm
+do
+   f=`basename $i | sed 's/CLUSTERGEN/'$FV_INST"_"$FV_LANG"_"$FV_VOX'/'`
+   fname=`echo $f | sed 's/INST/'$FV_INST'/g' | sed 's/LANG/'$FV_LANG'/g' | sed 's/VOX/'$FV_VOX'/g'`
+   cat $i |
+   sed 's%INST%'$FV_INST'%g' |
+   sed 's%LANG%'$FV_LANG'%g' |
+   sed 's%VOX%'$FV_VOX'%g' |
+   sed 's%CURRENTDIR%'"$CURRENTDIR"'%g' >festvox/$fname
+done
+
+
+echo "(set! $FV_INST"_"$FV_LANG"_"$FV_VOX::zdur_tree nil)" >festvox/$FV_INST"_"$FV_LANG"_"$FV_VOX"_durdata_cg.scm"
+echo "(set! $FV_INST"_"$FV_LANG"_"$FV_VOX::phone_durs nil)" >>festvox/$FV_INST"_"$FV_LANG"_"$FV_VOX"_durdata_cg.scm"
+
+echo "Set up for "$FV_INST"_"$FV_LANG"_"$FV_VOX" clustergen complete"
+
+
+
+

@@ -1,0 +1,155 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                     Carnegie Mellon University                        ##
+##                      Copyright (c) 2005-2008                          ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Extract all the feats in one go (much faster)                        ##
+##                                                                       ##
+##  saved about 33 hours from a 39 hours voice build                     ##
+##     and didn't require all utts to be festival at once                ##
+##                                                                       ##
+##  Redid this in Feb/Mar 2008 to make it use less disk space and time   ##
+##                                                                       ##
+###########################################################################
+
+LANG=C; export LANG
+
+DATAFILE=$1
+
+awk '{print $2}' $DATAFILE |
+while read i
+do
+#   echo Collecting feats $i >/dev/tty
+   cat festival/coeffs/$i.feats
+   if [ "$2" != "save" ]
+   then
+      rm -f festival/coeffs/$i.feats
+   fi
+done |
+awk '{printf("%s %d ",$1,NR-1);
+      for (i=3; i<=NF; i++)
+         printf("%s ",$i);
+      printf("\n");}' > festival/coeffs/cg_all.feats
+echo Sorting all feats
+sort -g festival/coeffs/cg_all.feats >festival/coeffs/cg_all_sorted.feats
+rm -f festival/coeffs/cg_all.feats
+
+awk '{print $2}' $DATAFILE |
+while read i
+do
+#   echo Collecting mcep $i >/dev/tty
+   cat festival/coeffs/$i.mcep
+   if [ "$2" != "save" ]
+   then
+      rm -f festival/coeffs/$i.mcep
+   fi
+done | 
+awk '{printf("%s %d ",$1,NR-1);
+      for (i=2; i<=NF; i++)
+         printf("%s ",$i);
+      printf("\n");}' >festival/coeffs/cg_all.mcep
+echo Sorting all mceps
+sort festival/coeffs/cg_all.mcep >festival/coeffs/cg_all_sorted.mcep
+rm -f festival/coeffs/cg_all.mcep
+
+echo Sorting feats by unittype
+cat festival/coeffs/cg_all_sorted.feats |
+awk '{if ($1 != l)
+      {
+         if (NR > 1)
+            close(ofile);
+#         printf("Split feats by unit type %s\n",$1);
+         ofile = sprintf("festival/feats/%s.feats.unsorted",$1);
+         l = $1; 
+         n = 1;
+      }
+         for (i=2; i<=NF; i++)
+            printf("%s ",$i) > ofile;
+         printf("\n") > ofile;
+      }
+      END {close(ofile);}'
+rm -f festival/coeffs/cg_all_sorted.feats
+
+echo Sorting mcep by unittype
+cat festival/coeffs/cg_all_sorted.mcep |
+awk '{if ($1 != l)
+      {
+         if (NR > 1)
+         {
+            close(ofile);
+         }
+#         printf("Split mcep by unit type %s\n",$1);
+         ofile = sprintf("festival/disttabs/%s.mcep.unsorted",$1);
+         print $1 > "festival/disttabs/unittypes"
+         l = $1; 
+         n = 1;
+      }
+         for (i=2; i<=NF; i++)
+            printf("%s ",$i) > ofile;
+         printf("\n") > ofile;
+         n = n + 1;
+      }
+      END {close(ofile); }'
+rm -f festival/coeffs/cg_all_sorted.mcep 
+
+echo Sorting samples and making f0_feats for each unittype
+cat festival/disttabs/unittypes |
+while read x
+do
+
+   sort -g festival/feats/$x.feats.unsorted |
+   awk '{printf("%d ",NR-1);
+         for (i=2; i<=NF; i++)
+            printf("%s ",$i);
+         printf("\n");}'>festival/feats/$x.feats
+   rm -f festival/feats/$x.feats.unsorted
+
+   sort -g festival/disttabs/$x.mcep.unsorted |
+   sed 's/^[^ ]*//' |
+   $ESTDIR/bin/ch_track -itype ascii -otype est_binary -s 0.005 -o festival/disttabs/$x.mcep
+   rm festival/disttabs/$x.mcep.unsorted
+
+   # HNM fix -c 1 vs -c 0
+   $ESTDIR/bin/ch_track -c 0 festival/disttabs/$x.mcep -otype ascii -o $$.f0
+#   cut -d " " -f 2- festival/feats/$x.feats |
+#   paste -d " " xxx.f0 - >festival/feats/${x}_f0.feats
+   cut -d " " -f 2- festival/feats/$x.feats >$$.mcep
+   paste -d " " $$.f0 $$.mcep >festival/feats/${x}_f0.feats
+   rm -f $$.f0 $$.mcep
+
+done
+
+echo END of sorting feats and mceps
+
+exit 0
+
+
+

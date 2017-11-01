@@ -1,0 +1,276 @@
+<chapter id="bsv-corpus-ch">
+<title>Corpus development</title>
+
+<para>
+This chapter discusses the techniques used to design a good corpus for
+recording for use in general speech synthesis.  The basic requirements
+for a speech synthesis corpus are:
+
+<itemizedlist mark=bullet>
+<listitem><para>
+Phonetically and prosodically balanced
+</para></listitem>
+<listitem><para>
+Targeted toward the intended domain(s)
+</para></listitem>
+<listitem><para>
+Easy to say by voice talent without mistakes
+</para></listitem>
+<listitem><para>
+Short enough for the voice talent to be willing to say it.
+</para></listitem>
+</itemizedlist>
+
+To make life easier in designing prompt list we have included scripts
+which go some way to aid the process.  The general idea is to take a
+very large amount of text and automatically find "nice" utterances
+that match these criteria.
+</para><para>
+The CMU ARCTIC Database prompt list <citation>kominek 2003</citation>
+was created very much in this way, though with an earlier version of
+the scripts.
+</para><para>
+
+As with most of our work there is a single script, that does a number
+of basic stages.  The default is reasonable in many cases, but with
+prompt selection it is always worth hand checking and potentially
+modifying and refining the process.
+
+</para><para>
+
+The basic idea is to limit the chosen utterances to those of a
+reasonable length (5-15 words), only choose sentences with high
+frequency words (which should be easier to say and less ambiguous in
+pronunciation, also restrict to words that are in the lexicon
+(avoiding letter to sound issues).
+
+</para><para>
+
+The script <filename>make_nice_prompts</filename> is set up for two
+classes of language, Latin script languages and non-Latin script
+languages.  Though as the non-Latin case is much more varied you may
+need to modify things.  We have successfully used it for UTF-8 encoded
+Hindi.
+
+</para><para>
+
+For the Latin-script languages (as opposed "asis" cases) we downcase
+the text when looking for variation.  Although some Latin based
+language make a significant case distinction, e.g. German, this is a
+reasonable route to avoid sentences with too many repeated words in
+them.
+
+</para><para>
+
+First gather lots of text data.  When we say lots we mean at least
+millions of words, or even 10s on millions of words.  This basic
+selection process is aimed at getting sentences for general voices and
+hence as large amount of starting data as possible is important.
+
+</para><para>
+
+Please also note the copyright of the data you are selecting from.  In
+CMU ARCTIC we used out-of-copyright texts from the Gutenberg project,
+so there would be no issue in distributing the data.  Copyright law in
+many countries allows for small subsets for copyright data, but this
+fair use is often argued by some.  There may not actually be a good
+solution to this, News stories, are typically copyright by the press
+agency releasing them.  Licenses on LDC data are often sufficient for
+using such texts to build prompts and then having no restriction on
+the voices generated, but the database itself may be under question.
+If you care about distribution (free or selling) you will need to
+address these issues.
+
+</para><para>
+
+The first stage once you have collected you data is check its
+encoding.  Make sure its all the same encoding.  Also check its
+reasonable.  For example the Europal data is nice and clean (as
+conditioned for Machine Translation models) but the punctuation has
+been separated from the words.  You may want to to de-htmlify your
+data before passing it to the selection routines.
+
+</para><para>
+
+Once you have a set of nice relatively clean data, you use the first
+stage of the script.  This finds the word frequencies of all the
+tokens in the text data.
+<blockquote><literallayout>
+    $FESTVOXDIR/src/promptselect/make_nice_prompts find_freq TEXT0 TEXT1 TEXT2
+</literallayout></blockquote>
+
+Give all the text files as arguments to this script.  The working
+files will be created in the current directory, but the text file
+arguments may be pathnames.
+
+</para><para>
+
+The next stage is to build a Festival lexicon for the most frequent
+words.  By default we select the top 5000 words, which has proven a
+reasonable choice.  You can optionally override the 5000 with an
+argument.
+<blockquote><literallayout>
+    $FESTVOXDIR/src/promptselect/make_nice_prompts make_freq_lex
+</literallayout></blockquote>
+
+</para><para>
+
+The next stage processes each sentence in the large text database to
+find those utterances that are "nice".  That of reasonable length, has
+only words in the frequency lexicon, no strange punctuation, capitals
+at the beginning, and punctuation at the end, and a few other
+heuristic rule conditions.  These seem to work well for the
+Latin-script languages (though it is possible the conditions are
+overly strict for some languages).  
+
+</para><para>
+
+Although Festival's text front end is used for processing the text,
+you do not need to build any language specific text front end (at
+least not normally).  Finding nice prompts is considered one of the
+very first parts of buildings support for a new language, so we are
+aware that there will be almost no resources available for the target
+language yet.
+
+</para><para>
+
+Because this process is using Festival's front end, it is not fast, as
+it needs to process the whole text database.  It is not unusual for
+this to take a number of hours to process.  While processing "nice"
+utterances are written to <filename>data_nice.data</filename>.  You
+should check this regularly in case there is some inappropriate
+condition in the rules and you are getting the wrong type of data.
+
+<blockquote><literallayout>
+    $FESTVOXDIR/src/promptselect/make_nice_prompts find_nice TEXT0 TEXT1 ...
+</literallayout></blockquote>
+
+Note this will only search for the first 100,000 nice utterances, from
+the data set, you can change the number in the script if you want more
+(or less).  
+
+</para><para>
+
+Once the "nice" utterances are found you can now find those nice
+utterances that have the best phonetic coverage.  There are two
+mechanism available here.  Because this is often the very first stage
+in building support for a new language, no lexicon and phonetics are
+available, thus selecting based on phonetic is not an option.
+Therefore we provide a simpler technique that selections based on
+letter coverage (in fact di-letter coverage).  This is often a
+reasonable solution, but it will depend on the language whether this
+is reasonable solution or not.  Note that for English, in spite of its
+somewhat poor relationship between orthography and pronunciation, this
+is reasonable, so don't exclude this as a possibility without trying
+it.
+
+</para><para>
+
+Letter selection will find the subset of the nice utterances that has
+the best letter coverage.  It is a greedy algorithm, but this is
+usually sufficient.  This process also takes a number to define the
+number of utterances it is looking for.  The process will be applied
+multiple times to the remaining data until that number is reached.  If
+there isn't enough data to select from it might loop for ever.  By
+default it looks for 1000 utterance, which is not unreasonable for a
+unit selection voices, 500 is probably sufficient for a CLUSTERGEN
+voice.  But, as they say, your mileage may vary.
+
+<blockquote><literallayout>
+    $FESTVOXDIR/src/promptselect/make_nice_prompts select_letter_n 
+</literallayout></blockquote>
+
+</para><para>
+
+If you do have a pronunciation lexicon for you language, you can also do
+select based on segments rather than letters.  We have not done
+exhaustive comparisons of how valuable segment selection is over
+letter selection.  It is clear that although probably important, it is
+probably less important that selecting a good voice talent, or
+recording the prompts in a high quality manner.  Two stages are
+required for segment selection.  The first stage is to render the nice
+prompts from words to segments
+<blockquote><literallayout>
+    $FESTVOXDIR/src/promptselect/make_nice_prompts synth_seg
+</literallayout></blockquote>
+Then greedily select the utterances with the best di-phone coverage.
+<blockquote><literallayout>
+    $FESTVOXDIR/src/promptselect/make_nice_prompts select_seg
+</literallayout></blockquote>
+We do not yet support <filename>select_seg_n</filename>.
+
+</para><para>
+
+After selection the nice prompts will me in
+<filename>data.done.data</filename>.  Look at it.  Do not expect it to
+be perfect.  I have never done this for a new language, without having
+to do it multiple times until I get something reasonable.  Even once
+you have the result, it is worth while checking each utterance and
+correcting and/or rejecting it for other reasons, such as
+ungrammatical, hard to read, ambiguous words etc.  Be bold and get rid
+of weird sentences, it will save you trouble later.  The selection
+process is deliberately designed to have redundancy as speech is a
+variable medium and we can never be sure what exact the voice talent
+will say, or how the unit selection process will select the units from
+the database.
+
+</para><para>
+
+It is wise to first go through every sentence and attempt to record it
+and at that time decide if the sentence is actually a reasonable
+utterance to include in the prompt set for that language.
+
+</para><para>
+
+The final stage extracts the vocabulary of the selected prompt set.
+You can use this vocab list to start building your pronunciation
+lexicon as you will need that to build your speech databases (unless
+you are using an orthography based selection technique).
+<blockquote><literallayout>
+    $FESTVOXDIR/src/promptselect/make_nice_prompts find_vocab
+</literallayout></blockquote>
+
+</para><para>
+You can also do the whole process with the command
+<blockquote><literallayout>
+    $FESTVOXDIR/src/promptselect/make_nice_prompts do_all TEXT0 TEXT1 ...
+</literallayout></blockquote>
+As really the <filename>find_nice</filename> stage takes up about 98% of 
+processing time, redoing the other parts each time isn't unreasonable.
+
+</para>
+
+<sect1>
+<title>Non-Latin-script languages</title>
+<para>
+
+For non-Latin-script languages there are options that seem to work
+well, if the language has spaces between words.  We have used this
+quite extensively for UTF-8 encoded languages (Arabic and Hindi).
+For these language use
+
+<blockquote><literallayout>
+    $FESTVOXDIR/src/promptselect/make_nice_prompts select_seg
+    $FESTVOXDIR/src/promptselect/make_nice_prompts find_freq_asis TEXT0 TEXT1 ...
+    $FESTVOXDIR/src/promptselect/make_nice_prompts make_freq_lex
+    $FESTVOXDIR/src/promptselect/make_nice_prompts find_nice_asis TEXT0 TEXT1 ...
+    $FESTVOXDIR/src/promptselect/make_nice_prompts select_letter_n
+    $FESTVOXDIR/src/promptselect/make_nice_prompts find_vocab_asis
+</literallayout></blockquote>
+You can also do the whole process with the command
+<blockquote><literallayout>
+    $FESTVOXDIR/src/promptselect/make_nice_prompts do_all_asis TEXT0 TEXT1 ...
+</literallayout></blockquote>
+
+</para><para>
+
+For languages that do not have spaces between the words (Chinese,
+Japanese, Thai etc), the above techniques will not work.  We have used
+the above techniques for Chinese, by first segmenting the data into
+words.  
+
+</para>
+
+</sect1>
+
+</chapter>

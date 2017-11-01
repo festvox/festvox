@@ -1,0 +1,287 @@
+(
+( occurid cluster )
+( p.name
+    0 "aa" "ae" "ah" "ao" "aw" "ax" "axr" "ay" "b" "brth" "ch" "d" "dh"
+    "dx" "eh" "el" "em" "en" "er" "ey" "f" "g" "h#" "hh" "hv" "ih" "iy"
+    "jh" "k" "l" "m" "n" "ng" "nx" "ow" "oy" "p" "pau" "r" "s" "sh" "t"
+    "th" "uh" "uw" "v" "w" "y" "z" "zh"
+)
+( p.ph_vc
++
+-
+0
+)
+( p.ph_ctype
+0
+a
+f
+l
+n
+r
+s
+)
+( p.ph_vheight
+0
+1
+2
+3
+)
+( p.ph_vlng
+0
+a
+d
+l
+s
+)
+( p.ph_vfront
+0
+1
+2
+3
+)
+( p.ph_vrnd
++
+-
+0
+)
+( p.ph_cplace
+0
+a
+b
+d
+g
+l
+p
+v
+)
+( p.ph_cvox
++
+-
+0
+)
+( n.name ignore
+    0 "aa" "ae" "ah" "ao" "aw" "ax" "axr" "ay" "b" "brth" "ch" "d" "dh"
+    "dx" "eh" "el" "em" "en" "er" "ey" "f" "g" "h#" "hh" "hv" "ih" "iy"
+    "jh" "k" "l" "m" "n" "ng" "nx" "ow" "oy" "p" "pau" "r" "s" "sh" "t"
+    "th" "uh" "uw" "v" "w" "y" "z" "zh"
+)
+( n.ph_vc
++
+-
+0
+)
+( n.ph_ctype
+0
+a
+f
+l
+n
+r
+s
+)
+( n.ph_vheight
+0
+1
+2
+3
+)
+( n.ph_vlng
+0
+a
+d
+l
+s
+)
+( n.ph_vfront
+0
+1
+2
+3
+)
+( n.ph_vrnd
++
+-
+0
+)
+( n.ph_cplace
+0
+a
+b
+d
+g
+l
+p
+v
+)
+( n.ph_cvox
++
+-
+0
+)
+( segment_duration ignore float)
+( seg_pitch ignore float )
+( p.seg_pitch ignore float )
+( n.seg_pitch ignore float )
+( R:SylStructure.parent.stress
+0
+1
+)
+( seg_onsetcoda
+coda
+onset
+)
+( n.seg_onsetcoda 
+0
+coda
+onset
+)
+( p.seg_onsetcoda
+0
+coda
+onset
+)
+( R:SylStructure.parent.accented
+0
+1
+)
+( pos_in_syl
+0
+1
+2
+3
+4
+5
+6
+7
+8
+)
+( syl_initial 
+0
+1
+)
+( syl_final
+0
+1
+)
+( R:SylStructure.parent.lisp_cg_break
+0
+1
+2
+3
+4
+)
+( R:SylStructure.parent.R:Syllable.p.lisp_cg_break
+0
+1
+2
+3
+4
+)
+( R:SylStructure.parent.position_type
+0
+initial
+single
+final
+mid
+)
+( pp.name ignore
+    0 "aa" "ae" "ah" "ao" "aw" "ax" "axr" "ay" "b" "brth" "ch" "d" "dh"
+    "dx" "eh" "el" "em" "en" "er" "ey" "f" "g" "h#" "hh" "hv" "ih" "iy"
+    "jh" "k" "l" "m" "n" "ng" "nx" "ow" "oy" "p" "pau" "r" "s" "sh" "t"
+    "th" "uh" "uw" "v" "w" "y" "z" "zh"
+)
+( pp.ph_vc ignore
++
+-
+0
+)
+( pp.ph_ctype ignore
+0
+a
+f
+l
+n
+r
+s
+)
+( pp.ph_vheight ignore
+0
+1
+2
+3
+)
+( pp.ph_vlng ignore
+0
+a
+d
+l
+s
+)
+( pp.ph_vfront ignore
+0
+1
+2
+3
+)
+( pp.ph_vrnd ignore
++
+-
+0
+)
+( pp.ph_cplace ignore
+0
+a
+b
+d
+g
+l
+p
+v
+)
+( pp.ph_cvox ignore
++
+-
+0
+)
+( n.lisp_is_pau 0 1)
+( p.lisp_is_pau 0 1)
+( R:SylStructure.parent.parent.gpos
+0
+aux
+cc
+content
+det
+in
+md
+pps
+to
+wp
+punc
+)
+( R:SylStructure.parent.parent.R:Word.p.gpos
+0
+aux
+cc
+content
+det
+in
+md
+pps
+to
+wp
+punc
+)
+( R:SylStructure.parent.parent.R:Word.n.gpos
+0
+aux
+cc
+content
+det
+in
+md
+pps
+to
+wp
+punc
+)
+)

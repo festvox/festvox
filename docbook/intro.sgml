@@ -1,0 +1,430 @@
+<chapter id="bsv-intro-ch">
+<title>Overview of Speech Synthesis</title>
+
+<sect1><title>History</title>
+
+<para>
+<comment>AWB: probably way too biased as a history</comment> The idea
+that a machine could generate speech has been with us for some time,
+but the realization of such machines has only really been practical
+within the last 50 years.  Even more recently, it's in the last 20
+years or so that we've seen practical examples of text-to-speech
+systems that can say any text they're given -- though it might be "wrong."
+</para>
+<para>
+The creation of synthetic speech covers a whole range of processes,
+and though often they are all lumped under the general term
+<firstterm>text-to-speech</firstterm>, a good deal of work has gone
+into generating speech from sequences of speech sounds; this would be
+a speech-sound (phoneme) to audio waveform synthesis, rather than
+going all the way from text to phonemes (speech sounds), and then to
+sound.
+</para>
+<para>
+One of the first practical application of speech synthesis was in 1936
+when the U.K. Telephone Company introduced a speaking clock.  It used
+optical storage for the phrases, words, and part-words ("noun,"
+"verb," and so on) which were appropriately concatenated to form
+complete sentences.
+</para>
+<para>
+Also around that time, Homer Dudley developed a mechanical device at
+Bell Laboratories that operated through the movement of pedals, and mechanical
+keys, like an organ. With a trained operator, it could be made to
+create sounds that, if given a good set-up, almost sounded like
+speech.  Called the <firstterm>Voder</firstterm>, it was demonstrated
+at the 1939 World's Fair in New York and San Francisco.  A recording
+of this device exists, and can be heard as part of a collection of
+historical synthesis examples that were distributed on a record as
+part of <citation>klatt87</citation>.
+</para>
+<para>
+The realization that the speech signal could be decomposed as a
+source-and-filter model, with the glottis acting as a sound source and
+the oral tract being a filter, was used to build analog electronic
+devices that could be used to mimic human speech.  The
+<firstterm>vocoder</firstterm>, also developed by Homer Dudley, is one
+such example.  Much of the work in synthesis in the 40s and 50s was
+primarily concerned with constructing replicas of the signal itself
+rather than generating the phones from an abstract form like text.
+</para>
+<para>
+Further decomposition of the speech signal allowed the development of
+<firstterm>formant synthesis</firstterm>, where collections of signals
+were composed to form recognization speech.  The prediction of
+parameters that compactly represent the signal, without the loss of
+any information critical for reconstruction, has always been, and
+still is, difficult.  Early versions of formant synthesis allowed
+these to be specified by hand, with automatic modeling as a goal.
+Today, formant synthesizers can produce high quality, recognizable
+speech if the parameters are properly adjusted, and these systems can
+work very well for some applications.  It's still hard to get
+fully natural sounding speech from these when the process is fully
+automatic -- as it is from all synthesis methods.
+</para>
+<para>
+With the rise of digital representations of speech, digital signal
+processing, and the proliferation of cheap, general-purpose computer
+hardware, more work was done in concatenation of natural recorded
+speech.  <firstterm>Diphones</firstterm> appeared; that is, two
+adjacent half-phones (context-dependent phoneme realizations), cut in
+the middle, joined into one unit.  The justification was that phone
+boundaries are much more dynamic than stable, interior parts of
+phones, and therefore mid-phone is a better place to concatenate
+units, as the stable points have, by definition, little rapid change,
+whereas there are rapid changes at the boundaries that depend upon the
+previous or next unit.
+</para>
+<para>
+The rise of concatenative synthesis began in the 70s, and has largely
+become practical as large-scale electronic storage has become cheap
+and robust.  When a megabyte of memory was a significant part of
+researchers salary, less resource-intensive techniques were worth
+their...  weight in saved cycles in gold, to use an odd metaphor.  Of
+course formant, synthesis can still require significant computational
+power, even if it requires less storage; the 80s speech synthesis
+relied on specialized hardware to deal with the constraints of the
+time.
+</para>
+<para>
+In 1972, the standard Unix manual (3rd edition) included commands to
+process text to speech, form text analysis, prosodic prediction,
+phoneme generation, and waveform synthesis through a specialized piece
+of hardware.  Of course Unix had only about 16 installations at the
+time and most, perhaps even all, were located in Bell Labs at Murray
+Hill.
+</para>
+<para>
+Techniques were developed to compress (code) speech in a way that it
+could be more easily used in applications.  The Texas Instruments
+<firstterm>Speak 'n Spell</firstterm> toy, released in the late 70s,
+was one of the early examples of mass production of speech synthesis.
+The quality was poor, by modern standards, but for the time it was
+very impressive.  Speech was basically encoded using LPC (linear
+Predictive Coding) and mostly used isolated words and letters though
+there were also a few phrases formed by concatenation.  Simple
+text-to-speech (TTS) engines based on specialised chips became popular
+on home computers such as the BBC Micro in the UK and the Apple ][.
+</para>
+<para>
+Dennis Klatt's MITalk synthesizer <citation>allen87</citation> in many
+senses defined the perception of automatic speech synthesis to the
+world at large.  Later developed into the product DECTalk, it produces
+somewhat robotic, but very understandable, speech.  It is a formant
+synthesizer, reflecting the state of the art at the time.
+</para>
+<para>
+Before 1980, research in speech synthesis was limited to the large
+laboratories that could afford to invest the time and money for
+hardware.  By the mid-80s, more labs and universities started to join
+in as the cost of the hardware dropped.  By the late eighties, purely
+software synthesizers became feasible; the speech quality was still
+decidedly inhuman (and largely still is), but it could be generated in
+near real-time.
+</para>
+<para>
+Of course, with faster machines and large disk space, people began to
+look to improving synthesis by using larger, and more varied
+inventories for concatenative speech.  Yoshinori Sagisaka at Advanced
+Telecommunications Research (ATR) in Japan developed nuu-talk
+<citation>nuutalk92</citation> in the late 80s and early 90s. It
+introduced a much larger inventory of concatenative units; thus,
+instead of one example of each diphone unit, there could be many, and
+an automatic, acoustically based distance function was used to find
+the best selection of sub-word units from a fairly broad database of
+general speech.  This work was done in Japanese, which has a much
+simpler phonetic structure than English, making it possible to get
+high quality with a relatively small databases.  Even up through 1994,
+the time needed to generate of the parameter files for a new voice in
+nuu-talk (503 senetences) was on the order of several days of CPU
+time, and synthesis was not generally possible in real time.
+</para>
+<para>
+With the demonstration of general <firstterm>unit selection
+synthesis</firstterm> in English in Rob Donovan's PhD work
+<citation>donovan95</citation>, and ATR's CHATR system
+(<citation>campbell96</citation> and <citation>hunt96</citation>), by
+the end of the 90's, unit selection had become a hot topic in speech
+synthesis research.  However, despite examples of it working
+excellently, generalized unit selection is known for producing very
+bad quality synthesis from time to time.  As the optimial search and
+selection agorithms used are not 100% reliable, both high and low
+quality synthesis is produced -- and many diffilculties still exists
+in turning general corpora into high-quality synthesizers as of this
+writing.
+</para>
+<para>
+Into the 2000s a new statistical method of speech synthesis has come
+to the forefront.  Again pioneered by work on Japan.  Prof Keiichi
+Tokuda's HTS System (from Nagoya Institute of Technology) showed that
+building generative models of speech, rather than selecting unit
+instances can generate reliable high quality speech.  Its prominance
+came to the fore front at the first Blizzard Challange in 2005 which
+showed that HTS output was reliably understoof by listeners.  HTS, and
+so-called HMM synthesis seems to do well on smaller amounts of data,
+and when then the data is less reliably recorded which offers a
+significant advantage over the requirement of very large carefully
+labelled corpora that seem to be required for unit selection work.  We
+include detailed walkthroughs form CMU's CLUSTERGEN statistical
+parametric synthesizer which is tightly coupled with this Festvox
+voice building toolkit, though HTS continues to benefit from the
+Festival systems (and much of what is in this document).
+</para>
+<para>
+Of course, the development of speech synthesis is not isolated from
+other developments in speech technology.  Speech recognition, which
+has also benefited from the reduction in cost of computational power
+and increased availability of general computing into the populace,
+informs a the work on speech synthesis, and vice versa.  There are now
+many more people who have the computational resouces and interest in
+running speech applications, and this ability to run such applications
+puts the demand on the technology to deliver both working recognition
+and acceptable quality speech synthesis.
+</para>
+<para>
+The availability of free and semi-free synthesis systems, such as
+the Festival Speech Synthesis System and the MBROLA project, makes the
+cost of entering the field of speech synthesis much lower, and many
+more groups have now joined in the development.
+</para>
+<para>
+However, although we are now at the stage were talking computers are
+with us, there is still a great deal of work to be done.  We can now
+build synthesizers of (probably) any language that can produce
+reconizable speech, with a sufficient amount of work; but if we are to
+use speech to receive information as easily when we're talking with
+computers as we do in everyday conversation, synthesized speech must
+be natural, controllable and efficient (both in rendering and in the
+building of new voices).
+</para>
+
+</sect1>
+
+<sect1><title>Uses of Speech Synthesis </title>
+
+<para>
+While speech and language were already important parts of daily life
+before the invention of the computer, the equipment and technology
+that has developed over the last several years has made it possible to
+have machines that speak, read, or even carry out dialogs.  A number
+of vendors provide both recognition and speech technology, and there
+are several telephone-based systems that do interesting things.
+</para>
+<para>
+...
+</para>
+
+</sect1>
+
+<sect1>
+<title>General Anatomy of a Synthesizer</title>
+
+<para>
+<blockquote><literallayout>
+[ diagram: text going in and moving around, coming out audio ]
+</literallayout></blockquote>
+</para>
+<para>
+Within Festival we can identify three basic parts of the 
+TTS process 
+<variablelist>
+<varlistentry>
+<term><emphasis>Text analysis:</emphasis></term>
+<listitem><para>
+From raw text to identified words and basic utterances. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>Linguistic analysis:</emphasis></term>
+<listitem><para>
+Finding pronunciations of the words and assigning prosodic 
+structure to them: phrasing, intonation and durations. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>Waveform generation:</emphasis></term>
+<listitem><para>
+From a fully specified form (pronunciation and prosody) generate 
+a waveform. 
+</para></listitem></varlistentry>
+</variablelist>
+These partitions are not absolute, but they are a good way of chunking 
+the problem. Of course, different waveform generation techniques may 
+need different types of information. <emphasis>Pronunciation</emphasis> may not 
+always use standard phones, and <emphasis>intonation</emphasis> need not necessarily 
+mean an F0 contour. For the main part, at along least the path which is 
+likely to generate a working voice, rather than the more research 
+oriented techniques described, the above three sections will be fairly 
+cleanly adhered to. 
+</para>
+<para>
+There is another part to TTS which is normally not mentioned, we will 
+mention it here as it is the most important aspect of Festival that 
+makes building of new voices possible -- the system <emphasis>architecture</emphasis>. 
+Festival provides a basic utterance structure, a language to manipulate 
+it, and methods for construction and deletion; it also interacts with 
+your audio system in an efficient way, spooling audio files while the 
+rest of the synthesis process can continue. With the Edinburgh Speech 
+Tools, it offers basic analysis tools (pitch trackers, classification 
+and regression tree builders, waveform I/O etc) and a simple but 
+powerful scripting language. All of these functions make it so that you 
+may get on with the task of building a voice, rather than worrying about 
+the underlying software too much. 
+</para>
+
+<sect2>
+<title> Text </title>
+<para>
+We try to model the voice independently of the meaning, with machine
+learning techniques and statistical methods.  This is an important
+abstraction, as it moves us from the realm of "all human thought" to
+"all possible sequences."  Rather than asking "when and why should
+this be said," we ask "how is this performed, as a series of speech
+sounds?" In general, we'll discuss this under the heading of text
+analysis -- going from written text, possibly with some mark-up, to a
+set of words and their relationships in an internal representation,
+called an utterance structure.
+</para>
+<para>
+<indexterm><primary> utterance chunking </primary></indexterm>
+<indexterm><primary> text analysis </primary></indexterm>
+Text analysis is the task of identifying the <emphasis>words</emphasis> in the text. 
+By <emphasis>words</emphasis>, we mean tokens for which there is a well defined method 
+of finding their pronunciation, i.e. from a lexicon, or using 
+letter-to-sound rules. The first task in text analysis is to make 
+chunks out of the input text -- <emphasis>tokenizing</emphasis> it. In Festival, at this 
+stage, we also chunk the text into more reasonably sized utterances. An 
+utterance structure is used to hold the information for what might most 
+simply be described as a <emphasis>sentence</emphasis>. We use the term loosely, as 
+it need not be anything syntactic in the traditional linguistic sense, 
+though it most often has prosodic boundaries or edge effects. 
+Separating a text into utterances is important, as it allows synthesis to 
+work bit by bit, allowing the waveform of the first utterance to be 
+available more quickly than if the whole files was processed as one. 
+Otherwise, one would simply play an entire recorded utterance -- which 
+is not nearly as flexible, and in some domains is even impossible. 
+</para>
+<para>
+<indexterm><primary> Chinese </primary></indexterm>
+<indexterm><primary> Japanese </primary></indexterm>
+Utterance chunking is an externally specifiable part of Festival, as it 
+may vary from language to language. For many languages, tokens are 
+white-space separated and utterances can, to a first approximation, be 
+separated after full stops (periods), question marks, or exclamation 
+points. Further complications, such as abbreviations, other-end 
+punctuation (as the upside-down question mark in Spanish), blank lines 
+and so on, make the definition harder. For languages such as Japanese 
+and Chinese, where white space is not normally used to separate what we 
+would term words, a different strategy must be used, though both these 
+languages still use punctuation that can be used to identify utterance 
+boundaries, and word segmentation can be a second process. 
+</para>
+<para>
+Apart from chunking, text analysis also does text <emphasis>normalization</emphasis>. 
+There are many tokens which appear in text that do not have 
+a direct relationship to their pronunciation. Numbers are perhaps 
+the most obvious example. Consider the following 
+sentence 
+<blockquote><literallayout>
+On May 5 1996, the university bought 1996 computers. 
+</literallayout></blockquote>
+In English, tokens consisting of solely digits have a number of different 
+forms of pronunciation. The <quote><emphasis>5</emphasis></quote> above is pronounced <quote><emphasis>fifth</emphasis></quote>, an 
+ordinal, because it is the day in a month, The first <quote><emphasis>1996</emphasis></quote> is 
+pronounced as <quote><emphasis>nineteen ninety six</emphasis></quote> because it is a year, and the 
+second <quote><emphasis>1996</emphasis></quote> is pronounced as <quote><emphasis>one thousand nine hundred 
+and ninety size</emphasis></quote> (British English) as it is a quantity. 
+</para>
+<para>
+<indexterm><primary> homographs </primary></indexterm>
+<indexterm><primary> token to word rules </primary></indexterm>
+Two problems that turn up here: non-trivial relationship of tokens to 
+words, and <emphasis>homographs</emphasis>, where the same token may have alternate 
+pronunciations in different contexts. In Festival, homograph 
+disambiguation is considered as part of text analysis. In addition to 
+numbers, there are many other symbols which have internal structure that 
+require special processing -- such as money, times, addresses, etc. All 
+of these can be dealt with in Festival by what is termed 
+<emphasis>token-to-word rules</emphasis>. These are language specific (and sometimes 
+text mode specific). Detailed examples will be given in the text 
+analysis chapter below. 
+</para>
+
+</sect2>
+
+<sect2>
+<title> Lexicons </title>
+<para>
+After we have a set of words to be spoken, we have to decide what the
+sounds should be -- what phonemes, or basic speech sounds, are spoken.
+Each language and dialect has a phoneme set associated with it, and
+the choice of this inventory is still not agreed upon; different
+theories posit different feature geometries. Given a set of units, we
+can, once again, train models from them, but it is up to linguistics
+(and practice) to help us find good levels of structure and the units
+at each. 
+</para>
+
+</sect2>
+
+<sect2>
+<title> Prosody </title>
+
+<para>
+Prosody, or the way things are spoken, is an extremely important part
+of the speech message.  Changing the placement of emphasis in a
+sentence can change the meaning of a word, and this emphasis might be
+revealed as a change in pitch, volume, voice quality, or timing.
+</para>
+<para>
+We'll present two approaches to taming the prosodic beast: limiting
+the domain to be spoken, and intonation modeling.  By limiting the
+domain, we can collect enough data to cover the whole output.  For
+some things, like weather or stock quotes, very high quality can be
+produced, since these are rather contained.  For general synthesis,
+however, we need to be able to turn any text, or perhaps concept, into
+a spoken form, and we can never collect all the sentences anyone could
+ever say.  To handle this, we break the prosody into a set of
+features, which we predict using statistically trained models.
+</para>
+<para>
+ - phrasing
+ - duration
+ - intonation
+ - energy
+ - voice quality
+</para>
+
+</sect2>
+
+<sect2>
+<title> Waveform generation </title>
+<para>
+For the case of concatenative synthesis, we actually collect
+recordings of voice talent, and this captures the voice quality to
+some degree. This way, we avoid detailed physical simulation of the
+oral tract, and perform synthesis by integrating pieces that we have
+in our inventory; as we don't have to produce the precisely controlled
+articulatory motion, we can model the speech using the units available
+in the sound alone -- though these are the surface realization of an
+underlying, physically generated signal, and knowledge of that system
+informs what we do.  During waveform generation, the system assembles
+the units into an audio file or stream, and that can be finally
+"spoken."  There can be some distortion as these units are joined
+together, but the results can also be quite good. 
+</para>
+<para>
+We systematically collect the units, in all variations, so as to be
+able to reproduce them later as needed.  To do this, we design a set
+of utterances that contain all of the variation that produces
+meaningful or apparent contrast in the language, and record it.  Of
+course, this requires a theory of how to break speech into relevant
+parts and their associated features; various linguistic theories
+predict these for us, though none are undisputed. There are several
+different possible unit inventories, and each has tradeoffs, in terms
+of size, speed, and quality; we will discuss these in some detail.
+</para>
+
+</sect2>
+</sect1>
+</chapter>
+
+

@@ -1,0 +1,36 @@
+# UNIX HTS-demo MAKEFILE
+#
+# This makefile will build various files for demonstraition of 
+# HMM-based speech synthesis.
+#
+# When invoked it expects to have the following environment variables
+# set
+#      SPTKBINDIR      - set to the directory which includes SPTK executable
+#      HTSBINDIR       - set to the directory which includes HTS executable
+#      DATADIR         - set to the directory where you expanded the data
+#
+
+CURRENTDIR = `pwd`
+
+# for the demonstration using HTS-demo_CMU-Communicator-KAL
+
+DATADIR    = $(CURRENTDIR)/../data
+SPEAKER    = v
+DATASET    = db
+
+# for the demonstration using HTS-demo_CSTR-TIMIT-KED
+
+# DATADIR    = /work/zen/hts_english/HTS-demo_CSTR-TIMIT-KED
+# SPEAKER    = ked
+# DATASET    = cstr_us_timit
+
+all:
+	sed 's:CURRENTDIR:'${CURRENTDIR}':g' ${CURRENTDIR}/scripts/Training.pl.bak | \
+	sed 's:SPTKBINDIR:'${SPTKBINDIR}':g' | \
+	sed 's:HTSBINDIR:'${HTSBINDIR}':g' | \
+	sed 's:DATADIR:'${DATADIR}':g' | \
+	sed 's:SPEAKER:'${SPEAKER}':g' | \
+	sed 's:DATASET:'${DATASET}':g' > ${CURRENTDIR}/scripts/Training.pl
+	chmod +x ${CURRENTDIR}/scripts/Training.pl
+
+

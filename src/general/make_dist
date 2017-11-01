@@ -1,0 +1,168 @@
+#!/bin/sh
+####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                   Carnegie Mellon University and                      ##
+##                   Alan W Black and Kevin A. Lenzo                     ##
+##                      Copyright (c) 1998-2000                          ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+
+LANG=C; export LANG
+
+if [ $# = 0 ]
+then
+   echo "Make voice distribution"
+   echo "Usage:  bin/make_dist TYPE"
+   echo "Where TYPE is one of"
+   echo "  festvox: runtime voice distribution (README, COPYING, festvox/"
+   echo "           festival/clunits/*.catalog festival/tree/*.tree" 
+   echo "  backup:  backup copy of basic stuff and some derived stuff"
+   echo "           (no prompts, lpc, plm_lab or f0)" 
+   echo "  devlite: Typical files you change in development"
+   echo "           bin/ etc/ lab/ pm/ festival/clunits/" 
+  
+   exit 1
+fi
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ ! -f etc/voice.defs ]
+then
+   $FESTVOXDIR/src/general/guess_voice_defs
+fi
+. ./etc/voice.defs
+if [ ! -d versions ]
+then
+   mkdir versions
+fi
+
+OPTNAME=$2
+
+# Voice distribution has festival/lib/voice/LANG/voicename as prefix
+# for all files
+if [ $1 = "festvox" ]
+then
+    fvdir=festival/lib/voices/$FV_LANG/$FV_FULLVOICENAME
+    if [ ! -f $fvdir ]
+    then
+       mkdir -p `dirname $fvdir`
+       (cd `dirname $fvdir`; ln -s ../../../.. $FV_FULLVOICENAME)
+    fi
+    fvsigdir=$fvdir/wav
+    tar zcvf versions/festvox_$FV_FULLVOICENAME$OPTNAME.tar.gz \
+         $fvdir/README \
+         $fvdir/COPYING \
+         $fvdir/festvox/*.scm \
+         $fvdir/festival/clunits/$FV_VOICENAME.catalogue \
+         $fvdir/festival/trees/$FV_VOICENAME.tree \
+         $fvdir/mcep/*.mcep \
+         $fvsigdir/* 
+    # that symlink causes some people problesm in cp's 
+    rm $fvdir
+fi        
+
+# Voice distribution has festival/lib/voice/LANG/voicename as prefix
+# for all files
+if [ $1 = "festvox_diphone" ]
+then
+    fvdir=festival/lib/voices/$FV_LANG/$FV_FULLVOICENAME
+    if [ ! -f $fvdir ]
+    then
+       mkdir -p `dirname $fvdir`
+       (cd `dirname $fvdir`; ln -s ../../../.. $FV_FULLVOICENAME)
+    fi
+    fvsigdir=$fvdir/wav
+    tar zcvf versions/festvox_$FV_FULLVOICENAME$OPTNAME.tar.gz \
+         $fvdir/README \
+         $fvdir/COPYING \
+         $fvdir/festvox/*.scm \
+         $fvdir/group/*.group \
+    # that symlink causes some people problesm in cp's 
+    rm $fvdir
+fi        
+
+# For storing forever, or at least a clean copy of the base form of
+# everything.
+if [ $1 = "backup" ]
+then
+    fvdir=.
+    mkdir -p $fvdir
+    touch $fvdir/lpc/.something
+    touch $fvdir/festival/feats/.something
+    touch $fvdir/festival/disttabs/.something
+    tar zcvf versions/festvox_$FV_VOICENAME$OPTNAME"_backup".tar.gz \
+    $fvdir/README \
+    $fvdir/COPYING \
+    $fvdir/festvox/*.scm \
+    $fvdir/festival/clunits/* \
+    $fvdir/festival/trees/$FV_VOICENAME.tree \
+    $fvdir/festival/utts/*.utt \
+    $fvdir/lpc/.something \
+    $fvdir/festival/feats/.something \
+    $fvdir/festival/disttabs/.something \
+    $fvdir/bin/* \
+    $fvdir/etc/* \
+    $fvdir/pm/*.pm \
+    $fvdir/mcep/*.mcep \
+    $fvdir/wav/*.wav \
+    $fvdir/lab/*.lab
+fi        
+
+if [ $1 = "recording" ]
+then
+    fvdir=.
+    tar zcvf versions/$FV_VOICENAME$OPTNAME"_orig".tar.gz \
+    $fvdir/etc/*.data \
+    $fvdir/rcording
+fi        
+
+if [ $1 = "devlite" ]
+then
+    fvdir=.
+    touch $fvdir/lpc/.something
+    touch $fvdir/festival/feats/.something
+    tar zcvf versions/festvox_$FV_VOICENAME$OPTNAME"_devlite".tar.gz \
+    $fvdir/README \
+    $fvdir/COPYING \
+    $fvdir/festvox/*.scm \
+    $fvdir/festival/clunits/* \
+    $fvdir/festival/trees/$FV_VOICENAME.tree \
+    $fvdir/bin/* \
+    $fvdir/etc/* \
+    $fvdir/pm/*.pm \
+    $fvdir/lab/*.lab
+fi        
+

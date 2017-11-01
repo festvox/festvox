@@ -1,0 +1,237 @@
+#!/bin/sh
+#
+#  This should be in perl
+#
+
+cat $1 |
+sed 's/@@/@/g' |
+grep -v "^@node" |
+awk 'BEGIN {
+         lastlineempty=0;
+         slevel = 0;
+         omit = 0;
+         printf("<chapter>");
+     }
+     function do_line(stag,etag,line)
+     {
+         printf("<%s>%s</%s>\n",stag,line,etag);
+     }
+     function process_line()
+     {
+        for (i=1; i<=NF; i++)
+        {
+           punc = "";
+           word = $i;
+	   while (word ~ /.*[.,:;"'"'"']$/)
+           {
+               punc = sprintf("%s%s",substr(word,length(word),1),punc);
+	       word = substr(word,1,length(word)-1);
+           }
+           if (word ~ /^@.*{.*/)
+           {
+             local = substr(word,2,index(word,"{")-2);
+             printf("<%s>",local);
+             bit = substr(word,index(word,"{")+1);
+             if (bit ~ /.*}/)
+		printf("%s</%s>%s ",
+		       substr(bit,1,length(bit)-1),
+                       local,punc);
+	     else
+		printf("%s ",bit);
+           }
+	   else if (word ~ /.*}$/)
+           {
+		printf("%s</%s>%s ",
+		       substr(word,1,length(word)-1),
+                       local,punc);
+           }
+           else 
+	       printf("%s%s ",word,punc);
+        }
+        printf("\n");
+     }
+     { 
+       if (($0 == "") && (literal != 1) && (omit == 0))
+       {
+         printf("%s",closing);
+         closing = "";
+       }
+       if ((literal == 1) && ($1 != "@end") && ($2 != "@example"))
+         printf("%s\n",$0);
+       else if ((omit == 1) && ($1 != "@end") && ($2 != "@menu"))
+         a = 1;
+       else if (($1 ~ /^@.*[^{]$/) &&
+           ($1 != "@cindex"))       
+       {
+          type = substr($1,2);
+          if (type == "chapter")
+              do_line("title","title",substr($0,length($1)+2));
+          else if (type == "section")
+	  {
+	      if (slevel > 1)
+                 printf("</sect2>");
+	      if (slevel > 0)
+                 printf("</sect1>\n\n");
+	      printf("<sect1><title>%s</title>\n",
+	             substr($0,10));
+              slevel = 1;
+	  }
+          else if (type == "subsection")
+	  {
+	      if (slevel > 1)
+                 printf("</sect2>\n\n");
+	      printf("<sect2><title>%s</title>\n",
+	             substr($0,13));
+              slevel = 2;
+	  }
+          else if ((type == "itemize") && ($2 == "@bullet"))
+	  {
+	       listtype="bullet";
+               item_close = 0;
+	       printf("<itemizedlist mark=bullet>\n");
+	  }
+          else if ((type == "end") && ($2 == "itemize"))
+	  {
+	       if (item_close == 1)
+                    printf("</para></listitem>\n");
+	       printf("</itemizedlist>\n");
+               item_close = 0;
+	  }
+          else if ((type == "item") && (listtype == "bullet"))
+          {
+	       if (item_close == 1)
+                    printf("</para></listitem>\n");
+	       printf("<listitem><para>\n");
+	       printf("%s\n",substr($0,7));
+	       item_close = 1;
+          }
+          else if ((type == "table") && ($2 == "@emph"))
+	  {
+	       listtype="tableemph";
+               item_close = 0;
+	       printf("<variablelist>\n");
+	  }
+          else if ((type == "end") && ($2 == "table"))
+	  {
+	       if (item_close == 1)
+                    printf("</para></listitem></varlistentry>\n");
+	       printf("</variablelist>\n");
+               item_close = 0;
+	  }
+          else if ((type == "item") && (listtype == "tableemph"))
+          {
+	       if (item_close == 1)
+                    printf("</para></listitem></varlistentry>\n");
+	       printf("<varlistentry>\n");
+	       printf("<term><emphasis>%s</emphasis></term>\n",substr($0,7));
+	       printf("<listitem><para>\n");
+	       item_close = 1;
+          }
+          else if ((type == "table") && ($2 == "@file"))
+	  {
+	       listtype="tablefile";
+               item_close = 0;
+	       printf("<variablelist>\n");
+	  }
+          else if ((type == "item") && (listtype == "tablefile"))
+          {
+	       if (item_close == 1)
+                    printf("</para></listitem></varlistentry>\n");
+	       printf("<varlistentry>\n");
+	       printf("<term><filename>%s</filename></term>\n",substr($0,7));
+	       printf("<listitem><para>\n");
+	       item_close = 1;
+          }
+
+          else if ((type == "table") && ($2 == "@code"))
+	  {
+	       listtype="tablecode";
+               item_close = 0;
+	       printf("<variablelist>\n");
+	  }
+          else if ((type == "item") && (listtype == "tablecode"))
+          {
+	       if (item_close == 1)
+                    printf("</para></listitem></varlistentry>\n");
+	       printf("<varlistentry>\n");
+	       printf("<term><varname>%s</varname></term>\n",substr($0,7));
+	       printf("<listitem><para>\n");
+	       item_close = 1;
+          }
+
+          else if (type == "example")
+	  {
+	       printf("<blockquote><literallayout>\n");
+	       literal = 1;
+	  }
+          else if ((type == "end") && ($2 == "example"))
+	  {
+	       printf("</literallayout></blockquote>\n");
+	       literal = 0;
+	  }
+          else if (type == "lisp")
+	  {
+	       printf("<blockquote><literallayout>\n");
+	       literal = 1;
+	  }
+          else if ((type == "end") && ($2 == "lisp"))
+	  {
+	       printf("</literallayout></blockquote>\n");
+	       literal = 0;
+	  }
+          else if (type == "menu")
+	  {
+	       omit = 1;
+	  }
+          else if ((type == "end") && ($2 == "menu"))
+	  {
+	       omit = 0;
+	  }
+          else if (type == "cindex")
+              do_line("indexterm><primary","primary></indexterm",
+                      substr($0,length($1)+2));
+          else
+              process_line();
+       }
+       else
+       {
+          if (lastlineempty)
+          {
+             printf("<para>\n");
+             closing="</para>";
+             lastlineempty=0;
+          }
+          process_line();
+       }
+       if ($0 == "")
+          lastlineempty = 1;
+       else
+          lastlineempty = 0;
+     }
+     END {
+         printf("%s\n",closing);
+         if (slevel > 1)
+            printf("</sect2>");
+	 if (slevel > 0)
+            printf("</sect1>\n\n");
+         printf("\n</chapter>\n");
+     }' |
+awk '{if ($1 == "@cindex")
+         printf("<indexterm><primary>%s</primary></indexterm>\n",
+	        substr($0,8));
+      else
+         print($0); 
+      }' |
+sed 's/<emph>/<emphasis>/g' |
+sed 's/<.emph>/<\/emphasis>/g' |
+sed 's/<file>/<filename>/g' |
+sed 's/<.file>/<\/filename>/g' |
+sed 's/<var>/<varname>/g' |
+sed 's/<.var>/<\/varname>/g' |
+sed 's/<code>/<varname>/g' |
+sed 's/<.code>/<\/varname>/g' |
+sed 's/<samp>/<quote><emphasis>/g' |
+sed 's/<.samp>/<\/emphasis><\/quote>/g' |
+sed 's/<cite>/<citation>/g' |
+sed 's/<.cite>/<\/citation>/g' > $2
+

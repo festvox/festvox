@@ -1,0 +1,112 @@
+#!/bin/sh
+####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                   Carnegie Mellon University and                      ##
+##                   Alan W Black and Kevin A. Lenzo                     ##
+##                      Copyright (c) 1998-2000                          ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Using a simple DTW cepstrum aligner for finding phones in a waveform ##
+##  Using Festival to generate a waveform to align against               ##
+##                                                                       ##
+###########################################################################
+
+LANG=C; export LANG
+
+if [ "$1" = "-help" ]
+then
+   echo align phone list to waveforms
+   echo "Usage: align_phones wavefile/phonelist"
+   echo "Wavefile/phonelist should be file one example per line like"
+   echo "  wav/awb_0001.wav pau hh ah l ow pau "
+   echo "  wav/awb_0002.wav pau sh iy hh ae d y oar ..."
+   echo "Pauses will be automatically added at start and end if they"
+   echo "aren't specified"
+   echo 'Output will be in alignlab/`basename $i .wav`'
+   exit 1
+fi
+
+##  This should really be given as arguments 
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+FESTIVAL=$ESTDIR/../festival/bin/festival
+# Note this must be the fixed version of sig2fv that supports -shift
+SIG2FV=$ESTDIR/bin/sig2fv
+# These parameters are chosen by because they seems vaguely right
+# and do produce reasonable results, but if you think you know better
+# you probably do, feel free to experiment
+SIG2FVPARAMS='-coefs melcep -delta melcep -melcep_order 12 -fbank_order 24 -shift 0.005 -factor 5.0 -preemph 0.97'
+
+PHONEALIGN=$FESTVOX/src/general/phonealign
+
+#
+#  You may want to comment out some of the following parts if
+#  you have already run them before
+#
+
+cat $1 |
+while read example
+do
+   wavefname=`echo $example | awk '{print $1}'`
+   fname=`basename $wavefname .wav`
+   echo $fname
+   # Get Festival to generate the prompt
+   echo $example | 
+   awk '{printf("(set! utt1 (utt.synth (Utterance Phones (");
+         for (i=2; i <=NF; i++)
+            printf("%s ",$i);
+         printf("))))\n");
+         printf("(utt.save.wave utt1 \"'$fname'-prompt.wav\")\n")
+         printf("(utt.save.segs utt1 \"'$fname'-prompt.lab\")\n");}' |
+   $FESTIVAL "(voice_ked_diphone)"
+
+   # Construct cepstrum files
+   $SIG2FV $SIG2FVPARAMS -otype est $fname-prompt.wav -o $fname-prompt.cep
+   $SIG2FV $SIG2FVPARAMS -otype est_binary $wavefname -o $fname-real.cep
+
+   # Because of a bug in the synthesis process the cepstrum files
+   # may be slightly longer than necessary, which causes NaN in
+   # the cepstrum files.  This clips them
+   $ESTDIR/bin/ch_track -end `tail -1 $fname-prompt.lab | awk '{print $1}'` $fname-prompt.cep -otype est_binary -o $fname-prompt.cep
+   
+   # Now the actual alignment   
+   $PHONEALIGN -withcosts -itrack $fname-prompt.cep -ilabel $fname-prompt.lab -otrack $fname-real.cep -olabel alignlab/$fname.lab
+    
+    rm -f $fname-real.cep $fname-prompt.cep $fname-prompt.lab $fname-prompt.wav
+done
+
+
+ 

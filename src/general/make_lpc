@@ -1,0 +1,97 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                   Carnegie Mellon University and                      ##
+##                   Alan W Black and Kevin A. Lenzo                     ##
+##                      Copyright (c) 1998-2000                          ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+###                                                                       ##
+###  Generate LPC coefficients and residual for diphones (or otherwise)   ##
+###                                                                       ##
+############################################################################
+
+LANG=C; export LANG
+
+if [ $# = 0 ]
+then
+   echo "Extract lpc coefficients and residuals"
+   echo "Usage:  bin/make_lpc etc/txt.done.data"
+   echo "Expects pm/*.pm to exist, and creates lpc/*.lpc and lpc/*.res"
+   echo "If etc/powfacts exists, waveform will be power normalized"
+   echo "for LPC and residual extraction, wav/*.wav will be unchanged though."
+   exit 1
+fi
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+PROMPTFILE=etc/txt.done.data
+if [ $# = 1 ]
+then
+   PROMPTFILE=$1
+fi
+
+awk '{print $2}' $PROMPTFILE |
+while read i
+do
+   fname=$i
+   echo $fname LPC
+
+   # Potentially normalise the power (if powfact is there)
+   if [ -f etc/powfacts ]
+   then
+       powfact=`awk '{if ($1 == "'$fname'") print $2}' etc/powfacts`
+       if [ ! "$powfact" ]
+       then
+           powfact=1.0
+       fi
+       $ESTDIR/bin/ch_wave -scale $powfact wav/$fname.wav -o /tmp/tmp$$.wav
+   else
+       cat wav/$fname.wav >/tmp/tmp$$.wav    
+   fi
+   # Change the overall volume too, of the normalised file
+   # $ESTDIR/bin/ch_wave -scaleN 0.65 -o /tmp/tmp$$.wav /tmp/tmp$$.wav
+
+   # and if you want to resample, now is the time (can be combine with above)
+   #$ESTDIR/bin/ch_wave -F 11025 -o /tmp/tmp$$.wav /tmp/tmp$$.wav
+
+   # Extract the LPC coefficients 
+  $ESTDIR/bin/sig2fv /tmp/tmp$$.wav -o lpc/$fname.lpc -otype est_binary -lpc_order 16 -coefs "lpc" -pm pm/$fname.pm -preemph 0.95 -factor 3 -window_type hamming
+   # Extract the residual
+   $ESTDIR/bin/sigfilter /tmp/tmp$$.wav -o lpc/$fname.res -otype riff -lpcfilter lpc/$fname.lpc -inv_filter
+
+   rm /tmp/tmp$$.wav
+done

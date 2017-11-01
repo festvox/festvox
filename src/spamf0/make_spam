@@ -1,0 +1,268 @@
+#!/bin/sh
+###########################################################################
+##                                                                       ##
+##                  Language Technologies Institute                      ##
+##                     Carnegie Mellon University                        ##
+##                       Copyright (c) 2010-2016                         ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##            Authors: Gopala Krishna Anumanchipalli                     ##
+##            Email:   gopalakr@cs.cmu.edu                               ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Statistic Phrase Accent Model for F0                                 ##
+##  [Updated 2016 for speed (parallelism) and robustness]                ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+## Building a Statistical Phrase/Accent F0 Model                         ##
+##                                                                       ##
+###########################################################################
+
+FESTIVAL=$ESTDIR/../festival/bin/festival
+WAGON=$ESTDIR/bin/wagon
+phstop=$4
+accstop=$5
+
+# This benefits from a parallel wagon (OMP support)
+NUM_CPUS=`./bin/find_num_available_cpu`
+# You need an updated speech_tools/wagon that supports omp
+OMP="-omp_nthreads ${NUM_CPUS}"
+STEPWISE=-stepwise
+## It doesn't seem to be worth -stepwise -- its too slow for the small gain
+STEPWISE=
+
+if [ $# = 0 ]
+then
+	# To run 10 iterations of Phrase/Accent Split
+	echo "USAGE:   $FESTVOXDIR/src/spamf0/make_spam setup"
+	echo "         $FESTVOXDIR/src/spamf0/make_spam model PROMPTFILE 10 100 100 [#Iterations PhraseStopValue AccentStopValue]"
+	echo "         $FESTVOXDIR/src/spamf0/make_spam select 10 [#Iterations]"
+	exit 0
+fi
+
+if [ "$1" = "setup" ]
+then
+	mkdir -p logf0	
+	mkdir -p logf0/lf0
+	cp -p $FESTVOXDIR/src/spamf0/spamf0.scm festvox
+	cp -p $FESTVOXDIR/src/spamf0/segphrase.desc logf0
+	cp -p $FESTVOXDIR/src/spamf0/sylacc.desc logf0
+	cp -p $FESTVOXDIR/src/spamf0/af.desc logf0
+	cp -p $FESTVOXDIR/src/spamf0/rmsecor bin
+	exit 0
+fi
+
+if [ "$1" = "model" ]
+then
+	PROMPTFILE=$2
+	ITRNUM=$3
+	tmp=$$
+        . ./etc/voice.defs
+        echo Making logf0 files from ccoefs
+        $0 parallel generate_logf0tilt $PROMPTFILE
+	for i in `awk '{print $2}' $PROMPTFILE`
+        do
+           cat logf0/lf0/phrase0.$i.feats
+        done >logf0/phrase0.feats
+
+	echo "----------ph $4 ac $5" >> logf0/summary
+        # Collect the tilt information together
+	for i in `awk '{print $2}' $PROMPTFILE`
+	do
+	   $ESTDIR/bin/ch_track -otype ascii logf0/lf0/$i.ltilt | grep -v "nan" 
+	done |
+        awk '{if (TNF == 0) TNF=NF;
+              if (NF == TNF) print $0}' > /tmp/$tmp
+	awk '{print (NR-1),$3,$4,$5,$6}' /tmp/$tmp > /tmp/$tmp.feats
+	awk '{print $3,$4,$5,$6}' /tmp/$tmp | $ESTDIR/bin/ch_track -itype ascii - -otype est_binary -s 0.005 -o /tmp/$tmp.data
+	./bin/traintest  logf0/phrase0.feats 
+	./bin/traintest  /tmp/$tmp.feats
+	$WAGON $OMP -stop $phstop -data logf0/phrase0.feats.train -test logf0/phrase0.feats.test  -desc logf0/segphrase.desc -o logf0/phrase0.tree $STEPWISE
+	$WAGON $OMP -desc logf0/af.desc -track /tmp/$tmp.data -data /tmp/$tmp.feats.train -test /tmp/$tmp.feats.test -o logf0/cb0.tree -stop $accstop $STEPWISE
+	$FESTIVAL -b $FESTVOXDIR/src/clustergen/clustergen_build.scm "(begin (set! atree (car (load 'logf0/cb0.tree t))) (set! vector_num 0) (set! lfd (fopen 'logf0/cb0.tree 'w))(set! ofd (fopen 'logf0/cb0.rawparams 'w)) (set! atree (clustergen::dump_tree_vectors atree ofd)) (pprintf atree lfd))"
+# 4 following lines for gmm 2 above for cart
+#	nr=`wc -l /tmp/$tmp | awk '{print $1}'`
+#	awk -v nr=$nr 'BEGIN{printf("%d 3\n",nr);}{print $3,$4,$6}' /tmp/$tmp >/tmp/$tmp.gfeat
+#	~/projects/BWTrainer/GMM/mygmm /tmp/$tmp.gfeat $gcb /tmp/cb0.rawparams
+#	awk '{print $1,$2,$3,$4,0,0,$5,$6}' /tmp/cb0.rawparams > logf0/cb0.rawparams
+	$ESTDIR/bin/ch_track -otype est_binary -s 0.005 -o logf0/cb0.params logf0/cb0.rawparams
+	rm -f /tmp/$tmp /tmp/$tmp.feats /tmp/$tmp.data /tmp/$tmp.gfeat /tmp/$tmp.cb0.rawparams
+
+	titr=1
+	while [ $titr -le $ITRNUM ]
+	do
+           echo SPAM Interation $titr
+	   pitr=`echo "$titr - 1" | bc -l`
+	   mkdir -p logf0/lf$titr
+
+           # Can be parallelized
+           export titr
+           export basemean
+           export basestd
+           $0 parallel generate_lf $PROMPTFILE $titr $basemean $basestd
+
+           # Collect the (parallel) generated feats together
+           rm -f logf0/phrase$titr.feats logf0/acc$titr.feats logf0/acode$titr.data
+           awk '{print $2}' $PROMPTFILE |
+           while read x
+           do
+              cat logf0/lf$titr/phrase$x.feats >>logf0/phrase$titr.feats
+              cat logf0/lf$titr/acc$x.feats >>logf0/acc$titr.feats
+              cat logf0/lf$titr/acode$x.data >>logf0/acode$titr.data
+           done
+
+           # (re)Build models	
+	   awk '{print $1,$3,$5,$7}' logf0/cb$pitr.rawparams | $ESTDIR/bin/ch_track -itype ascii - -otype est_binary -s 0.005 -o /tmp/$tmp.cb$pitr.track
+	   ./bin/traintest logf0/acc$titr.feats 
+	   $WAGON $OMP -data logf0/acc$titr.feats.train -test logf0/acc$titr.feats.test -track /tmp/$tmp.cb$pitr.track -desc logf0/sylacc.desc -o logf0/acc$titr.tree $STEPWISE -stop $accstop
+   	   $FESTIVAL -b $FESTVOXDIR/src/clustergen/clustergen_build.scm "(begin (set! atree (car (load 'logf0/acc$titr.tree t))) (set! vector_num 0) (set! lfd (fopen 'logf0/acc$titr.tree 'w))(set! ofd (fopen 'logf0/cb$pitr.regrawparams 'w)) (set! atree (clustergen::dump_tree_vectors atree ofd)) (pprintf atree lfd))"
+	  $ESTDIR/bin/ch_track -otype est_binary -s 0.005 -o logf0/cb$pitr.regparams logf0/cb$pitr.regrawparams
+
+	   for i in `awk '{print $2}' $PROMPTFILE`
+	   do
+		$ESTDIR/bin/ch_track -otype ascii logf0/lf$titr/$i.ltilt | grep -v "nan" >> /tmp/$tmp
+	   done
+
+	   awk '{print (NR-1),$3,$4,$5,$6}' /tmp/$tmp > /tmp/$tmp.feats
+	   awk '{print $3,$4,$5,$6}' /tmp/$tmp | $ESTDIR/bin/ch_track -itype ascii - -otype est_binary -s 0.005 -o /tmp/$tmp.data
+	   ./bin/traintest logf0/phrase$titr.feats
+	   ./bin/traintest /tmp/$tmp.feats 
+	   $WAGON $OMP -stop $phstop -data logf0/phrase$titr.feats.train -test logf0/phrase$titr.feats.test  -desc logf0/segphrase.desc -o logf0/phrase$titr.tree $STEPWISE
+	   $WAGON $OMP -desc logf0/af.desc -track /tmp/$tmp.data -data /tmp/$tmp.feats.train -test /tmp/$tmp.feats.test -o logf0/cb$titr.tree -stop $accstop $STEPWISE
+   	   $FESTIVAL -b $FESTVOXDIR/src/clustergen/clustergen_build.scm "(begin (set! atree (car (load 'logf0/cb$titr.tree t))) (set! vector_num 0) (set! lfd (fopen 'logf0/cb$titr.tree 'w))(set! ofd (fopen 'logf0/cb$titr.rawparams 'w)) (set! atree (clustergen::dump_tree_vectors atree ofd)) (pprintf atree lfd))"
+# 4 following lines gmm 2 above for cart
+#	nr=`wc -l /tmp/$tmp | awk '{print $1}'`
+#	awk -v nr=$nr 'BEGIN{printf("%d 3\n",nr);}{print $3,$4,$6}' /tmp/$tmp >/tmp/$tmp.gfeat
+#	~/projects/BWTrainer/GMM/mygmm /tmp/$tmp.gfeat $gcb /tmp/cb$titr.rawparams
+#	awk '{print $1,$2,$3,$4,0,0,$5,$6}' /tmp/cb$titr.rawparams > logf0/cb$titr.rawparams
+
+	   $ESTDIR/bin/ch_track -otype est_binary -s 0.005 -o logf0/cb$titr.params logf0/cb$titr.rawparams
+	
+   	   rm -f /tmp/$tmp /tmp/$tmp.feats /tmp/$tmp.data /tmp/$tmp.cb$pitr.track
+	   for i in `awk '{print $2}' $PROMPTFILE`
+	   do
+		$ESTDIR/bin/ch_track -c 0 logf0/lf0/$i.lf0 > /tmp/$tmp.t1
+		$ESTDIR/bin/ch_track -c 0 logf0/lf$titr/$i.lf0 > /tmp/$tmp.t2
+		paste /tmp/$tmp.t1 /tmp/$tmp.t2 | awk '{if ($2> 0 && $1 >0){print $1, $2}}' | ./bin/rmsecor
+	   done | awk 'BEGIN{nc=0;}{if($1=="RMSE" && $2!="nan"){s2+=$2;s4+=$4;nc++}}END{print s2/nc,s4/nc}' >> logf0/summary
+	   titr=`echo "$titr + 1"| bc -l`
+	done
+
+        rm -f /tmp/$tmp.*
+	exit 0
+fi
+
+if [ "$1" = "generate_lf" ]
+then
+    PROMPTFILE=$2
+
+    . ./etc/voice.defs
+
+    $FESTIVAL -b festvox/spamf0.scm "(load 'festvox/"$FV_FULLVOICENAME".scm)" "(load 'festvox/clustergen.scm)" "(set! cg:basemean $basemean)" "(set! cg:basestd $basestd)" "(cg_splitf0 '$PROMPTFILE $titr 'logf0/segphrase.desc 'logf0/sylacc.desc)" 
+
+    exit 0
+fi
+
+if [ "$1" = "generate_logf0tilt" ]
+then
+    PROMPTFILE=$2
+
+    . ./etc/voice.defs
+    for i in `awk '{print $2}' $PROMPTFILE` 
+    do 
+       echo $i making logf0
+       $ESTDIR/bin/ch_track -otype ascii -c 0 ccoefs/$i.mcep | 
+       awk '{if ($1>1){$1=log($1);}else if($1<0){$1=0;} print $0}' | 
+       $ESTDIR/bin/ch_track -itype ascii - -otype est_binary -s 0.005 -o logf0/lf0/$i.lf0
+    done
+    $FESTIVAL -b festvox/spamf0.scm "(load 'festvox/clustergen.scm)" "(cg_dumpstats '$PROMPTFILE 'logf0/segphrase.desc)"
+
+    exit 0
+fi
+
+if [ "$1" = "parallel" ]
+then
+    ACTION="$2"
+    PROMPTFILE="$3"
+    if [ "$PROMPTFILE" = "" ]
+    then
+	PROMPTFILE=etc/txt.done.data
+    fi
+    
+    if [ ! -d tmpdir ]
+    then
+       # for the split promptfile
+       mkdir tmpdir
+    fi
+
+    # We use xargs to parallelize our work. We split our promptfile in 16
+    # parts. Then run those in parallel with xargs
+    num_cpus=$(./bin/find_num_available_cpu)
+    seq 0 15 | xargs -n 1 -P $num_cpus $0 _parallelworker $ACTION $PROMPTFILE
+    exit 0
+fi
+
+if [ "$1" = "_parallelworker" ]
+then
+    ACTION="$2"
+    PROMPTFILE="$3"
+    INDEX="$4"
+
+    # Get our partition of PROMPTFILE
+    SPLITPROMPTFILE=tmpdir/dobuild_parallelworker.$$.$INDEX
+    cat $PROMPTFILE | awk "NR%16==$INDEX {print \$0}" > $SPLITPROMPTFILE
+    
+    # Run our task
+    $0 $ACTION $SPLITPROMPTFILE
+    rm $SPLITPROMPTFILE
+    exit 0
+fi    
+
+
+if [ "$1" = "select" ]
+then
+	ITRNUM=$2
+	bestrun=`tail -n $2 logf0/summary| awk '{print $1,NR}' | sort -g| head -n 1| awk '{print $2}'`
+	echo $bestrun
+	bn1=`echo "$bestrun - 1"| bc -l`
+	cp -p logf0/phrase$bn1.tree festival/trees/phrase.tree
+	cp -p logf0/acc$bestrun.tree festival/trees/acc.tree
+	cp -p logf0/cb$bn1.regparams festival/trees/cb.params
+#	awk 'BEGIN{print "#";for (i=0;i<150;i++){print i}}' > logf0/acode.list
+#	./bin/make_ngrams logf0/acode$bestrun.data
+#	echo "(set! acode_probs '(" > logf0/acode_probs.scm
+#	awk '{for (i=2;i<NF;i++){has[$i]++;tc++}}END{for(i in has){print "(",i,has[i],has[i]/tc,")"}}END{print "))"}' logf0/acode$bestrun.data >> logf0/acode_probs.scm
+#	ncb=`awk '{for (i=1;i<=NF;i++){arr[$i]=1;}}END{for (i in arr){print i}}' logf0/acode$bestrun.data| sort -n | tail -n 1`
+#	ncb=`echo "$ncb + 1"| bc -l`
+#	./wfst/do_wfst basewfst $ncb
+#	./wfst/do_wfst train logf0/acode$bestrun.data $ncb
+	exit 0
+fi

@@ -1,0 +1,17 @@
+<chapter id="bsv-install-ch">
+<title>Tools Installation</title>
+
+<para>
+This chapter describes the installation method for Festival, the
+Festvox voice building tools and related system as used throughout
+this book. Binary distributions are included for standard systems, but
+full source is also provided as are instrction on installation.
+</para>
+<para>
+These tools are included on the CD as distributed with the book,
+though all parts (and possible later releases of them) are also
+available from <ulink url="http://festvox.org">
+<filename>http://festvox.org</filename></ulink>.
+</para>
+
+</chapter>

@@ -1,0 +1,1256 @@
+<chapter id="bsv-unitsel-ch">
+<title>Unit selection databases</title>
+
+<para>
+<indexterm><primary> unit selection </primary></indexterm>
+This chapter discusses some of the options for building waveform 
+synthesizers using unit selection techniques in Festival. This is still 
+very much an on-going research question and we are still adding new 
+techniques as well as improving existing ones often so the techniques 
+described here are not as mature as the techniques as described in 
+previous diphone chapter. 
+</para>
+<para>
+By "unit selection" we actually mean the selection of some unit of 
+speech which may be anything from whole phrase down to diphone (or even 
+smaller). Technically diphone selection is a simple case of this. 
+However typically what we mean is unlike diphone selection, in unit 
+selection there is more than one example of the unit and some mechanism 
+is used to select between them at run-time. 
+</para>
+<para>
+<indexterm><primary> CHATR </primary></indexterm>
+<indexterm><primary> nuutalk </primary></indexterm>
+ATR's CHATR <citation>hunt96</citation> system and earlier work at that lab 
+<citation>nuutalk92</citation> is an excellent example of one particular method for 
+selecting between multiple examples of a phone within a database. For a 
+discussion of why a more generalized inventory of units is desired see 
+<citation>campbell96</citation> though we will reiterate some of the points here. 
+With diphones a fixed view of the possible space of speech units has 
+been made which we all know is not ideal. There are articulatory 
+effects which go over more than one phone, e.g. /s/ can take on 
+artifacts of the roundness of the following vowel even over an 
+intermediate stop, e.g. <quote><emphasis>spout</emphasis></quote> vs <quote><emphasis>spit</emphasis></quote>. But its not just 
+obvious segmental effects that cause variation in pronunciation, 
+syllable position, word/phrase initial and final position have typically 
+a different level of articulation from segments taken from word internal 
+position. Stressing and accents also cause differences. Rather than 
+try to explicitly list the desired inventory of all these phenomena and 
+then have to record all of them a potential alternative is to take a 
+natural distribution of speech and (semi-)automatically find the 
+distinctions that actually exist rather predefining them. 
+</para>
+<para>
+The theory is obvious but the design of such systems and finding the 
+appropriate selection criteria, weighting the costs of relative candidates 
+is a non-trivial problem. However techniques like this often produce 
+very high quality, very natural sounding synthesis. However they also 
+can produce some very bad synthesis too, when the database has unexpected 
+holes and/or the selection costs fail. 
+</para>
+<para>
+Two forms of unit selection will discussed here, not because we feel 
+they are the best but simply because they are the ones actually 
+implemented by us and hence can be distributed. These should still be 
+considered research systems. Unless you are specifically interested or 
+have the expertise in developing new selection techniques it is not 
+recommended that you try these, if you need a working voice within a 
+month and can't afford to miss that deadline then the diphone option is 
+safe, well tried and stable. In you need higher quality and know 
+something about what you need to say, then we recommend the limited 
+domain techniques discussed in the following chapter. The limited 
+domain synthesis offers the high quality of unit selection but 
+avoids much (all ?) of the bad selections. 
+</para>
+<sect1><title>Cluster unit selection</title>
+
+<para>
+This is a reimplementation of the techniques as described in 
+<citation>black97c</citation>. The idea is to take a database of general speech and 
+try to cluster each phone type into groups of acoustically similar units 
+based on the (non-acoustic) information available at synthesis time, 
+such as phonetic context, prosodic features (F0 and duration) and higher 
+level features such as stressing, word position, and accents. The 
+actually features used may easily be changed and experimented with as can 
+the definition of the definition of acoustic distance between the units 
+in a cluster. 
+</para>
+<para>
+In some sense this work builds on the results of both the CHATR 
+selection algorithm <citation>hunt96</citation> and the work of <citation>donovan95</citation>, but 
+differs in some important and significant ways. Specifically in 
+contrast to <citation>hunt96</citation> this cluster algorithm pre-builds CART trees 
+to select the appropriate cluster of candidate phones thus avoiding the 
+computationally expensive function of calculating target costs (through 
+linear regression) at selection time. Secondly because the clusters are 
+built directly from the acoustic scores and target features, a target 
+estimation function isn't required removing the need to calculate 
+weights for each feature. This cluster method differs from the 
+clustering method in <citation>donovan95</citation> in that it can use more 
+generalized features in clustering and uses a different acoustic cost 
+function (Donovan uses HMMs), also his work is based on sub-phonetic 
+units (HMM states). Also Donovan selects one candidate while here we 
+select a group of candidates and finds the best overall selection by 
+finding the best path through each set of candidates for each target 
+phone, in a manner similar to <citation>hunt96</citation> and <citation>iwahashi93</citation> 
+before. 
+</para>
+
+<para>
+The basic processes involved in building a waveform synthesizer for 
+the clustering algorithm are as follows.   A high level walkthrough
+of the scripts to run is given after these lower level details.
+<itemizedlist mark=bullet>
+<listitem><para>
+
+Collect the database of general speech. 
+</para></listitem>
+<listitem><para>
+
+Building utterance structures for your database using the techniques 
+discussed in <xref linkend="bsv-uttbuild-sect">.
+</para></listitem>
+<listitem><para>
+
+Building coefficients for acoustic distances, typically some 
+form of cepstrum plus F0, or some pitch synchronous analysis (e.g. 
+LPC). 
+</para></listitem>
+<listitem><para>
+
+Build distances tables, precalculating the acoustic distance 
+between each unit of the same phone type. 
+</para></listitem>
+<listitem><para>
+
+Dump selection features (phone context, prosodic, positional and 
+whatever) for each unit type. 
+</para></listitem>
+<listitem><para>
+
+Build cluster trees using <filename>wagon</filename> with the features
+and acoustic distances dumped by the previous two stages
+
+</para></listitem>
+<listitem><para>
+
+Building the voice description itself 
+</para></listitem>
+</itemizedlist>
+</para>
+<sect2><title>Choosing the right unit type</title>
+<para>
+before you start you must make a decision about what unit type you are
+going to use.  Note there are two dimensions here.  First is
+<emphasis>size</emphasis>, such as phone, diphone, demi-syllable.  The
+second <emphasis>type</emphasis> itself which may be simple phone,
+phone plus stress, phone plus word etc.  The code here and the related
+files basically assume unit <emphasis>size</emphasis> is
+<emphasis>phone</emphasis>.  However because you may also include a
+percentage of the previous unit in the acoustic distance measure this
+unit size is more effectively phone plus previous phone, thus it is
+somewhat diphone like.  The cluster method has actual restrictions on
+the unit size, it simply clusters the given acoustic units with the
+given feature, but the basic synthesis code is currently assuming
+phone sized units.
+</para>
+<para>
+The second dimension, type, is very open and we expect that
+controlling this will be a good method to attained high quality
+general unit selection synthesis.  The parameter
+<varname>clunit_name_feat</varname> may be used define the unit type.
+The simplest conceptual example is the one used in the limited domain
+synthesis.  There we distinguish each phone with the word it comes
+from, thus a <emphasis>d</emphasis> from the word
+<emphasis>limited</emphasis> is distinct from the
+<emphasis>d</emphasis> in the word <emphasis>domain</emphasis>.  Such
+distinctions can hard partition up the space of phones into types that
+can be more manageable.  
+</para>
+<para>
+The decision of how to carve up that space depends largely on the
+intended use of the database.  The more distinctions you make less you
+depend on the clustering acoustic distance, but the more you depend on
+your labels (and the speech) being (absolutely) correct.  The
+mechanism to define the unit type is through a (typically) user
+defined feature function.  In the given setup scripts this feature
+function will be called
+<varname>lisp_INST_LANG_NAME::clunit_name</varname>.  Thus the voice
+simply defines the function
+<varname>INST_LANG_NAME::clunit_name</varname> to return the
+unit type for the given segment.  If you wanted to make
+a diphone unit selection voice this function could simply be
+<blockquote><literallayout>
+(define (INST_LANG_NAME::clunit_name i)
+  (string_append
+   (item.name i) 
+   "_"
+   (item.feat i "p.name")))
+</literallayout></blockquote>
+
+This the unittype would be the phone plus its previous phone.  Note
+that the first part of a unit name is assumed to be the phone name in
+various parts of the code thus although you make think it would be neater
+to return <varname>previousphone_phone</varname> that would mess
+up some other parts of the code.
+</para>
+<para>
+In the limited domain case the word is attached to the phone.  You
+can also consider some demi-syllable information or more to differentiate
+between different instances of the same phone.
+</para>
+<para>
+The important thing to remember is that at synthesis time the same
+function is called to identify the unittype which is used to select the
+appropriate cluster tree to select from.  Thus you need to ensure
+that if you use say diphones that the your database really does not have 
+<emphasis>all</emphasis> diphones in it.
+</para>
+</sect2>
+<sect2><title>Collecting databases for unit selection</title>
+
+<para>
+Unlike diphone database which are carefully constructed to ensure 
+specific coverage, one of the advantages of unit selection is that 
+a much more general database is desired. However, although voices 
+may be built from existing data not specifically gathered for 
+synthesis there are still factors about the data that will help make 
+better synthesis. 
+</para>
+<para>
+Like diphone databases the more cleanly and carefully the speech is 
+recorded the better the synthesized voice will be. As we are going to 
+be selecting units from different parts of the database the more similar 
+the recordings are, the less likely bad joins will occur. However 
+unlike diphones database, prosodic variation is probably a good thing, 
+as it is those variations that can make synthesis from unit selection 
+sound more natural. Good phonetic coverage is also useful, at least 
+phone coverage if not complete diphone coverage. Also synthesis using 
+these techniques seems to retain aspects of the original database. If 
+the database is broadcast news stories, the synthesis from it will 
+typically sound like read news stories (or more importantly will sound 
+best when it is reading news stories). 
+</para>
+<para>
+<indexterm><primary> Timit </primary></indexterm>
+<indexterm><primary> f2b </primary></indexterm>
+<indexterm><primary> BU Radio Corpus </primary></indexterm>
+Although it is too early to make definitive statements about what size 
+and type of data is best for unit selection we do have some rough 
+guides. A Timit like database of 460 phonetically balanced sentences 
+(around 14,000 phones) is not an unreasonable first choice. If the 
+text has not been specifically selected for phonetic coverage a larger 
+database is probably required, for example the Boston University Radio 
+News Corpus speaker <varname>f2b</varname> <citation>ostendorf95</citation> has been used 
+relatively successfully. Of course all this depends on what use you 
+wish to make of the synthesizer, if its to be used in more restrictive 
+environments (as is often the case) tailoring the database for the task 
+is a very good idea. If you are going to be reading a lot of telephone 
+numbers, having a significant number of examples of read numbers will 
+make synthesis of numbers sound much better (see the following 
+chapter on making such design more explicit). 
+</para>
+<para>
+The database used as an example here is a TIMIT 460 sentence database 
+read by an American male speaker. 
+</para>
+<para>
+Again the notes about recording the database apply, though it will 
+sometimes be the case that the database is already recorded and beyond 
+your control, in that case you will always have something legitimate to 
+blame for poor quality synthesis. 
+</para>
+</sect2>
+
+<sect2><title>Preliminaries</title>
+
+<para>
+<indexterm><primary> directory structure </primary></indexterm>
+Throughout our discussion we will assume the following database layout. 
+It is highly recommended that you follow this format otherwise scripts, 
+and examples will fail. There are many ways to organize databases and 
+many of such choices are arbitrary, here is our "arbitrary" layout. 
+</para>
+<para>
+The basic database directory should contain the following directories 
+<variablelist>
+<varlistentry>
+<term><varname>bin/</varname></term>
+<listitem><para>
+Any database specific scripts for processing. Typically this 
+first contains a copy of standard scripts that are then customized 
+when necessary to the particular database 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>wav/</varname></term>
+<listitem><para>
+The waveform files. These should be headered, one utterances per file 
+with a standard name convention. They should have the extension 
+<filename>.wav</filename> and the fileid consistent with all other files through 
+the database (labels, utterances, pitch marks etc). 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>lab/</varname></term>
+<listitem><para>
+The segmental labels. This is usually the master label files, 
+these may contain more information that the labels used by festival 
+which will be in <filename>festival/relations/Segment/</filename>. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>lar/</varname></term>
+<listitem><para>
+The EGG files (larynograph files) if collected. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>pm/</varname></term>
+<listitem><para>
+Pitchmark files as generated from the lar files or from the signal 
+directly. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>festival/</varname></term>
+<listitem><para>
+Festival specific label files. 
+<variablelist>
+<varlistentry>
+<term><filename>festival/relations/</filename></term>
+<listitem><para>
+The processed labeled files for building Festival utterances, 
+held in directories whose name reflects the relation they represent: 
+<filename>Segment/</filename>, <filename>Word/</filename>, <filename>Syllable/</filename> etc. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><filename>festival/utts/</filename></term>
+<listitem><para>
+The utterances files as generated from the <filename>festival/relations/</filename> 
+label files. 
+</para></listitem></varlistentry>
+</variablelist>
+</para></listitem></varlistentry>
+</variablelist>
+Other directories will be created for various processing reasons. 
+</para>
+</sect2>
+
+<sect2><title>Building utterance structures for unit selection</title>
+
+<para>
+<indexterm><primary> building utterances </primary></indexterm>
+In order to make access well defined you need to construct Festival 
+utterance structures for each of the utterances in your database. This 
+(in is basic form) requires labels for: segments, syllables, words, 
+phrases, F0 Targets, and intonation events. Ideally these should all be 
+carefully hand labeled but in most cases that's impractical. There are 
+ways to automatically obtain most of these labels but you should be 
+aware of the inherit errors in the labeling system you use (including 
+labeling systems that involve human labelers). Note that when a unit 
+selection method is to be used that fundamentally uses segment 
+boundaries its quality is going to be ultimately determined by the 
+quality of the segmental labels in the databases. 
+</para>
+<para>
+<indexterm><primary> aligner </primary></indexterm>
+For the unit selection algorithm described below the segmental labels 
+should be using the same phoneset as used in the actual synthesis voice. 
+However a more detailed phonetic labeling may be more useful 
+(e.g. marking closures in stops) mapping that information back to the 
+phone labels before actual use. Autoaligned databases typically aren't 
+accurate enough for use in unit selection. Most autoaligners are built 
+using speech recognition technology where actual phone boundaries are 
+not the primary measure of success. General speech recognition systems 
+primarily measure words correct (or more usefully semantically correct) 
+and do not require phone boundaries to be accurate. If the database is 
+to be used for unit selection it is very important that the phone 
+boundaries are accurate. Having said this though, we have successfully 
+used the aligner described in the diphone chapter above to label general 
+utterance where we knew which phone string we were looking for, using 
+such an aligner may be a useful first pass, but the result should always 
+be checked by hand. 
+</para>
+<para>
+<indexterm><primary> noisy labeling </primary></indexterm>
+It has been suggested that aligning techniques and unit selection 
+training techniques can be used to judge the accuracy of the labels and 
+basically exclude any segments that appear to fall outside the typical 
+range for the segment type. Thus it, is believed that unit selection 
+algorithms should be able to deal with a certain amount of noise in the 
+labeling. This is the desire for researchers in the field, but we 
+are some way from that and the easiest way at present to improve the 
+quality of unit selection algorithms at present is to ensure that 
+segmental labeling is as accurate as possible. Once we have a better 
+handle on selection techniques themselves it will then be possible to 
+start experimenting with noisy labeling. 
+</para>
+<para>
+<indexterm><primary> optimal coupling </primary></indexterm> However
+it should be added that this unit selection technique (and many
+others) support what is termed "optimal coupling"
+<citation>conkie96</citation> where the acoustically most appropriate
+join point is found automatically at run time when two units are
+selected for concatenation.  This technique is inherently robust to at
+least a few tens of millisecond boundary labeling errors.
+</para>
+<para>
+For the cluster method defined here it is best to construct more than 
+simply segments, durations and an F0 target. A whole syllabic structure 
+plus word boundaries, intonation events and phrasing allow a much richer 
+set of features to be used for clusters. See <xref linkend="bsv-uttbuild-sect">
+for a more general discussion of how to build utterance structures 
+for a database. 
+</para>
+</sect2>
+
+<sect2><title>Making cepstrum parameter files</title>
+
+<para>
+<indexterm><primary> making cepstrum parameters </primary></indexterm>
+<indexterm><primary> MFCC </primary></indexterm>
+
+In order to cluster similar units in a database we build an 
+acoustic representation of them. This is is also still a research 
+issue but in the example here we will use Mel cepstrum.  Interestingly
+we do not generate these at fixed intervals, but at 
+pitch marks.  Thus have a parametric spectral representation
+of each pitch period.  We have found this a better method,
+though it does require that pitchmarks are reasonably identified.
+
+</para>
+<para>
+
+Here is an example script which will generate these parameters for a
+database, it is included in
+<filename>festvox/src/unitsel/make_mcep</filename>. 
+
+<blockquote><literallayout>
+for i in $*
+do
+  fname=`basename $i .wav`
+  echo $fname MCEP
+  $SIG2FV $SIG2FVPARAMS -otype est_binary $i -o mcep/$fname.mcep -pm pm/$fname.pm -window_type hamming
+done
+</literallayout></blockquote>
+</para>
+<para>
+<indexterm><primary> LPC </primary></indexterm>
+<indexterm><primary> making LPC parameters </primary></indexterm>
+The above builds coefficients at fixed frames. We have also 
+experimented with building parameters pitch synchronously and have 
+found a slight improvement in the usefulness of the measure based on 
+this. We do not pretend that this part is particularly neat in the 
+system but it does work. When pitch synchronous parameters are 
+build the clunits module will automatically put the local 
+F0 value in coefficient 0 at load time. This happens to be 
+appropriate from LPC coefficients. The script in 
+<filename>festvox/src/general/make_lpc</filename> can be used to 
+generate the parameters, assuming you have already 
+generated pitch marks. 
+</para>
+<para>
+Note the secondary advantage of using LPC coefficients is that they are 
+required any way for LPC resynthesis thus this allows less information 
+about the database to be required at run time. We have not yet tried 
+pitch synchronous MEL frequency cepstrum coefficients but that should be 
+tried. Also a more general duration/number of pitch periods match 
+algorithm is worth defining. 
+</para>
+</sect2>
+
+<sect2><title>Building the clusters</title>
+
+<para>
+<indexterm><primary> clunits </primary></indexterm>
+
+Cluster building is mostly automatic. Of course you need the
+<varname>clunits</varname> modules compiled into your version of
+Festival. Version 1.3.1 or later is required, the version of
+<varname>clunits</varname> in 1.3.0 is buggy and incomplete and will
+not work. To compile in <varname>clunits</varname>, add
+
+<blockquote><literallayout>
+ALSO_INCLUDE += clunits
+</literallayout></blockquote>
+
+to the end of your <filename>festival/config/config</filename> file,
+nad recompile.  To check if an installation already has support for
+<varname>clunits</varname> check the value of the variable
+<varname>*modules*</varname>.
+
+</para>
+<para>
+
+<indexterm><primary> clunits_params </primary></indexterm> 
+
+The file <filename>festvox/src/unitsel/build_clunits.scm</filename>
+contains the basic parameters to build a cluster model for a databases
+that has utterance structures and acoustic parameters. The function
+<varname>build_clunits</varname> will build the distance tables, dump
+the features and build the cluster trees. There are many parameters
+are set for the particular database (and instance of cluster building)
+through the Lisp variable <varname>clunits_params</varname>. An
+reasonable set of defaults is given in that file, and reasonable
+run-time parameters will be copied into
+<filename>festvox/INST_LANG_VOX_clunits.scm</filename> when a
+new voice is setup.
+
+</para>
+<para>
+
+The function <varname>build_clunits</varname> runs through all the
+steps but in order to better explain what is going on, we will go
+through each step and at that time explain which parameters affect the
+substep.
+
+</para>
+<para>
+The first stage is to load in all the utterances in the database, sort
+them into segment type and name them with individual names (as
+<varname>TYPE_NUM</varname>. This first stage is required for all
+other stages so that if you are not running <varname>build_clunits</varname>
+you still need to run this stage first. This is done by the calls
+
+<blockquote><literallayout>
+    (format t "Loading utterances and sorting types\n")
+    (set! utterances (acost:db_utts_load dt_params))
+    (set! unittypes (acost:find_same_types utterances))
+    (acost:name_units unittypes)
+</literallayout></blockquote>
+
+Though the function <varname>build_clunits_init</varname> will do the
+same thing.
+
+</para>
+<para>
+This uses the following parameters 
+<variablelist>
+<varlistentry>
+<term><varname>name STRING</varname></term>
+<listitem><para>
+A name for this database. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>db_dir FILENAME</varname></term>
+<listitem><para>
+This pathname of the database, typically <filename> . </filename> as
+in the current directory.
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>utts_dir FILENAME</varname></term>
+<listitem><para>
+The directory contain the utterances. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>utts_ext FILENAME</varname></term>
+<listitem><para>
+The file extention for the utterance files 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>files</varname></term>
+<listitem><para>
+The list of file ids in the database. 
+</para></listitem></varlistentry>
+</variablelist>
+For example for the KED example these parameters are 
+<blockquote><literallayout>
+       (name 'ked_timit)
+       (db_dir "/usr/awb/data/timit/ked/")
+       (utts_dir "festival/utts/")
+       (utts_ext ".utt")
+       (files ("kdt_001" "kdt_002" "kdt_003" ... ))
+</literallayout></blockquote>
+In the examples below the list of fileids is extracted from
+the given prompt file at call time.
+</para>
+<para>
+The next stage is to load the acoustic parameters and build 
+the distance tables. The acoustic distance between each segment 
+of the same type is calculated and saved in the distance table. 
+Precalculating this saves a lot of time as the cluster will require 
+this number many times. 
+</para>
+<para>
+This is done by the following two function calls 
+<blockquote><literallayout>
+    (format t "Loading coefficients\n")
+    (acost:utts_load_coeffs utterances)
+    (format t "Building distance tables\n")
+    (acost:build_disttabs unittypes clunits_params)
+</literallayout></blockquote>
+The following parameters influence the behaviour. 
+<variablelist>
+<varlistentry>
+<term><varname>coeffs_dir FILENAME</varname></term>
+<listitem><para>
+The directory (from db_dir) that contains the acoustic coefficients 
+as generated by the script <filename>make_mcep</filename>. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>coeffs_ext FILENAME</varname></term>
+<listitem><para>
+The file extention for the coefficient files 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>get_std_per_unit </varname></term>
+<listitem>
+<para>
+
+Takes the value <varname>t</varname> or <varname>nil</varname>. If
+<varname>t</varname> the parameters for the type of segment are
+normalized by finding the means and standard deviations for the class
+are used. Thus a mean mahalanobis euclidean distance is found between
+units rather than simply a euclidean distance.  The recommended value
+is <varname>t</varname>.
+
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>ac_left_context FLOAT</varname></term>
+<listitem><para>
+
+The amount of the previous unit to be included in the the distance.
+1.0 means all, 0.0 means none. This parameter may be used to make the
+acoustic distance sensitive to the previous acoustic context.  The
+recommended value is <varname>0.8</varname>.
+
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>dur_pen_weight FLOAT</varname></term>
+<listitem><para>
+
+The penalty factor for duration mismatch between units. 
+
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>f0_pen_weight FLOAT</varname></term>
+<listitem><para>
+
+The penalty factor for F0 mismatch between units. 
+
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>ac_weights (FLOAT FLOAT ...)</varname></term>
+<listitem><para>
+The weights for each parameter in the coefficeint files used 
+while finding the acoustic distance between segments. There must 
+be the same number of weights as there are parameters in the 
+coefficient files.   The first parameter is (in normal operations) 
+F0.  Its is common to give proportionally more weight to F0 that
+to each individual other parameter.  The remaining parameters are
+typically MFCCs (and possibly delta MFCCs).  Finding the right
+parameters and weightings is one the key goals in unit selection 
+synthesis so its not easy to give concrete recommendations.  The
+following aren't bad, but there may be better ones too though we suspect
+that real human listening tests are probably the best way to find
+better values.
+</para></listitem></varlistentry>
+</variablelist>
+An example is 
+<blockquote><literallayout>
+       (coeffs_dir "mcep/")
+       (coeffs_ext ".mcep")
+       (dur_pen_weight 0.1)
+       (get_stds_per_unit t)
+       (ac_left_context 0.8)
+       (ac_weights
+          (0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5 0.5))
+</literallayout></blockquote>
+</para>
+<para>
+
+The next stage is to dump the features that will be used to index the
+clusters. Remember the clusters are defined with respect to the
+acoustic distance between each unit in the cluster, but they are
+indexed by these features. These features are those which will be
+available at text-to-speech time when no acoustic information is
+available. Thus they include things like phonetic and prosodic context
+rather than spectral information. The name features may (and probably
+should) be over general allowing the decision tree building program
+<varname>wagon</varname> to decide which of theses feature actual does
+have an acoustic distinction in the units.
+
+</para>
+<para>
+The function to dump the features is 
+<blockquote><literallayout>
+    (format t "Dumping features for clustering\n")
+    (acost:dump_features unittypes utterances clunits_params)
+</literallayout></blockquote>
+The parameters which affect this function are 
+<variablelist>
+<varlistentry>
+<term><varname>fests_dir FILENAME</varname></term>
+<listitem><para>
+The directory when the features will be saved (by segment type). 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>feats  LIST</varname></term>
+<listitem><para>
+The list of features to be dumped. These are standard festival 
+feature names with respect to the Segment relation. 
+</para></listitem></varlistentry>
+</variablelist>
+For our KED example these values are 
+<blockquote><literallayout>
+       (feats_dir "festival/feats/")
+       (feats 
+             (occurid
+               p.name p.ph_vc p.ph_ctype 
+                   p.ph_vheight p.ph_vlng 
+                   p.ph_vfront  p.ph_vrnd 
+                   p.ph_cplace  p.ph_cvox    
+               n.name n.ph_vc n.ph_ctype 
+                   n.ph_vheight n.ph_vlng 
+                   n.ph_vfront  n.ph_vrnd 
+                   n.ph_cplace  n.ph_cvox
+              segment_duration 
+              seg_pitch p.seg_pitch n.seg_pitch
+              R:SylStructure.parent.stress 
+              seg_onsetcoda n.seg_onsetcoda p.seg_onsetcoda
+              R:SylStructure.parent.accented 
+              pos_in_syl 
+              syl_initial
+              syl_final
+              R:SylStructure.parent.syl_break 
+              R:SylStructure.parent.R:Syllable.p.syl_break
+              pp.name pp.ph_vc pp.ph_ctype 
+                  pp.ph_vheight pp.ph_vlng 
+                  pp.ph_vfront  pp.ph_vrnd 
+                  pp.ph_cplace pp.ph_cvox))
+</literallayout></blockquote>
+</para>
+<para>
+
+Now that we have the acoustic distances and the feature descriptions
+of each unit the next stage is to find a relationship between those
+features and the acoustic distances. This we do using the CART tree
+builder <varname>wagon</varname>. It will find out questions about
+which features best minimize the acoustic distance between the units
+in that class.  <varname>wagon</varname> has many options many of
+which are apposite to this task though it is interesting that this
+learning task is interestingly closed. That is we are trying to
+classify <emphasis>all</emphasis> the units in the database, there is
+no test set as such. However in synthesis there will be desired units
+whose feature vector didn't exist in the training set.
+
+</para>
+<para>
+The clusters are built by the following function 
+<blockquote><literallayout>
+    (format t "Building cluster trees\n")
+    (acost:find_clusters (mapcar car unittypes) clunits_params)
+</literallayout></blockquote>
+</para>
+<para>
+The parameters that affect the tree building process are 
+<variablelist>
+<varlistentry>
+<term><varname>tree_dir FILENAME</varname></term>
+<listitem><para>
+the directory where the decision tree for each segment type will 
+be saved 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>wagon_field_desc  LIST</varname></term>
+<listitem><para>
+A filename of a wagon field descriptor file. This is a standard 
+field description (field name plus field type) that is require for 
+wagon.  An example is given in <filename>festival/clunits/all.desc
+</filename> which should be sufficient for the default feature
+list, though if you change the feature list (or the values
+those features can take you may need to change this file.
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>wagon_progname FILENAME</varname></term>
+<listitem><para>
+The pathname for the <filename>wagon</filename> CART building program. This 
+is a string and may also include any extra parameters you 
+wish to give to <filename>wagon</filename>.
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>wagon_cluster_size INT</varname></term>
+<listitem><para>
+The minimum cluster size (the wagon <varname>-stop</varname> value). 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>prune_reduce INT</varname></term>
+<listitem><para>
+This number of elements in each cluster to remove in pruning. 
+This removes the units in the cluster that are furthest from the center. 
+This is down within the wagon training.
+</para></listitem></varlistentry>
+
+<varlistentry>
+<term><varname>cluster_prune_limit INT</varname></term>
+<listitem><para>
+
+This is a post wagon build operation on the generated trees (and
+perhaps a more reliably method of pruning).  This defines the maximum
+number of units that will be in a cluster at a tree leaf.  The wagon
+cluster size the minimum size.  This is usefully when there are some
+large numbers of some particular unit type which cannot be
+differentiated.  Format example silence segments without context of
+nothing other silence.  Another usage of this is to cause only
+the center example units to be used.  We have used this in
+building diphones databases from general databases but making the
+selection features only include phonetic context features and then
+restrict the number of diphones we take by making this number 5 or so.
+
+</para></listitem></varlistentry>
+
+<varlistentry>
+<term><varname>unittype_prune_threshold INT</varname></term>
+<listitem><para>
+
+When making complex unit types this defines the minimal number of
+units of that type required before building a tree.  When doing
+cascaded unit selection synthesizers its often not worth 
+excluding large stages if there is say only one example of a 
+particular demi-syllable.
+
+</para></listitem></varlistentry>
+</variablelist>
+
+</para>
+<para>
+<indexterm><primary> distance table size </primary></indexterm>
+<indexterm><primary> saving space </primary></indexterm>
+Note that as the distance tables can be large there is an alternative 
+function that does both the distance table and clustering in one, 
+deleting the distance table immediately after use, thus you only need 
+enough disk space for the largest number of phones in any type. 
+To do this 
+<blockquote><literallayout>
+    (acost:disttabs_and_clusters unittypes clunits_params)
+</literallayout></blockquote>
+Removing the calls to <varname>acost:build_disttabs</varname> and 
+<varname>acost:find_clusters</varname>. 
+</para>
+<para>
+In our KED example these have the values 
+<blockquote><literallayout>
+       (trees_dir "festival/trees/")
+       (wagon_field_desc "festival/clunits/all.desc")
+       (wagon_progname "/usr/awb/projects/speech_tools/bin/wagon")
+       (wagon_cluster_size 10)
+       (prune_reduce 0)
+</literallayout></blockquote>
+</para>
+<para>
+The final stage in building a cluster model is collect the 
+generated trees into a single file and dumping the unit 
+catalogue, i.e. the list of unit names and their files and 
+position in them. This is done by the lisp function 
+<blockquote><literallayout>
+    (acost:collect_trees (mapcar car unittypes) clunits_params)
+    (format t "Saving unit catalogue\n")
+    (acost:save_catalogue utterances clunits_params)
+</literallayout></blockquote>
+The only parameter that affect this is 
+<variablelist>
+<varlistentry>
+<term><varname>catalogue_dir FILENAME</varname></term>
+<listitem><para>
+the directory where the catalogue will be save (the <varname>name</varname> 
+parameter is used to name the file). 
+</para></listitem></varlistentry>
+</variablelist>
+Be default this is 
+<blockquote><literallayout>
+       (catalogue_dir "festival/clunits/")
+</literallayout></blockquote>
+</para>
+<para>
+There are a number of parameters that are specified with a cluster 
+voice. These are related to the run time aspects of the cluster 
+model. These are 
+<variablelist>
+<varlistentry>
+<term><varname>join_weights FLOATLIST</varname></term>
+<listitem><para>
+This are a set of weights, in the same format as <varname>ac_weights</varname> 
+that are used in optimal coupling to find the best join point between two 
+candidate units. This is different from <varname>ac_weights</varname> as it 
+is likely different values are desired, particularly increasing the 
+F0 value (column 0). 
+</para></listitem></varlistentry>
+
+<varlistentry>
+<term><varname>continuity_weight FLOAT</varname></term>
+<listitem><para>
+The factor to multiply the join cost over the target cost. This 
+is probably not very relevant given the the target cost is merely 
+the position from the cluster center.
+</para></listitem></varlistentry>
+
+<varlistentry>
+<term><varname>log_scores 1</varname></term>
+<listitem><para>
+If specified the joins scores are converted to logs.  For databases
+that have a tendency to contain non-optimal joins (probably any 
+non-limited domain databases), this may be useful to stop failed 
+synthesis of longer sentences.  The problem is that the sum of
+very large number can lead to overflow.  This helps reduce this.
+You could alternatively change the continuity_weight to a number less
+that 1 which would also partially help.  However such overflows
+are often a pointer to some other problem (poor distribution of
+phones in the db), so this is probably just a hack.
+</para></listitem></varlistentry>
+
+<varlistentry>
+<term><varname>optimal_coupling INT</varname></term>
+<listitem><para>
+If <varname>1</varname> this uses optimal coupling and searches the cepstrum 
+vectors at each join point to find the best possible join point. 
+This is computationally expensive (as well as having to load in lots 
+of cepstrum files), but does give better results.   If the 
+value is <varname>2</varname> this only checks the coupling distance at the
+given boundary (and doesn't move it), this is often adequate in
+good databases (e.g. limited domain), and is certainly faster.
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>extend_selections INT</varname></term>
+<listitem><para>
+If <varname>1</varname> then the selected cluster will be extended 
+to include any unit from the cluster of the previous segments 
+candidate units that has correct phone type (and isn't already included
+in the current cluster). This is experimental 
+but has shown its worth and hence is recommended. This means 
+that instead of selecting just units selection is effectively 
+selecting the beginnings of multiple segment units. This option 
+encourages far longer units. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>pm_coeffs_dir FILENAME</varname></term>
+<listitem><para>
+The directory (from <varname>db_dir</varname> where the pitchmarks are 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>pm_coeffs_ext FILENAME</varname></term>
+<listitem><para>
+The file extension for the pitchmark files. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>sig_dir FILENAME</varname></term>
+<listitem><para>
+Directory containing waveforms of the units (or residuals if 
+Residual LPC is being used, PCM waveforms is PSOLA is being used) 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>sig_ext FILENAME</varname></term>
+<listitem><para>
+File extension for waveforms/residuals 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>join_method METHOD</varname></term>
+<listitem><para>
+
+Specify the method used for joining the selected units. Currently it
+supports <varname>simple</varname>, a very naive joining mechanism,
+and <varname>windowed</varname>, where the ends of the units are
+windowed using a hamming window then overlapped (no prosodic
+modification takes place though). The other two possible values for
+this feature are <varname>none</varname> which does nothing, and
+<varname>modified_lpc</varname> which uses the standard UniSyn module
+to modify the selected units to match the targets.
+
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>clunits_debug 1/2</varname></term>
+<listitem><para>
+With a value of <varname>1</varname> some debugging information is
+printed during synthesis, particularly how many candidate phones
+are available at each stage (and any extended ones).  Also where
+each phone is coming from is printed.
+</para><para>
+With a value of <varname>2</varname> more debugging information
+is given include the above plus joining costs (which are very readable
+by humans).
+</para></listitem></varlistentry>
+</variablelist>
+</para>
+</sect2>
+
+</sect1>
+
+<sect1><title>Building a Unit Selection Cluster Voice</title>
+
+<para>
+<indexterm><primary> cluster example </primary></indexterm> 
+
+The previous section gives the low level details ofin
+the building of a cluster unit selection voice.  This section
+gives a higher level view with explict command that you 
+should run.
+
+The steps involved in building a unit selection voices are basically
+the same as that for building a limited domain voice (<xref
+linkend="bsv-ldom-ch">).  Though in for general voices, in constrast
+to ldom voice, it is much more important to get all parts correct,
+from pitchmarks to labeling.
+
+</para>
+<para>
+The following tasks are required: 
+<itemizedlist mark=bullet>
+<listitem><para>
+Read and understand all the issues regarding the following
+steps
+</para></listitem>
+<listitem><para>
+Design the prompts
+</para></listitem>
+<listitem><para>
+Record the prompts
+</para></listitem>
+<listitem><para>
+Autolabel the prompts
+</para></listitem>
+<listitem><para>
+Build utterance structures for recorded utterances
+</para></listitem>
+<listitem><para>
+Extract pitchmark and build LPC coefficients
+</para></listitem>
+<listitem><para>
+Building a clunit based synthesizer from the utterances
+</para></listitem>
+<listitem><para>
+Testing and tuning
+</para></listitem>
+</itemizedlist>
+</para>
+<para>
+The following are the commands that you must type (assuming all the
+other hardwork has been done beforehand.  It is assume that the
+environment variables <filename>FESTVOXDIR</filename> and
+<filename>ESTDIR</filename> have been set to point to their respective
+directories.  For example as
+<blockquote><literallayout>
+export FESTVOXDIR=/home/awb/projects/festvox
+export ESTDIR=/home/awb/projects/speech_tools
+</literallayout></blockquote>
+Next you must select a name for the voice, by convention we use
+three part names consisting of a institution name, a language, and
+a speaker.  Make a directory of that name and change directory into it
+<blockquote><literallayout>
+mkdir cmu_us_awb
+cd cmu_us_awb
+</literallayout></blockquote>
+There is a basic set up script that will construct the directory
+structure and copy in the template files for voice building.
+If a fourth argument is given, it can be name
+one of the standard prompts list.
+</para>
+<para>
+For example the simplest is
+<filename>uniphone</filename>.  This contains three sentences which
+contain each of the US English phonemes once (if spoken appropriately).
+This prompt set is hopelessly minimal for any high quality synthesis
+but allows us to illustrate the process and allow you to build a voice
+quickly.
+<blockquote><literallayout>
+$FESTVOXDIR/src/unitsel/setup_clunits cmu us awb uniphone
+</literallayout></blockquote>
+Alternatively you can copy in a prompt list into the etc directory.
+The format of these should be in the standard "data" format 
+as in
+<blockquote><literallayout>
+( uniph_0001 "a whole joy was reaping." )
+( uniph_0002 "but they've gone south." )
+( uniph_0003 "you should fetch azure mike." )
+</literallayout></blockquote>
+
+Note the spaces after the initial left parenthesis are significant,
+and double quotes and backslashes within the quote part must be
+escaped (with backslash) as is common in Perl or Festival itself.
+
+</para>
+<para>
+
+The next stage is to generate waveforms to act as prompts, or timing
+cues even if the prompts are not actually played.  The files are also
+used in aligning the spoken data.
+
+<blockquote><literallayout>
+festival -b festvox/build_clunits.scm '(build_prompts_waves "etc/uniphone.data")'
+</literallayout></blockquote>
+
+Use whatever prompt file you are intending to use.  Note that you may
+want to add lexical entries to
+<filename>festvox/WHATEVER_lexicon.scm</filename> and other text
+analysis things as desired.  The purpose is that the prompt files
+match the phonemes that the voice talent will actually say.
+
+</para>
+<para>
+You may now record, assuming you have prepared the recording studio,
+gotten written permission to record your speaker (and explained
+to them what the resulting voice might be used for), checked recording
+levels and sound levels and shield the electrical equipment as
+much as possible.
+<blockquote><literallayout>
+./bin/prompt_them etc/uniphone.data
+</literallayout></blockquote>
+After recording the recorded files should be in <filename>wav/</filename>.
+It is wise to check that the are actually there and sound like you expected.
+Getting the recording quality as high as possible is fundamental to
+the success of building a voice.
+</para>
+<para>
+Now we must label the spoken prompts.  We do this my matching
+the synthesized prompts with the spoken ones.  As we know where the
+phonemes begin and end in the synthesized prompts we can then map
+that onto the spoken ones and find the phoneme segments.  This
+technique works fairly well, but it is far from perfect and it 
+is worthwhile to at least check the result, and most probably fix
+the result by hand.
+<blockquote><literallayout>
+./bin/make_labs prompt-wav/*.wav
+</literallayout></blockquote>
+Especially in the case of the uniphone synthesizer, where there is
+one and only one occurrence of each phone they all must be correct
+so its important to check the labels by hand.  Note for
+large collections you may find the full Sphinx based labeling
+technique better <xref linkend="bsv-sphinx-sect">).
+</para>
+<para>
+After labeling we can build the utterance structure using the prompt
+list and the now labeled phones and durations.
+<blockquote><literallayout>
+festival -b festvox/build_clunits.scm '(build_utts "etc/uniphone.data")'
+</literallayout></blockquote>
+</para>
+<para>
+The next stages are concerned with signal analysis, specifically pitch
+marking and cepstral parameter extraction.  There are a number of
+methods for pitch mark extraction and a number of parameters within
+these files that may need tuning.  Good pitch periods are important.
+See <xref linkend="bsv-pitchmarks-sect"> .  In its simplest
+case the follow may work
+<blockquote><literallayout>
+./bin/make_pm_wave wav/*.wav
+</literallayout></blockquote>
+</para>
+<para>
+The next stage it find the Mel Frequency Cepstral Coefficents.  This
+is done pitch synchronously and hence depends on the pitch periods extracted
+above.  These are used for clustering and for join measurements.
+<blockquote><literallayout>
+./bin/make_mcep wav/*.wav
+</literallayout></blockquote>
+</para>
+<para>
+Now we can do the main part of the build, building the cluster unit
+selection synthesizer.  This consists of a number os
+stages all based on the controlling Festival script.  The
+parameters of which are described above.
+<blockquote><literallayout>
+festival -b festvox/build_clunits.scm '(build_clunits "etc/uniphone.data")'
+</literallayout></blockquote>
+For large databases this can take some time to run as there is a 
+squared aspect to this based on the number of instances of 
+each unit type.
+</para>
+
+</sect1>
+
+<sect1><title>Diphones from general databases</title>
+
+<para>
+<indexterm><primary> diphones from utterances </primary></indexterm>
+<indexterm><primary> diphones from general database </primary></indexterm>
+As touched on above the choice of an inventory of units can be viewed as 
+a line from a small inventory phones, to diphones, triphones to 
+arbitrary units. Though the direction you come from influences the 
+selection of the units from the database. CHATR <citation>campbell96</citation> lies 
+firmly at the "arbitrary units" end of the spectrum. Although it can 
+exclude bad units from its inventory it is very much <quote><emphasis>everything 
+minus some</emphasis></quote> view of the world. Microsoft's Whistler <citation>huang97</citation> on 
+the other hand, starts off with a general database base but selects 
+typical units from it. Thus its inventory is substantially smaller than 
+the full general database the units are extracted from. At the other 
+end of the spectrum we have the fixed pre-specified inventory like 
+diphone synthesis as has bee described in the previous chapter. 
+</para>
+<para>
+In this section we'll give some examples of moving along the line 
+from the fixed pre-specified inventory to the words the more general 
+inventories but these techniques still have a strong component 
+of prespecification. 
+</para>
+<para>
+Firstly lets us assume you have a general database that is labeled with 
+utterances as described above. We can extract a standard diphone 
+database from this general database, however unless the database was 
+specifically designed, a general database is unlikely to have diphone 
+coverage. Even when phonetically rich databases are used such as Timit 
+there is likely to be very few vowel-vowel diphones as they are 
+comparatively rare. But as these diphone are rare we may be able to do 
+with out them and hence it is at least an interesting exercise to 
+extract an as complete as possible diphone index from a general 
+database. 
+</para>
+<para>
+The simplest method is to linearly search for all phone-phone pairs in 
+the phone set through all utterances simply taking the first example. 
+Some same code is given in <filename>src/diphone/make_diphs_index.scm</filename>. 
+This basic idea is to load in all the utterances in a database, and 
+index each segment by is phone name and succeeding phone name. Then 
+various selection techniques can be use to select from the multiple 
+candidates of each diphone (or you can split the indexing further). 
+After selection a diphone index file can be saved. 
+</para>
+<para>
+The utterances to load are identified by a list of fileids. For 
+example if the list of fileids (without parenthesis) is in 
+the file <filename>etc/fileids</filename>, the following will builds a diphone 
+index. 
+<blockquote><literallayout>
+festival .../make_diphs_utts.scm
+...
+festival> (set! fileids (load "etc/fileids" t))
+...
+festival> (make_diphone_index fileids "dic/f2bdiph.est")
+</literallayout></blockquote>
+</para>
+<para>
+Note that as this diphone index will contain a number of holes 
+you will need to either augment it with <quote><emphasis>similar</emphasis></quote> diphones 
+or process your diphone selections through <varname>UniSyn_module_hooks</varname> 
+as described in the previous chapter. 
+</para>
+<para>
+As you complicate the selection, and the number of diphones you used 
+from the database you will need to complicate the names used to 
+identify the diphones themselves. The convention of using underscores 
+for syllable internal consonant clusters and dollars for syllable 
+initial consonants can be followed, but you will need to go further if 
+you wish to start introducing new feature such as phrase finality and 
+stress. Eventually going to a generalized naming scheme (type and number) 
+as used by the cluster selection technique described above, will prove 
+worth while. Also using CART trees, through hand written and fully 
+deterministic (one candidate at the leafs), will be a reasonable 
+algorithm to select between hand stipulated alternatives with 
+reasonable backoff strategies. 
+</para>
+<para>
+Another potential direction is to use the acoustic costs used in the 
+clustering methods described in the previous section. These can be used 
+to identify what the most typical unit in a cluster are (the mean 
+distances from all other units are given in the leafs). Pruning these 
+trees until the cluster only contain a single example should help to 
+improve synthesis, in that variation in the feature in the "diphone" 
+index will then be determined by the features specified in the cluster 
+train algorithm. Of course though as you limit the number of distinct 
+units types the more prosodic modification will be required by your 
+signal processing algorithm, which requires that you have good pitch 
+marks. 
+</para>
+<para>
+If you already have an existing database but don't wish to go to full 
+unit selection, such techniques are probably quite feasible and worth 
+further investigation. 
+</para>
+
+</sect1>
+
+
+</chapter>

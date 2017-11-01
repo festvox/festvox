@@ -1,0 +1,465 @@
+#!/usr/bin/perl
+#  ----------------------------------------------------------------  #
+#      The HMM-Based Speech Synthesis System (HTS): version 1.1      #
+#                        HTS Working Group                           #
+#                                                                    #
+#                   Department of Computer Science                   #
+#                   Nagoya Institute of Technology                   #
+#                                and                                 #
+#    Interdisciplinary Graduate School of Science and Engineering    #
+#                   Tokyo Institute of Technology                    #
+#                      Copyright (c) 2001-2003                       #
+#                        All Rights Reserved.                        #
+#                                                                    #
+#  Permission is hereby granted, free of charge, to use and          #
+#  distribute this software and its documentation without            #
+#  restriction, including without limitation the rights to use,      #
+#  copy, modify, merge, publish, distribute, sublicense, and/or      #
+#  sell copies of this work, and to permit persons to whom this      #
+#  work is furnished to do so, subject to the following conditions:  #
+#                                                                    #
+#    1. The code must retain the above copyright notice, this list   #
+#       of conditions and the following disclaimer.                  #
+#                                                                    #
+#    2. Any modifications must be clearly marked as such.            #
+#                                                                    #     
+#  NAGOYA INSTITUTE OF TECHNOLOGY, TOKYO INSITITUTE OF TECHNOLOGY,   #
+#  HTS WORKING GROUP, AND THE CONTRIBUTORS TO THIS WORK DISCLAIM     #
+#  ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING ALL        #
+#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT    #
+#  SHALL NAGOYA INSTITUTE OF TECHNOLOGY, TOKYO INSITITUTE OF         #
+#  TECHNOLOGY, HTS WORKING GROUP, NOR THE CONTRIBUTORS BE LIABLE     #
+#  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY         #
+#  DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,   #
+#  WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS    #
+#  ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR           #
+#  PERFORMANCE OF THIS SOFTWARE.                                     #
+#                                                                    #
+#  ----------------------------------------------------------------  # 
+#   Training.pl : execute all HTK command for HMM-based speech       #
+#                 synthesis system, and generate speech from         #
+#                 trained HMMs.                                      #
+#                                                                    #
+#                                    2003/05/09 by Heiga Zen         #
+#  ----------------------------------------------------------------  #
+
+$|=1;
+
+# Setting ==============================
+$man	    = 'SPEAKER';
+$cnd	    = 'DATASET';
+$qnum       = '001';
+@HMMSET     = ('cmp','dur');
+@SET_CMP    = ('mcep','logF0');
+@SET_DUR    = ('dur');
+%thr        = ('cmp' => '000',
+               'dur' => '000');
+%gam        = ('cmp' => '000',
+               'dur' => '000');
+%STREAM	    = ('mcep'  => '1',
+               'logF0' => '2-4',
+               'dur'   => '1');
+%FREQWARP   = ('8000'  => '0.31',
+               '10000' => '0.35',
+               '16000' => '0.42');
+
+# Speech Analysis Setting ==============
+$samprate   = '16000';          # sampling rate
+$mceporder  = 24;               # for 24-order Mel-Cepstrum
+$frameshift = 80;               # for 5-ms frame shift 
+
+# Switch ================================
+$MEE            = 1;            # Make Environment for Experiment
+$HNH            = 1;            # HInit & HRest
+$CMF            = 1;            # Convert Monophone to FullContext
+$HFF            = 1;            # HERest for FullContext
+$TCC            = 1;            # Tree-Based Context Clustering
+$HFC            = 1;            # HERest for Clustered Triphone
+$CDH            = 1;            # Duration Model Clustering
+$MKU            = 1;            # Make Unseen Models
+$GEN            = 0;            # Generate Speech
+
+# Discrimination ========================
+$MAN            = "_${man}";
+$CND            = "_${cnd}";
+$QNUM           = "_qst${qnum}";
+
+# Global Value ==========================
+$numIters       = 5;
+$numConst       = 5;
+$numstate       = 5;
+$minvar         = "1.0e-04";
+$beam           = "1.0e+20";
+
+# File location =========================
+# setting of project directory ----------
+$projectdir     = "CURRENTDIR";
+$datadir        = "DATADIR";
+
+# directory of executor -----------------
+$htsbindir      = "HTSBINDIR";
+$sptkbindir     = "SPTKBINDIR";
+$scpdir         = "$projectdir/scripts";
+
+# prototype -----------------------------
+$prtfile	= "$projectdir/proto/s5_m1_c75p1p1p1.prt";
+
+# data file scripts ---------------------
+$datscp         = "$datadir/lists/data${CND}${MAN}.scp";
+
+# files for monophone ------------------
+$monolst	= "$datadir/lists/mono${MAN}.list";
+$monomlf 	= "$datadir/labels/mono${MAN}.mlf";
+
+# files for fullcontext -----------------
+$fulllst	 = "$datadir/lists/full${MAN}.list";
+$fullmlf	 = "$datadir/labels/full${MAN}.mlf";
+$fulllst_all = "$datadir/lists/full${MAN}_all.list";
+
+# stats file ----------------------------
+foreach $i ('cmp','dur'){
+   $stafile{$i}	= "$projectdir/stats/$cnd/$man/stats${CND}${MAN}_${i}.sts";
+}
+
+# hmm file ------------------------------
+foreach $i (@HMMSET){
+   $hmmsdir{$i}  = "$projectdir/hmms/$cnd/$man/$i";
+}
+$hinitdir	= "$hmmsdir{'cmp'}/HInit";
+$hrestdir	= "$hmmsdir{'cmp'}/HRest";
+foreach $i (@HMMSET){
+   $fullmmf{$i}  = "$hmmsdir{$i}/fullcontext_${i}.mmf";
+}
+foreach $i (@HMMSET){
+   $clusmmf{$i}	= "$hmmsdir{$i}/clustered_${i}${QNUM}.mmf";
+}
+
+# config file ---------------------------
+$edcfgfile	= "$projectdir/configs/default.conf";
+$syncfgfile     = "$projectdir/configs/synthesis.conf";
+
+# edit files ----------------------------
+$mon2fuled      = "$projectdir/edfiles/$cnd/$man/mon2ful.hed";
+foreach $i (@HMMSET){
+   $inffile{$i}  = "$projectdir/trees/$cnd/$man/$i/tree${MAN}${QNUM}_${i}.inf";
+   $clushed{$i}	= "$projectdir/edfiles/$cnd/$man/$i/cxtclus${MAN}${QNUM}_${i}.hed";
+   $mkuhed{$i}	= "$projectdir/edfiles/$cnd/$man/$i/mkunseen${MAN}${QNUM}_${i}.hed";
+}
+$qsfile         = "$datadir/questions/questions${QNUM}.hed";
+
+# files for generate speech from HMM  ----
+$genscp         = "${projectdir}/gen/scp/${cnd}${MAN}${QNUM}.gen";
+$win_mcep_dyn   = "${datadir}/win/mcep_dyn.win";
+$win_mcep_acc   = "${datadir}/win/mcep_acc.win";
+$win_lf0_dyn    = "${datadir}/win/lf0_dyn.win";
+$win_lf0_acc    = "${datadir}/win/lf0_acc.win";
+$genlabdir      = "${datadir}/labels/fullcontext/gen";
+$gendir         = "$projectdir/gen/$cnd/$man/${cnd}${MAN}${QNUM}";
+
+# Command Option ========================
+$hinitopt	= "-T 1 -m 1 -v $minvar";
+$hrestopt	= "-T 1 -m 1 -v $minvar -u tmvw";
+$herestopt	= "-T 1 -m 1 -v $minvar -u tmvw -t $beam -w 3";
+foreach $i (@HMMSET){
+   $mdl{$i} = "-m" if($thr{$i} eq '000');
+}
+
+# Main Program ==========================
+# Make Environment for Experiment -------
+if ($MEE) {
+   # make directory for HMM
+    print "HTS training: make directory for HMM\n";
+   mkdir "$projectdir/hmms/$cnd",0755;
+   mkdir "$projectdir/hmms/$cnd/$man",0755;
+   foreach $i (@HMMSET){
+      mkdir "$hmmsdir{$i}",0755;
+   }
+   mkdir "$hmmsdir{'cmp'}/HInit",0755;
+   mkdir "$hmmsdir{'cmp'}/HRest",0755;
+
+   # make directory for stats file
+   mkdir "$projectdir/stats/$cnd",0755;
+   mkdir "$projectdir/stats/$cnd/$man",0755;
+
+   # make directory for tree file
+   mkdir "$projectdir/trees/$cnd",0755;
+   mkdir "$projectdir/trees/$cnd/$man",0755;
+   foreach $i (@HMMSET){
+      mkdir "$projectdir/trees/$cnd/$man/$i",0755;
+   }
+
+   # make directory for edit file
+   mkdir "$projectdir/edfiles/$cnd",0755;
+   mkdir "$projectdir/edfiles/$cnd/$man",0755;
+   foreach $i (@HMMSET){
+      mkdir "$projectdir/edfiles/$cnd/$man/$i",0755;
+   }
+
+   # make directory for generated parameter file 
+   mkdir "$projectdir/gen/$cnd",0755;
+   mkdir "$projectdir/gen/$cnd/$man",0755;
+   mkdir "$gendir",0755; 
+}
+
+# HInit & HRest -------------------------
+if ($HNH) {
+    print "HTS training: HInit and HRest\n";
+   print_time();
+   open(HMMLIST,$monolst);
+   while (<HMMLIST>) {
+      chop;
+      $phone = $_;
+      $scp = $datscp;
+
+      print "=============== $phone ================\n";
+      if (grep($_ eq $phone, keys %MODELCOPY) > 0){
+         print("use $hrestdir/$MODELCOPY{$phone}\n\t instead of $hrestdir/$phone.\n");
+         open(SRCMAC,"$hrestdir/$MODELCOPY{$phone}");
+         open(TGTMAC,">$hrestdir/$phone");
+         while (<SRCMAC>){
+            s/~h \"$MODELCOPY{$phone}\"/~h \"$phone\"/;
+            print TGTMAC;
+         }
+         close(TGTMAC);
+         close(SRCMAC);
+      } else {
+         shell("$htsbindir/HInit -A -e 1.0E-3 -i 50 -I $monomlf -M $hinitdir -S $scp -l $phone -o $phone $hinitopt $prtfile");
+         shell("$htsbindir/HRest -A -e 1.0E-3 -i 50 -I $monomlf -M $hrestdir -S $scp -l $phone $hrestopt $hinitdir/$phone");
+      }
+   }
+   close(HMMLIST);
+}
+
+
+# Convert Monophone to FullContext -----
+if ($CMF) {
+    print "HTS training: Convert Monophone to FullContext\n";
+   print_time();
+
+   open(EDFILE,">$mon2fuled");
+   print EDFILE "CL \"$fulllst\"\n";
+   close(EDFILE);
+
+   shell("$htsbindir/HHEd -A -B -d $hrestdir -T 1 -w $fullmmf{'cmp'} $mon2fuled $monolst");
+   shell("gzip -c $fullmmf{'cmp'} > ${fullmmf{'cmp'}}.gz");
+   print_time();
+}
+
+
+# HERest for FullContext ----------------
+if ($HFF) {
+    print "HTS training: HERest for FullContext\n";
+   print_time();
+   $i = "1";
+   $statsopt = "";
+  
+   while ($i <= $numIters) {
+      if ($i == $numIters) {
+         $statsopt = "-s $stafile{'cmp'}";
+      }
+    
+      print("\n\nIteration ",$i," of Embedded Re-estimation\n");
+      shell("$htsbindir/HERest -A -B -H $fullmmf{'cmp'} -I $fullmlf -M $hmmsdir{'cmp'} -S $datscp $herestopt $statsopt $fulllst");
+      $i++;
+      print_ls($fullmmf{'cmp'});
+   }
+   shell("gzip -c $fullmmf{'cmp'} > ${fullmmf{'cmp'}}_embed.gz");
+   print_time();
+}
+
+
+# Tree-Based Context Clustering ---------
+if ($TCC) {
+    print "HTS training: Tree-Based Context Clustering\n";
+   print_time();
+   $i = "cmp";
+   make_edfile_state($i);
+   shell("$htsbindir/HHEd -A -B -C $edcfgfile -H $fullmmf{'cmp'} -T 1 -i $mdl{$i} -v $minvar -s -w $clusmmf{$i} $clushed{$i} $fulllst");
+   shell("gzip -c $clusmmf{$i} > ${clusmmf{$i}}.gz");
+   print_time();
+}
+
+
+# HERest for Clustered Triphone ---------
+if ($HFC) {
+    print "HTS training: HERest for Clustered Triphone\n";
+   print_time();
+   $i = "1";
+   $statopt = "";
+  
+   while ($i <= $numIters) {
+      if ($i == $numIters) {
+         $statopt = "-g $fullmmf{'dur'}";
+      }
+    
+      print("\n\nIteration ",$i," of Embedded Re-estimation\n");
+      shell("$htsbindir/HERest -A -B -H $clusmmf{'cmp'} -I $fullmlf -M $hmmsdir{'cmp'} -S $datscp $statopt $herestopt $fulllst");
+      $i++;
+      print_ls($clusmmf{'cmp'});
+   }
+   print_time();
+}
+
+
+# Duration Model Clustering -------------
+if ($CDH) {
+    print "HTS training: Duration Model Clustering\n";
+    print_time();
+    make_edfile_state("dur");
+    shell("perl $scpdir/convstats.pl $stafile{'cmp'} > $stafile{'dur'}");
+    shell("$htsbindir/HHEd -A -C $edcfgfile -D -H $fullmmf{'dur'} -T 1 $mdl{'dur'} -s -w $clusmmf{'dur'} $clushed{'dur'} $fulllst");
+    print_time();
+}
+
+# Make Unseen Models -------------------
+if ($MKU) {
+    print "HTS training: Make Unseen Models\n";
+    print_time();
+    foreach $i (@HMMSET) {
+       make_edfile_mkunseen($i);
+       shell("$htsbindir/HHEd -A -C $edcfgfile -D -H $clusmmf{$i} -s -T 1 -w $clusmmf{$i} $mkuhed{$i} $fulllst");
+    }
+    print_time();
+
+    system("mv $projectdir/trees/$cnd/$man/cmp/trees.1 $projectdir/trees-mcep.inf");
+    system("mv $projectdir/trees/$cnd/$man/cmp/trees.2 $projectdir/trees-lf0.inf");
+    system("mv $projectdir/trees/$cnd/$man/dur/trees.1 $projectdir/trees-dur.inf");
+
+    system("mv $projectdir/hmms/$cnd/$man/cmp/pdf.1 $projectdir/mcep.pdf");
+    system("mv $projectdir/hmms/$cnd/$man/cmp/pdf.2 $projectdir/lf0.pdf");
+    system("mv $projectdir/hmms/$cnd/$man/dur/pdf.1 $projectdir/duration.pdf");
+}
+
+# Generate Speech from HMMs ------------
+if ($GEN) {
+    print "HTS training: Generate Speech From HMMs\n";
+   print_time();
+   make_genfile();
+   shell("$htsbindir/HMGenS -A -C $syncfgfile -D $genscp");
+   gen_wave();
+   print_time();
+}
+
+# sub rutine ============================
+sub shell($) {
+   my($command) = @_;
+   my($exit,$start,$end,$h,$m,$s);
+
+   $start = time;
+   print "HTS training: executing:\n";
+   print $command."\n";
+   $exit = system($command);
+   $end = time;
+
+   $h = int(($end-$start)/3600);
+   $m = int((($end-$start)-$h*3600)/60);
+   $s = $end-$start-$h*3600-$m*60;
+
+   print "==================================================\n";
+   printf("Realtime %d:%2d.%2d\n",$h,$m,$s);
+   print "==================================================\n";
+}
+
+sub print_time {
+   print "\n";
+   print "==================================================\n";
+   print `date`;
+   print "==================================================\n";
+   print "\n";
+}
+
+sub print_ls(@){
+   print "\n";
+   print "==================================================\n";
+   print `ls -l @_`;
+   print "==================================================\n";
+   print "\n";
+}
+
+sub make_edfile_state($){
+   my($kind) = @_;
+   my($state,$stats,@lines,@set,$i);
+
+   $state = $numstate;
+   $stats = 'cmp';
+   @set = @SET_CMP;
+  
+   if($kind eq 'dur'){
+      $state = 1;
+      $stats = 'dur';
+      @set = @SET_DUR;
+   }
+
+   open(QSFILE,"$qsfile");
+   @lines = <QSFILE>;
+   close(QSFILE);
+
+   open(EDFILE,">$clushed{$kind}");
+   print EDFILE "RO $gam{$kind} \"$stafile{$stats}\"\n";
+   print EDFILE "\nTR 4\n\n";
+   print EDFILE @lines;
+   print EDFILE "\nTR 2\n\n";
+   for ($i = 2;$i < 2+$state;$i++){
+      foreach $j (@set){
+         print EDFILE "TB $thr{$kind} ${j}_s${i}_ {*.state[${i}].stream[$STREAM{$j}]}\n";
+      }
+   }
+   print EDFILE "\nTR 1\n\n";
+   print EDFILE "ST \"$inffile{$kind}\"\n";
+   close(EDFILE);
+}
+
+sub make_edfile_mkunseen($){
+   my($kind) = @_;
+
+   open(EDFILE,">$mkuhed{$kind}");
+   print EDFILE "\nTR 2\n\n";
+   print EDFILE "LT \"$inffile{$kind}\"\n";
+   print EDFILE "AU \"$fulllst_all\"\n";
+   print EDFILE "CT \"$projectdir/trees/$cnd/$man/$kind\"\n";
+   print EDFILE "CM \"$projectdir/hmms/$cnd/$man/$kind\"\n";
+
+   close(EDFILE);
+}
+
+sub make_genfile() {
+   print "$genscp\n";
+   open (GENSCP,">$genscp");
+   print GENSCP "TR 1\n";
+   print GENSCP "LM $fulllst_all $clusmmf{cmp} $fulllst_all $clusmmf{dur}\n";
+   print GENSCP "LW 2 $win_mcep_dyn $win_mcep_acc 2 $win_lf0_dyn $win_lf0_acc\n";
+   print GENSCP "SI $mceporder\n";
+   print GENSCP "SD $gendir\n";
+   print GENSCP "SL $genlabdir\n";
+  
+   $line = `ls $genlabdir`;
+   @FILE = split('\n',$line);
+   $num  = @FILE;
+
+   printf GENSCP "GE $num ";
+  
+   foreach $file (@FILE) {
+      print GENSCP "$file ";
+   }
+  
+   print "\n";
+   close(GENSCP);
+}
+     
+sub gen_wave() {
+   $line = `ls $gendir/*.mcep`;
+   @FILE = split('\n',$line);
+   $num  = @FILE;
+  
+   foreach $file (@FILE) {
+      $base = `basename $file .mcep`;
+      chomp($base);
+      $line = "$scpdir/lfreq2pch.pl $gendir/${base}.lf0 | "
+             ."$sptkbindir/excite -p $frameshift | "
+             ."$sptkbindir/mlsadf -m $mceporder -p $frameshift -a $FREQWARP{$samprate} $file | "
+             ."$sptkbindir/x2x +fs > $gendir/${base}.raw";
+
+      print "$line\n";
+      system $line;
+   }
+}

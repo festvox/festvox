@@ -1,0 +1,335 @@
+#!/bin/bash
+###########################################################################
+##                                                                       ##
+##                  Language Technologies Institute                      ##
+##                     Carnegie Mellon University                        ##
+##                       Copyright (c) 2010-2011                         ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##            Authors: Alok Parlikar                                     ##
+##            Email:   aup@cs.cmu.edu                                    ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Syntactic Phrasing Model                                             ##
+##    (and simpler pos/tag model -- for flite voices -- Aug 2016)        ##
+##                                                                       ##
+###########################################################################
+#
+# Setup a voice, add wavs and txt.done.data
+#
+# To build (unsupervised) gpos tagset for the language
+#    $FESTVOXDIR/src/phrasyn/do_phrasyn prebuild etc/txt.done.data
+# (check festvox/VOICE_gpos.scm to see if the classes are ok)
+#
+# Build the voice (build_cg_(rfs)_voice
+#
+# To build a simple NB,B,BB tree predictor
+#    $FESTVOXDIR/src/phrasyn/do_phrasyn postbuild etc/txt.done.data
+# Generates a tree in festvox/VOICE_phrasetree.scm (without syntax)
+#
+# Note (Jan 2017) the gpos table and phrasebreak table are not yet
+# transfered to the flite voice so you shouldn't use them for flite yet
+#
+
+set -e # Stop running script on one error, instead of silently continuing
+
+LANG=C; export LANG
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ ! "$FESTVOXDIR" ]
+then
+   echo "environment variable FESTVOXDIR is unset"
+   echo "set it to your local festvox directory e.g."
+   echo '   bash$ export FESTVOXDIR=/home/awb/projects/festvox/'
+   echo or
+   echo '   csh% setenv FESTVOXDIR /home/awb/projects/festvox/'
+   exit 1
+fi
+
+. ./etc/voice.defs
+
+if [ $FV_LANG == "us" ]
+then
+    PHRASYN_LANG="us"
+else
+    PHRASYN_LANG="non-us"
+fi
+
+ACTION=$1
+PROMPTFILE=$2
+MODE=$3
+NTCOUNT=$4
+STOPVALUE=$5
+
+if [ -z "$ACTION" ]
+then
+    echo "Please specify an action. One of: "
+    echo "dump_phrasing_tree" "build_phrasing_grammar" "utt_parse" "build_break_prediction_tree" "fill_bnb_probs"
+    echo "or prebuild or postbuild for simple tree"
+    exit 2
+fi
+
+if [ ! -f "$PROMPTFILE" ]
+then
+    echo "Please point me to your txt.done.data file"
+    exit 1
+fi
+
+if [ ! -d "syntax" ]
+then
+    mkdir syntax
+fi
+
+if [ ! -f "festvox/phrasyn.scm" ]
+then
+    echo "Copying phrasyn.scm"
+    cp -p $FESTVOXDIR/src/phrasyn/phrasyn.scm festvox/
+fi
+
+if [ ! -f $PROMPTFILE.train.train ]
+then
+    echo "Creating Traintest sets"
+    ./bin/traintest $PROMPTFILE
+    ./bin/traintest $PROMPTFILE.train
+fi
+
+if [ "$ACTION" = "prebuild" ]
+then
+   $FESTVOXDIR/src/phrasyn/do_phrasyn make_tagset_corpus $PROMPTFILE
+   $FESTVOXDIR/src/phrasyn/do_phrasyn find_tagset $PROMPTFILE
+
+    exit 0
+fi
+
+if [ "$ACTION" = "postbuild" ]
+then
+   $FESTVOXDIR/src/phrasyn/do_phrasyn dump_phrasing_tree etc/txt.done.data.train gpos 20 20
+   $FESTVOXDIR/src/phrasyn/do_phrasyn build_phrasing_grammar etc/txt.done.data.train gpos 20 20
+   $FESTVOXDIR/src/phrasyn/do_phrasyn utt_parse etc/txt.done.data.train gpos 20 20
+
+   # Simple tree based (but need syntax based one to bootstrap from)
+   $FESTVOXDIR/src/phrasyn/do_phrasyn build_break_prediction_tree etc/txt.done.data.train gpos 20 15
+
+    exit 0
+fi
+
+# For unsupervised part of speech tagging
+if [ "$ACTION" = "make_tagset_corpus" ]
+then
+    if [ ! -d tagset ]
+    then
+       mkdir tagset
+    fi
+    # Should case fold, and punc tokenize
+    cat $PROMPTFILE |
+    sed 's/^[^"]*"//g;s/"[ ]*)[ ]*$//' | sed 's/\\"/"/g' |
+    tr "[A-Z]" "[a-z]" |
+    awk '{printf("%s\n\n",$0)}' |
+    sed 's/"/ /g' >tagset/corpus.txt
+
+fi
+
+if [ "$ACTION" = "make_tagset_corpus_asis" ]
+then
+    if [ ! -d tagset ]
+    then
+       mkdir tagset
+    fi
+    # Should case fold, and punc tokenize
+    cat $PROMPTFILE |
+    sed 's/^[^"]*"//g;s/"[ ]*)[ ]*$//' | sed 's/\\"/"/g' |
+    tr "[A-Z]" "[a-z]" |
+    awk '{printf("%s\n",$0)}' |
+    sed 's/"/ /g' >tagset/corpus.txt
+
+fi
+
+if [ "$ACTION" = "find_tagset" ]
+then
+    # Unsupervised pos tag set discovery (crude technique)
+    if [ ! -f tagset/corpus.txt ]
+    then
+       echo "Cannot find tagset/corpus.txt, run either"
+       echo "   make_tagset_corpus (ascii-based language)"
+       echo "   make_tagset_corpus_asis (unicode-based language)"
+    fi
+
+    (cd tagset && $FESTVOXDIR/src/promptselect/find_gpos corpus.txt)
+
+    ls -lt tagset/tagset_??.txt | 
+      awk '{if ((foundone != 1) && ($5 > 0))
+           {
+             print $NF; foundone = 1;
+            }}' >tagset/picked
+    rm -f tagset/tagset.txt
+    ln `cat tagset/picked` tagset/tagset.txt
+
+    echo "(set! ${FV_VOICENAME}_guess_pos '(" >tagset/gpos.scm
+    cat tagset/tagset.txt |
+    sed 's/__COMMA__/,/g' |
+    awk '{printf("(tag%03d ",NR);
+          for (i=1; i<=NF; i++)
+             printf("\"%s\" ",$i);
+          printf(")\n")}' >>tagset/gpos.scm
+    echo "))" >>tagset/gpos.scm
+
+    grep "^(tag" tagset/gpos.scm | sed 's/^(/( /' |
+    awk '{print $2} END {print "content"; print "0"}' >tagset/tags
+    grep "^(tag" tagset/gpos.scm | tr -d "()"
+    cat tagset/tags | awk 'END {printf("%d tags\n",NR)}'
+
+    cp -p tagset/gpos.scm festvox/${FV_VOICENAME}_gpos.scm
+
+fi
+
+if [ "$ACTION" = "dump_phrasing_tree" ]
+then
+    corpusfile="syntax/$FV_VOICENAME.$MODE.corpus"
+    $FESTVOXDIR/../festival/bin/festival -b festvox/phrasyn.scm "festvox/$FV_FULLVOICENAME.scm" "(set! cg:phrasyn nil)" "(voice_$FV_FULLVOICENAME )" "(dump_scfg_corpus '$PROMPTFILE.train '$corpusfile '$MODE)"
+fi
+
+if [ "$ACTION" = "build_phrasing_grammar" ]
+then
+
+#    tagfile=$FESTVOXDIR/src/phrasyn/tags/$PHRASYN_LANG.$MODE
+    corpusfile="syntax/$FV_VOICENAME.$MODE.corpus"
+    cat $corpusfile | tr -d "()" | awk '{for (i=1; i<=NF; i++) print $i}' | sort -u >syntax/tags
+    tagfile=syntax/tags
+    
+    $ESTDIR/bin/scfg_make -nonterms $NTCOUNT -terms $tagfile -o "syntax/$FV_VOICENAME.$NTCOUNT.$MODE.gram" -values random -domain prob
+    $ESTDIR/bin/scfg_train -grammar "syntax/$FV_VOICENAME.$NTCOUNT.$MODE.gram" -corpus $corpusfile -o "syntax/$FV_VOICENAME.$NTCOUNT.$MODE.out" -heap 10000000 -passes 20 -checkpoint 1 | tee "syntax/$FV_VOICENAME.$NTCOUNT.$MODE.out.log"
+    # Pick the best grammar from log
+    bestpass=`cat syntax/$FV_VOICENAME.$NTCOUNT.$MODE.out.log | grep 'pass' | sed 's/^pass \([0-9]*\) cross entropy \([0-9.]*\).*$/\1 \2/g' | sort -k2,2 -gr | tail -1 | awk '{printf("%03d",$1)}'`
+    mv syntax/$FV_VOICENAME.$NTCOUNT.$MODE.out.$bestpass syntax/$FV_VOICENAME.$NTCOUNT.$MODE.out
+    ln -sf $FV_VOICENAME.$NTCOUNT.$MODE.out syntax/grammar.$NTCOUNT.$MODE.out
+    rm -f syntax/$FV_VOICENAME.$NTCOUNT.$MODE.out.*
+fi
+
+if [ "$ACTION" = "utt_parse" ]
+then
+    corpusfile="syntax/$FV_VOICENAME.$NTCOUNT.$MODE.corpus"
+    outdir="syntax/utts.$NTCOUNT.$MODE"
+    echo "$outdir"
+    if [ ! -d "$outdir" ]
+    then
+	mkdir $outdir
+    fi
+
+    loadgrammar="(set! scfg_grammar (load \"syntax/$FV_VOICENAME.$NTCOUNT.$MODE.out\" t))"
+
+    $FESTVOXDIR/../festival/bin/festival -b festvox/phrasyn.scm "festvox/$FV_FULLVOICENAME.scm" "(set! cg:phrasyn nil)" "(voice_$FV_FULLVOICENAME )" "$loadgrammar" "(utt_parse '$PROMPTFILE '$outdir '$MODE)"
+
+fi
+
+if [ "$ACTION" = "build_break_prediction_tree" ]
+then
+    outdir="syntax/break_prediction_tree.$NTCOUNT.$MODE"
+    if [ ! -d "$outdir" ]
+    then
+	mkdir $outdir
+    fi
+
+    featsfile=$FESTVOXDIR/src/phrasyn/desc/$PHRASYN_LANG.$MODE.feats
+    descfile=$FESTVOXDIR/src/phrasyn/desc/$PHRASYN_LANG.$MODE.desc
+    echo "(voice_$FV_FULLVOICENAME )" >syntax/call_this_voice.scm
+
+    # End Write feats and desc file
+
+    cat "$PROMPTFILE.train.train" | awk -v ntcount="$NTCOUNT" -v mode="$MODE" '{printf("syntax/utts.%s.%s/%s.utt\n",ntcount, mode, $2)}' > $outdir/uttstrainfile 
+    cat "$PROMPTFILE.train.test" | awk -v ntcount="$NTCOUNT" -v mode="$MODE" '{printf("syntax/utts.%s.%s/%s.utt\n",ntcount, mode, $2)}' > $outdir/uttsdevfile 
+    
+    $ESTDIR/../festival/examples/dumpfeats -relation Word -feats $featsfile -from_file $outdir/uttstrainfile -output $outdir/break_base.train.data -eval festvox/phrasyn.scm -eval "festvox/$FV_FULLVOICENAME.scm" -eval syntax/call_this_voice.scm
+    $ESTDIR/../festival/examples/dumpfeats -relation Word -feats $featsfile -from_file $outdir/uttsdevfile -output $outdir/break_base.dev.data -eval festvox/phrasyn.scm -eval "festvox/$FV_FULLVOICENAME.scm" -eval syntax/call_this_voice.scm
+
+    # Might want to boost Bs, but it seems not worth it
+    boostB='{if ($1 == "B"){ print $0,1;} else {print $0,1}}'
+
+    echo $boostB > $outdir/boostB.awk
+
+    # Don't train for BB's -- they are free. 
+    cat $outdir/break_base.train.data | grep -v '^BB' | awk -f $outdir/boostB.awk > $outdir/break.train.data
+    cat $outdir/break_base.dev.data | grep -v '^BB' | awk -f $outdir/boostB.awk > $outdir/break.dev.data
+
+    $ESTDIR/bin/wagon -heap 10000000 -desc $descfile -stop $STOPVALUE -data $outdir/break.train.data -o $outdir/break_prediction.tree -test $outdir/break.dev.data -stepwise -swopt B_NB_F1
+
+    # Test the built tree
+    cat $PROMPTFILE.test | awk -v ntcount="$NTCOUNT" -v mode="$MODE" '{printf("syntax/utts.%s.%s/%s.utt\n",ntcount, mode, $2)}' > $outdir/testutts
+    $ESTDIR/../festival/examples/dumpfeats -relation Word -feats $featsfile -from_file $outdir/testutts -output $outdir/test.data -eval festvox/phrasyn.scm
+    
+    # Don't test over BB's --> they are free.
+    cat $outdir/test.data | awk '{print $0, 1;}' | grep -v '^BB'  > $outdir/test20.data
+
+    $ESTDIR/bin/wagon_test -heap 10000000 -desc $descfile -data $outdir/test20.data -tree $outdir/break_prediction.tree -o $outdir/test20.predicted
+
+    ln -sf break_prediction_tree.$NTCOUNT.$MODE/break_prediction.tree syntax/break_prediction.$NTCOUNT.$MODE.tree
+
+    cp -pr $outdir/break_prediction.tree festvox/${FV_VOICENAME}_phrasetree.scm
+    
+    echo "Tree located in $outdir/break_prediction.tree"
+fi
+
+if [ "$ACTION" = "fill_bnb_probs" ]
+then
+    cat syntax/break_prediction_tree.$NTCOUNT.$MODE/break.train.data | cut -f 1 -d " " | awk '
+     # Print list of word frequencies
+     BEGIN {tot = 0}
+     {
+         for (i = 1; i <= NF; i++)
+             freq[$i]++;
+         tot = tot + NF
+     }
+     
+     END {
+         for (word in freq)
+             printf "%s\t%f\t%d\n", word, (freq[word])/tot, freq[word]
+     }' | sort --key=2 -gr | sort > syntax/break_prediction_tree.$NTCOUNT.$MODE/break.train.probs
+    bprob=$(cat syntax/break_prediction_tree.$NTCOUNT.$MODE/break.train.probs | awk '$1=="B" {print $2}')
+    nbprob=$(cat syntax/break_prediction_tree.$NTCOUNT.$MODE/break.train.probs | awk '$1=="NB" {print $2}')
+
+    sed -iorig "s/__BPROB__/$bprob/g" festvox/${FV_VOICENAME}_phrasing.scm
+    sed -i "s/__NBPROB__/$nbprob/g" festvox/${FV_VOICENAME}_phrasing.scm
+fi
+
+if [ "$ACTION" = "do_all" ]
+then
+    for i in "dump_phrasing_tree" "build_phrasing_grammar" "utt_parse" "build_break_prediction_tree" "fill_bnb_probs"
+    do
+	$0 $i $PROMPTFILE $3 $4 $5
+    done
+fi

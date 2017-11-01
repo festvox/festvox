@@ -1,0 +1,1066 @@
+<chapter><title>Festival's Scheme Programming Language</title>
+
+<para>
+This chapter acts as a reference guide for the particular dialect of 
+the Scheme programming language used in the Festival Speech Synthesis 
+systems. The Scheme programming language is a dialect of Lisp 
+designed to be more consistent. It was chosen for the basic 
+scripting language in Festival because: 
+<itemizedlist mark=bullet>
+<listitem><para>
+
+it is a very easy language for machines to parse and interpret, thus 
+the foot print for the interpreter proper is very small 
+</para></listitem>
+<listitem><para>
+
+it offers garbage collection making managing objects safe and easy. 
+</para></listitem>
+<listitem><para>
+
+it offers a general consistent datastructure for representing parameters, 
+rules etc. 
+</para></listitem>
+<listitem><para>
+
+it was familiar to the authors 
+</para></listitem>
+<listitem><para>
+
+its is suitable for use as an embedded system 
+</para></listitem>
+</itemizedlist>
+Having a scripting language in Festival is actually one of the 
+fundamental properties that makes Festival a useful system. The fact 
+that new voices and languages in many cases can be added without 
+changing the underlying C++ code makes the system mouch more powerful 
+and accessible than a more monolithic system that requires recompilation 
+for any parameter changes. As there is sometimes confusion we 
+should make it clear that Festival contains its own Scheme interpreter 
+as part of the system. Festival can be view as a Scheme interpreter 
+that has had basic addition to its function to include modules 
+that can do speech synthesis, no external Scheme interperter is 
+required to use Festival. 
+</para>
+<para>
+The actual interpreter used in Festival is based on George Carret's 
+SIOD, "Scheme in one Defun". But this has been substantially enhanced 
+from its small elegant beginnings into something that might be better 
+called "Scheme in one directory". Although there is a standard for 
+Scheme the version in Festival does not fully follow it, for both good 
+and bad reasons. Thus finding in order for people to be able to program 
+in Festival's Scheme we provide this chapter to list the core type, 
+functions, etc and some examples. We do not pretend to be teaching 
+programming here but as we know many people who are interested in 
+building voices are not primarily programmers, some guidance on the 
+language and its usage will make the simple programming that is 
+required in building voices, more accessible. 
+</para>
+<para>
+For reference the Scheme Revised Revised Revised report describes the 
+standard definition <citation>srrrr90</citation>. For a good introduction to 
+programming in general that happens to use Scheme as its example 
+language we recommend <citation>abelson85</citation>. Also for those who are 
+unfamiliar with the use of Lisp-like scripting languages we recommend a 
+close look as GNU Emacs which uses Lisp as its underlying scripting 
+language, knowledge of the internals of Emacs did to some extent 
+influence the scripting language design of Festival. 
+</para>
+<sect1><title>Overview</title>
+
+<para>
+"Lots of brackets" is what comes to most people's minds when considering 
+Lisp and its various derivatives such as Scheme. At the start this can 
+seem daunting and it is true that parenthesis errors can cuase problems. 
+But with an editor that does proper bracket matching, brackets can 
+actually be helpful in code structure rather than a hindrance. 
+</para>
+<para>
+The fundamental structure is the <emphasis>s-expression</emphasis>. It consists of an 
+atom, or a list of s-expressions. This simply defined recursive 
+structure allows complex structures to easily be specified. For 
+example 
+<blockquote><literallayout>
+3
+(1 2 3)
+(a (b c) d)
+((a b) (d e))
+</literallayout></blockquote>
+Unlike other programming languages Scheme's data and code are 
+in the same format, s-expressions. Thus s-expression 
+are evaluated, recursively. 
+<variablelist>
+<varlistentry>
+<term><emphasis>Symbols:</emphasis></term>
+<listitem><para>
+are treated as variables and evaluated return their currently set value. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>Strings and numbers:</emphasis></term>
+<listitem><para>
+evalutate to themselves. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>Lists:</emphasis></term>
+<listitem><para>
+The each member of the list is evaluated and the first item in 
+the list is treated as a function and applied using the remainer of the 
+list as arguments to the function. 
+</para></listitem></varlistentry>
+</variablelist>
+Thus the s-expression 
+<blockquote><literallayout>
+(+ 1 2)
+</literallayout></blockquote>
+when evaluated will return <varname>3</varname> as the symbol <varname>+</varname> 
+is bound to a function that adds it arguments. 
+</para>
+<para>
+Variables may be set using the <varname>set!</varname> function which takes 
+a variable name and a value as arguments 
+<blockquote><literallayout>
+(set! a 3)
+</literallayout></blockquote>
+The <varname>set!</varname> function is unusual in that it does not evaluate its 
+first argument. If it did you have to explcitly quote it or set some 
+other variable to have a value of <varname>a</varname> to get the desired effect. 
+</para>
+<para>
+quoting, define 
+</para>
+</sect1>
+
+<sect1><title>Data Types</title>
+
+<para>
+There a number of basic data types in this Scheme, new ones may also be 
+added but only through C++ functions. This basic types are 
+<variablelist>
+<varlistentry>
+<term><emphasis>Symbols:</emphasis></term>
+<listitem><para>
+symbols atoms starting with an alphabetic character. Unlike 
+numbers and strings, they may be used as variables. Examples 
+are 
+<blockquote><literallayout>
+a bcd f6 myfunc 
+plus cond
+</literallayout></blockquote>
+Symbols may be created from strings by using the function <varname>intern</varname> 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>Numbers:</emphasis></term>
+<listitem><para>
+In this version of scheme all numbers are doubles, there is no 
+distinction between floats, doubles and ints. Examples are 
+<blockquote><literallayout>
+1
+1.4
+3.14
+345
+3456756.4345476
+</literallayout></blockquote>
+Numbers evaluate to themselves, that is the value of the atom 2 
+is the number 2. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>Strings:</emphasis></term>
+<listitem><para>
+Strings are bounded by the double quote characters <varname>&quot;</varname>. 
+For example 
+<blockquote><literallayout>
+"a"
+"abc"
+"This is a string"
+</literallayout></blockquote>
+Strings evaluate to themselves. They may be converted to symbols 
+with the function <varname>intern</varname>. If they are strings of characaters 
+that represent numbers you can convert a string to a number with 
+the function <varname>parse-number</varname>. For example 
+<blockquote><literallayout>
+(intern "abc") => abc
+(parse-number "3.14") => 3.14
+</literallayout></blockquote>
+Although you can make symbols from numbers you should not do that. 
+</para>
+<para>
+Double quotes may be specified within a string by escaping it with a 
+backslash. Backslashes therefore also require an escape backslash. 
+That is, <varname>"ab\"c"</varname> contains four characters, <varname>a</varname>, <varname>b</varname>, 
+<varname>"</varname> and <varname>c</varname>. <varname>"ab\\c"</varname> also contains four characters, 
+<varname>a</varname>, <varname>b</varname>, <varname>\</varname> and <varname>c</varname>. And <varname>"ab\\\"c"</varname> 
+contains five characters <varname>a</varname>, <varname>b</varname>, <varname>\</varname>, <varname>"</varname> and 
+<varname>c</varname>. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>Lists or Cons</emphasis></term>
+<listitem><para>
+Lists start with a left parenthesis and end with a right parenthesis 
+with zero or more s-expression between them. For example 
+<blockquote><literallayout>
+(a b c)
+()
+(b (b d) e)
+((the boy) saw (the girl (in (the park))))
+</literallayout></blockquote>
+Lists can be made by various functions most notably <varname>cons</varname> and 
+<varname>list</varname>. <varname>cons</varname> returns a list whose first item is the first 
+item in the list, standardly called its <varname>car</varname>, and whose remainder, 
+standardly called its <varname>cdr</varname>, is the second argument of <varname>cons</varname>. 
+<blockquote><literallayout>
+(cons 'a '(b c)) => (a b c)
+(cons '(a b) '(c d)) => ((a b) c d)
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>Functions:</emphasis></term>
+<listitem><para>
+Functions may be applied explicity bu the function <varname>apply</varname> 
+or more normally as when the appear as the first item in a list 
+to be evaluated. The normal way to define function is using 
+the <varname>define</varname> function. For example 
+<blockquote><literallayout>
+(define (ftoc temp)
+   (/ (* (- temp 32) 5) 9))
+</literallayout></blockquote>
+This binds the function to the variable <varname>ftoc</varname>. Functions 
+can also be defined anonymously which sometimes is convinient. 
+<blockquote><literallayout>
+(lambda (temp)
+   (/ (* (- temp 32) 5) 9))
+</literallayout></blockquote>
+returns a function. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>Others:</emphasis></term>
+<listitem><para>
+other internal types are support by Festival's scheme including some 
+inportant object types use for synthesis such as utterances, waveforms, 
+items etc. The are normally printed as in the form 
+<blockquote><literallayout>
+#&lt;Utterance 6234>
+#%lt;Wave 1294>
+</literallayout></blockquote>
+The rpint form is a convinience form only. Enter that string of 
+characters will not allow a reference to that object. The number is 
+unique to that object instance (it is actually the internal address of 
+the object), and can be used visually to note if objects are the same or 
+not. 
+</para></listitem></varlistentry>
+</variablelist>
+</para>
+</sect1>
+
+<sect1><title>Functions</title>
+
+<para>
+This section lists the basic functions in Festival's Scheme. It doesn't 
+list them all (see the Festival manual for that) but does highlight the 
+key functions that you should normally use. 
+</para>
+<sect2><title>Core functions</title>
+
+<para>
+These functions are the basic functions used in Scheme. These 
+include the structural functions for setting variables, 
+conditionals. loops, etc. 
+</para>
+<variablelist>
+<varlistentry>
+<term><varname>(set! SYMBOL VALUE)</varname></term>
+<listitem><para>
+Sets <varname>SYMBOL</varname> to <varname>VALUE</varname>. 
+<varname>SYMBOL</varname> is not evaluated, 
+while <varname>VALUE</varname> is. Example 
+<blockquote><literallayout>
+(set! a 3)
+(set! pi 3.14)
+(set! fruit '(apples pears bananas))
+(set! fruit2 fruit)
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(define (FUNCNAME ARG0 ARG1 ...) . BODY)</varname></term>
+<listitem><para>
+define a function called <varname>FUNCNAME</varname> with specified arguments and 
+body. 
+<blockquote><literallayout>
+(define (myadd a b) (+ a b))
+(define (factorial a)
+ (cond
+  ((< a 2) 1)
+  (t (* a (factorial (- a 1))))))
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(if TEST TRUECASE [FALSECASE] )</varname></term>
+<listitem><para>
+If the value of <varname>TEST</varname> is non-nil, evaluate <varname>TRUECASE</varname> and return 
+value else if present evaluate <varname>FALSECASE</varname> if present and return value, 
+else return <varname>nil</varname>. 
+<blockquote><literallayout>
+(if (string-equal v "apples")
+   (format t "It's an apple\n")
+   (format t "It's not an apple\n"))
+(if (member v '(apples pears bananas))
+   (begin
+       (format t "It's a fruit (%s)\n" v)
+       'fruit)
+   'notfruit)
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(cond (TEST0 . BODY) (TEST1 . BODY) ...)</varname></term>
+<listitem><para>
+A multiple if statement. Evaluates each <varname>TEST</varname> until a non-nil test 
+is found then evalues each of the expressions in that <varname>BODY</varname> return 
+the value of the last one. 
+<blockquote><literallayout>
+(cond
+  ((string-equal v "apple")
+   'ringo)
+  ((string-equal v "plum")
+   'ume)
+  ((string-equal v "peach")
+   'momo)
+  (t
+   'kudamono)
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(begin . BODY )</varname></term>
+<listitem><para>
+This evaluates each s-expression in <varname>BODY</varname> and returns the value 
+of the last s-expression in the list. This is useful for case 
+where only one s-expression is expected but you need to call a number 
+of functions, notably the <varname>if</varname> function. 
+<blockquote><literallayout>
+(if (string-equal v "pear")
+    (begin
+       (format t "assuming it's a asian pear\n")
+       'nashi)
+    'kudamono)
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(or . DISJ)</varname></term>
+<listitem><para>
+evalutate each disjunct until one is non-nil and return that value. 
+<blockquote><literallayout>
+(or (string-equal v "tortoise")
+    (string-equal v "turtle"))
+(or (string-equal v "pear")
+    (string-equal v "apple")
+    (< num_fruits 6))
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(and . CONJ)</varname></term>
+<listitem><para>
+evalutate each conjunct until one is nil and return that value or 
+return the value of the last conjunct. 
+<blockquote><literallayout>
+(and (< num_fruits 10)
+     (> num_fruits 3))
+(and (string-equal v "pear")
+     (< num_fruits 6)
+     (or (string-equal day "Tuesday")
+         (string-equal day "Wednesday")))
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+</variablelist>
+
+</sect2>
+
+<sect2><title>List functions</title>
+
+<variablelist>
+<varlistentry>
+<term><varname>(car EXPR)</varname></term>
+<listitem><para>
+returns the "car" of <varname>EXPR</varname>, for a list this is the first item, 
+for an atom or the empty list this is defined to be <varname>nil</varname>. 
+<blockquote><literallayout>
+(car '(a b)) => a
+(car '((a b) c d)) => (a b)
+(car '(a (b c) d)) => a
+(car nil) => nil
+(car 'a) => nil
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(cdr EXPR)</varname></term>
+<listitem><para>
+returns the "cdr" of <varname>EXPR</varname>, for a list this is the rest of the 
+list, for an atom or the empty list this is defined to be <varname>nil</varname>. 
+<blockquote><literallayout>
+(cdr '(a b)) => (b)
+(cdr '((a b) c d)) => (c d)
+(cdr '(a)) => nil
+(cdr '(a (b c))) => ((b c))
+(cdr nil) => nil
+(cdr 'a) => nil
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(cons EXPR0 EXPR2)</varname></term>
+<listitem><para>
+build a new list whose "car" is <varname>EXPR0</varname> and whose "cdr" is <varname>EXPR1</varname>. 
+<blockquote><literallayout>
+(cons 'a '(b c)) => (a b c)
+(cons 'a ()) => (a)
+(cons '(a b) '(c d) => '((a b) c d))
+(cons () '(a) => '(nil a))
+(cons 'a 'b => (a . b))
+(cons nil nil) => (nil)
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(list . BODY)</varname></term>
+<listitem><para>
+Form a list from each of the arguments 
+<blockquote><literallayout>
+(list 'a 'b 'c) => (a b c)
+(list '(a b) 'c 'd) => ((a b) c d)
+(list nil '(a b) '(a b)) => (nil (a b) (a b))
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(append . BODY)</varname></term>
+<listitem><para>
+Join each of the arguments (lists) into a single list 
+<blockquote><literallayout>
+(append '(a b) '(c d)) => (a b c d)
+(append '(a b) '((c d)) '(e f)) => (a b (c d) e f)
+(append nil nil) => nil
+(append '(a b)) => (a b))
+(append 'a 'b) => error
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(nth N LIST)</varname></term>
+<listitem><para>
+Return Nth member of list, the first item is the 0th member. 
+<blockquote><literallayout>
+(nth 0 '(a b c)) => a
+(nth 2 '(a b c)) => c
+(nth 3 '(a b c)) => nil
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(nth_cdr N LIST)</varname></term>
+<listitem><para>
+Return Nth cdr list, the first cdr is the 0th member, which is 
+the list itself. 
+<blockquote><literallayout>
+(nth 0 '(a b c)) => (a b c)
+(nth 2 '(a b c)) => (c)
+(nth 1 '(a b c)) => (b c)
+(nth 3 '(a b c)) => nil
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(last LIST)</varname></term>
+<listitem><para>
+The last cdr of a list, traditionally this function has always been called 
+<varname>last</varname> rather <varname>last_cdr</varname> 
+<blockquote><literallayout>
+(last '(a b c)) => (c)
+(last '(a b (c d))) => ((c d))
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(reverse LIST)</varname></term>
+<listitem><para>
+Return the list in reverse order 
+<blockquote><literallayout>
+(reverse '(a b c)) => (c b a)
+(reverse '(a)) => (a)
+(reverse '(a b (c d))) => ((c d) b a)
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(member ITEM LIST)</varname></term>
+<listitem><para>
+Returns the cdr in LIST whose car is ITEM or nil if it found 
+<blockquote><literallayout>
+(member 'b '(a b c)) => (b c)
+(member 'c '(a b c)) => (c)
+(member 'd '(a b c)) => nil
+(member 'b '(a b c b)) => (b c b)
+</literallayout></blockquote>
+Note that <varname>member</varname> uses <varname>eq</varname> to test equality, hence this 
+does not work for strings. You should use <varname>member_string</varname> 
+if the list contains strings. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(assoc ITEM ALIST)</varname></term>
+<listitem><para>
+a-list are a standard list format for representing feature value 
+pairs. An a-list is basically a list of pairs of name and value, 
+although the name may be any lisp item it is usually an symbol. A 
+typlical a-list is 
+<blockquote><literallayout>
+((name AH)
+ (duration 0.095)
+ (vowel +)
+ (occurs ("file01" "file04" "file07" "file24"))
+)
+</literallayout></blockquote>
+<varname>assoc</varname> is a function that allows you to look up values 
+in an a-list 
+<blockquote><literallayout>
+(assoc 'name '((name AH) (duration 0.95))) => (name AH)
+(assoc 'duration '((name AH) (duration 0.95))) => (duration 0.95)
+(assoc 'vowel '((name AH) (duration 0.95))) => nil
+</literallayout></blockquote>
+Note that <varname>assoc</varname> uses <varname>eq</varname> to test equality, hence this 
+does not work names that are strings. 
+You should use <varname>assoc_string</varname> if the a-list uses strings for 
+names. 
+</para></listitem></varlistentry>
+</variablelist>
+
+</sect2>
+
+<sect2><title>Arithmetic functions</title>
+
+<para>
++ - * / exp log sqrt < > <= >= = 
+</para>
+</sect2>
+
+<sect2><title>I/O functions</title>
+
+<para>
+File names in Festival use the Unix convention of using "/" as the 
+directory separator. However under other operating systems, such as 
+Windows, the "/" will be appropriately mapped into backslash as 
+required. For most cases you do not need to worry about this and if you 
+use forward slash all the time ti will work. 
+</para>
+<variablelist>
+<varlistentry>
+<term><varname>(format FD FORMATSTRING . ARGS)</varname></term>
+<listitem><para>
+The <varname>format</varname> function is a little unusually in
+Lisp. It basically follows the <varname>printf</varname> command in C,
+or more closely follows the <varname>format</varname> function in
+Emacs lisp. It is desgined to print out infomation that is not
+necessarily to be read in by Lisp (unlike <varname>pprint</varname>,
+<varname>print</varname> and
+<varname>printfp</varname>). <varname>FD</varname> is a file
+descriptor as created by <varname>fopen</varname>, and the result is
+printed to that. Also two special values are allows
+there. <varname>t</varname> causes the output to be sent to standard
+out (which is usually the terminal).  <varname>nil</varname> causes
+the output to be written to a string and returned by the
+function. Also the variable <varname>stderr</varname> is set to a file
+descriptor for standard error output.
+</para>
+<para>
+The format string closely follows the format used in C's printf 
+functions. It is actually interpreted by those functions in its 
+implementation. <varname>format</varname> supports the following directives 
+<variablelist>
+<varlistentry>
+<term><emphasis>%d</emphasis></term>
+<listitem><para>
+Print as integer 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>%d</emphasis></term>
+<listitem><para>
+Print as integer in hexadecimal 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>%f</emphasis></term>
+<listitem><para>
+Print as float 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>%s</emphasis></term>
+<listitem><para>
+Convert item to string 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>%%</emphasis></term>
+<listitem><para>
+A percent character 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>%g</emphasis></term>
+<listitem><para>
+Print as double 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>%c</emphasis></term>
+<listitem><para>
+Print number as character 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>%l</emphasis></term>
+<listitem><para>
+Print as Lisp object 
+</para></listitem></varlistentry>
+</variablelist>
+In addition directive sizes are supported, including (zero or space) 
+padding, and widths. Explicitly specified sizes as arguments as in 
+<varname>%*s</varname> are not supported, nor is <varname>%p</varname> for pointers. 
+</para>
+<para>
+The <varname>%s</varname> directive will try to convert the corresponding 
+lisp argument to a string before passing it to the low level print 
+function. Thus list will be printed to strings, and numbers also 
+coverted. This form will loose the distinction between lisp symbols 
+and lisp strings as the quote will not be present in the <varname>%s</varname> 
+form. In general <varname>%s</varname> should be used for getting nice human 
+output and not for machine readable output as it is a lossy print 
+form. 
+</para>
+<para>
+In contrast <varname>%l</varname> is designed to reserve the Lisp forms 
+so they can be more easily read, quotes will appear and escapes 
+for embedded quote will be treated properly. 
+<blockquote><literallayout>
+(format t "duration %0.3f\n" 0.12345) => duration 0.123
+(format t "num %d\n" 23) => num 23
+(format t "num %04d\n" 23) => num 0023
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>(pprintf SEXP [FD])</emphasis></term>
+<listitem><para>
+Pretty print give expression to standard out (or FD if specified). 
+Pretty printing is a technique that inserts newlines in the 
+printout and indentation to make the lisp expression easier to 
+read. 
+
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>(fopen FILENAME MODE)</emphasis></term>
+<listitem><para>
+This creates a file description, which can be used in the various I/O 
+functions. It closely follows C stdio <varname>fopen</varname> function. The 
+mode may be 
+<variablelist>
+<varlistentry>
+<term><emphasis>"r"</emphasis></term>
+<listitem><para>
+to open the file for reading 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>"w"</emphasis></term>
+<listitem><para>
+to open the file for writing 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>"a"</emphasis></term>
+<listitem><para>
+to open the file at the end for writing (so-called, append). 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>"b"</emphasis></term>
+<listitem><para>
+File I/O in binary (for OS's that make the distinction), 
+</para></listitem></varlistentry>
+</variablelist>
+Or any combination of these. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>(fclose FD)</emphasis></term>
+<listitem><para>
+Close a file descriptor as created by <varname>fopen</varname>. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>(read)</emphasis></term>
+<listitem><para>
+Read next s-expression from standard in 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>(readfp FD)</emphasis></term>
+<listitem>
+<para>
+Read next s-expression from given file descriptor FD. On end of 
+file it returns an sexpression eq to the value returned by the 
+function <varname>(eof_val)</varname>. A typical example use of these 
+functions is 
+<blockquote><literallayout>
+(let ((ifd (fopen infile "r"))
+      (ofd (fopen outfile "w"))
+      (word))
+   (while (not (equal? (set! word (readfp ifd)) (eof-val)))
+      (format ofd "%l\n" (lex.lookup word nil)))
+   (fclose ifd)
+   (fclose ofd)))
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>(load FILENAME [NOEVAL])</emphasis></term>
+<listitem><para>
+Load in the s-expressions in <varname>FILENAME</varname>. If <varname>NOEVAL</varname> is 
+unspecified the s-expressions are evaluated as they are read. If 
+<varname>NOEVAL</varname> is specified and non-nil, <varname>load</varname> will return all 
+s-expressions in the file un-evaluated in a single list. 
+</para></listitem></varlistentry>
+</variablelist>
+
+</sect2>
+
+<sect2><title>String functions</title>
+
+<para>
+As in many other languages, Scheme has a distinction between 
+<varname>strings</varname> and <varname>symbols</varname>. String evaluate to themselves and 
+cannot be assigned other values, symbols of the print name are 
+<varname>equal?</varname> while strings of teh same name aren't necessarily. 
+</para>
+<para>
+In Festival's Scheme, strings are eight bit clean and designed to hold 
+strings of text and characters in what ever language is being 
+synthesized. Strings are always treats as string of 8 bit characters 
+even though some language may interpret these are 16-bit characters. 
+Symbols, in general, should not contain 8bit characters. 
+<variablelist>
+<varlistentry>
+<term><varname>(string-equal STR1 STR2)</varname></term>
+<listitem><para>
+Finds the string of <varname>STR1</varname> and <varname>STR2</varname> and returns <varname>t</varname> if 
+these are equal, and <varname>nil</varname> otherwise. Symbol names and numbers are 
+mapped to string, though you should be aware that the mapping of a 
+number to a string may not always produce what you hope for. A number 
+<varname>0</varname> may or may not be mapped to <varname>"0"</varname> or maybe to <varname>"0.0"</varname> 
+such that you should not dependent on the mapping. You can use 
+<varname>format</varname> to map a number ot a string in an explicit manner. It is 
+however safe to pass symbol names to <varname>string-equal</varname>. In most cases 
+<varname>string-equal</varname> is the right function to use rather than 
+<varname>equal?</varname> which is must stricter about its definition of equality. 
+<blockquote><literallayout>
+(string-equal "hello" "hello") => t
+(string-equal "hello" "Hello") => false
+(string-equal "hello" 'hello) => t
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(string-append . ARGS)</varname></term>
+<listitem><para>
+For each argument coerce it to a string, and return the concatenation of 
+all arguments. 
+<blockquote><literallayout>
+(string-append "abc" "def") => "abcdef"
+(string-append "/usr/local/" "bin/" "festival") => "/usr/local/bin/festival"
+(string-append "/usr/local/" t 'hello) => "/usr/local/thello"
+(string-append "abc") => "abc"
+(string-append ) => ""
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(member_string STR LIST)</varname></term>
+<listitem><para>
+returns <varname>nil</varname> if no member of <varname>LIST</varname> is <varname>string-equal</varname> to 
+<varname>STR</varname>, otherwise it returns <varname>t</varname>. Again, this is often the 
+safe way to check membership of a list as this will work properly if 
+<varname>STR</varname> or the members of <varname>LIST</varname> are symbols or strings. 
+<blockquote><literallayout>
+(member_string "a" '("b" "a" "c")) => t
+(member_string "d" '("b" "a" "c")) => nil
+(member_string "d" '(a b c d)) => t
+(member_string 'a '("b" "a" "c")) => t
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(string-before STR SUBSTR)</varname></term>
+<listitem><para>
+Returns the initial prefix of <varname>STR</varname> up to the first occurrence 
+of <varname>SUBSTR</varname> in <varname>STR</varname>. If <varname>SUBSTR</varname> doesn't 
+exist within <varname>STR</varname> the empty string is returned. 
+<blockquote><literallayout>
+(string-before "abcd" "c") => "ab"
+(string-before "bin/make_labs" "/") => "bin"
+(string-before "usr/local/bin/make_labs" "/") => "usr"
+(string-before "make_labs" "/") => ""
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(string-after STR SUBSTR)</varname></term>
+<listitem><para>
+Returns the longest suffix of <varname>STR</varname> after the first occurrence 
+of <varname>SUBSTR</varname> in <varname>STR</varname>. If <varname>SUBSTR</varname> doesn't 
+exist within <varname>STR</varname> the empty string is returned. 
+<blockquote><literallayout>
+(string-after "abcd" "c") => "d"
+(string-after "bin/make_labs" "/") => "make_labs"
+(string-after "usr/bin/make_labs" "/") => "bin/make_labs"
+(string-after "make_labs" "/") => ""
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(length STR)</varname></term>
+<listitem><para>
+Returns the lengh of given string (or list). Length does not coerce its 
+argument into a string, hence given a symbol as argument is an error. 
+<blockquote><literallayout>
+(length "") => 0
+(length "abc") => 3
+(length 'abc) -> SIOD ERROR
+(length '(a b c)) -> 3
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(symbolexplode SYMBOL)</varname></term>
+<listitem><para>
+returns a list of single character strings for each character in 
+<varname>SYMBOL}'</varname> print name. This will also work on strings. 
+<blockquote><literallayout>
+(symbolexplode 'abc) => ("a" "b" "c")
+(symbolexplode 'hello) => ("h" "e" "l" "l" "o")
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(intern STR)</varname></term>
+<listitem><para>
+Convert a string into a symbol with the same print name. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(string-matches STR REGEX)</varname></term>
+<listitem><para>
+Returns <varname>t</varname> if <varname>STR</varname> matches <varname>REGEX</varname> regular expression. 
+Regular expressions are described more fully below. 
+<blockquote><literallayout>
+(string-matches "abc" "a.*") => t
+(string-matches "hello" "[Hh]ello") => t
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+</variablelist>
+</para>
+</sect2>
+
+<sect2><title>System functions</title>
+
+<para>
+In order to interact more easily with the underlying operating system, 
+Festival Scheme includes a number of basic function that allow Scheme 
+programs to make use of the operating system functions. 
+<variablelist>
+<varlistentry>
+<term><varname>(system COMMAND)</varname></term>
+<listitem><para>
+Evaluates the command with the Unix shell (or equivalent). Its 
+not clear how this should (or does0 work on other operating systems 
+so it should be used sparingly if the code is to be portable. 
+<blockquote><literallayout>
+(system "ls") => lists files in current directory.
+(system (format nil "cat %s" filename))
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(get_url URL OFILE)</varname></term>
+<listitem><para>
+Copies contents of <varname>URL</varname> into <varname>OFILE</varname>. It support 
+<filename>file:</filename> and <filename>http:</filename> prefixes, but current does not support the 
+<varname>ftp:</varname> protocol. 
+<blockquote><literallayout>
+(get_url "http://www.festvox.org/index.html" "festvox.html")
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(setenv NAME VALUE)</varname></term>
+<listitem><para>
+Set environment variable <varname>NAME</varname> to <varname>VALUE</varname> which should 
+be strings 
+<blockquote><literallayout>
+(setenv "DISPLAY" "nara.mt.cs.cmu.edu:0.0")
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(getenv NAME)</varname></term>
+<listitem><para>
+Get value of environment variable <varname>NAME</varname>. 
+<blockquote><literallayout>
+(getenv "DISPLAY")
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(getpid)</varname></term>
+<listitem><para>
+The process id, as a number. This is useful when creating 
+files that need to be unique for the festival instance. 
+<blockquote><literallayout>
+(set! bbbfile (format nil "/tmp/stuff.%05d" (getpid)))
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(cd DIRECTORY)</varname></term>
+<listitem><para>
+Change directory. 
+<blockquote><literallayout>
+(cd "/tmp")
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>(pwd)</varname></term>
+<listitem><para>
+return a string which is a pathname to the current working directory. 
+</para></listitem></varlistentry>
+</variablelist>
+</para>
+</sect2>
+
+<sect2><title>Utterance Functions</title>
+
+<para>
+%%%%% Utterance construction and access functions
+</para>
+</sect2>
+
+<sect2><title>Synthesis Functions</title>
+
+<para>
+%%%%% Synthesis specific functions
+</para>
+</sect2></sect1>
+
+<sect1><title>Debugging and Help</title>
+
+<para>
+%%%%% backtrace, debugging, advise etc.
+</para>
+</sect1>
+
+<sect1><title>Adding new C++ functions to Scheme</title>
+
+<para>
+Brief decsription of C++ interface.
+</para>
+
+</sect1>
+
+<sect1><title>Regular Expressions</title>
+
+<para>
+Regular expressions are fundamentally useful in any text processing 
+language. This is also true in Festival's Scheme. The function 
+<varname>string-matches</varname> and a number of other places (notably CART trees) 
+allow th eunse of regular expressions to matche strings. 
+</para>
+<para>
+We will not go into the formal aspects of regular expressions 
+but just give enough discussion to help you use them here. See 
+<citation>regexbook</citation> for probablay more information than you'll ever 
+need. 
+</para>
+<para>
+Each implementation of regex's may be slightly different hence here we 
+will lay out the full syntaxt and semantics of the our regex patterns. 
+This is not an arbitrary selection, when Festival was first developed we 
+use the GNU libg++ <varname>Regex</varname> class but for portability to non-GNU 
+systems we had replace that with our own impelementation based on Henry 
+Spencer regex code (which is at the core of many regex libraries). 
+</para>
+<para>
+In general all character match themselves except for the following 
+which (can) have special interpretations 
+<blockquote><literallayout>
+. * + ? [ ] - ( ) | ^ $ \
+</literallayout></blockquote>
+If these are preceded by a backslash then they no longer will have 
+special interpretation. 
+<variablelist>
+<varlistentry>
+<term><varname>.</varname></term>
+<listitem><para>
+Matches any character. 
+<blockquote><literallayout>
+(string-matches "abc" "a.c") => t
+(string-matches "acc" "a.c") => t
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>*</varname></term>
+<listitem><para>
+Matches zero or more occurrences of the preceding item in the regex 
+<blockquote><literallayout>
+(string-matches "aaaac" "a*c") => t
+(string-matches "c" "a*c") => t
+(string-matches "anythingc" ".*c") => t
+(string-matches "canythingatallc" "c.*c") => t
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>+</varname></term>
+<listitem><para>
+Matches one or more occurrences of the preceding item in the regex 
+<blockquote><literallayout>
+(string-matches "aaaac" "a+c") => t
+(string-matches "c" "a*c") => nil
+(string-matches "anythingc" ".+c") => t
+(string-matches "c" ".+c") => nil
+(string-matches "canythingatallc" "c.+c") => t
+(string-matches "cc" "c.+c") => nil
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>?</varname></term>
+<listitem><para>
+Matches zero or one occurrences of the preceding item. This 
+is it makes the preceding item optional. 
+<blockquote><literallayout>
+(string-matches "abc" "ab?c") => t
+(string-matches "ac" "ab?c") => t
+</literallayout></blockquote>
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>[ ]</varname></term>
+<listitem><para>
+can defined a set of characters. This can also be used to defined 
+a range. For example <varname>[aeiou]</varname> is and lower case vowel, <varname>[a-z]</varname> 
+is an lower case letter from a thru z. <varname>[a-zA-Z]</varname> is any character 
+upper or lower case. 
+</para>
+<para>
+If the <varname>^</varname> is specifed first it negates the class, thus 
+<varname>[^a-z]</varname> matches anything but a lower case character. 
+</para></listitem></varlistentry>
+
+<varlistentry>
+<term><varname>\( \)</varname></term>
+<listitem><para>
+Allow sections to be formed to allow other operators to affect them.
+For example the <varname>*</varname> applies to the previous item
+thus to match zero more occurrences of somethign longer than a 
+single character
+<blockquote><literallayout>
+(string-matches "helloworld" "hello\\(there\\)*world") => t
+(string-matches "hellothereworld" "hello\\(there\\)*world") => t
+(string-matches "hellotherethereworld" "hello\\(there\\)*world") => t
+</literallayout></blockquote>
+Note that you need two backslashes, one to escape the other backslashes
+</para></listitem></varlistentry>
+
+<varlistentry>
+<term><varname>\|</varname></term>
+<listitem><para>
+Or operator.  Allows choice of two alternatives
+<blockquote><literallayout>
+(string-matches "hellofishworld" "hello\\(fish\\|chips\\)world") => t
+(string-matches "hellochipsworld" "hello\\(fish\\|chips\\)world") => t
+</literallayout></blockquote>
+Note that you need two backslashes, one to escape the other backslashes
+</para></listitem></varlistentry>
+
+</variablelist>
+
+
+</para>
+</sect1>
+
+<sect1><title>Some Examples</title>
+
+<para>
+%%%%% some typical example code usage
+</para>
+
+</sect1>
+
+
+</chapter>

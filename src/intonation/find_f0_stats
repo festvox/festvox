@@ -1,0 +1,123 @@
+#!/bin/sh
+####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                      Carnegie Mellon University                       ##
+##                         Copyright (c) 2005                            ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Find F0 mean/std min (mean-3*std) max (mean+3*std) from upto 100     ##
+##  files sampled from the promptlist                                    ##
+##                                                                       ##
+###########################################################################
+
+LANG=C; export LANG
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ ! "$FESTVOXDIR" ]
+then
+   echo "environment variable FESTVOXDIR is unset"
+   echo "set it to your local festvox directory e.g."
+   echo '   bash$ export FESTVOXDIR=/home/awb/projects/festvox/'
+   echo or
+   echo '   csh% setenv FESTVOXDIR /home/awb/projects/festvox/'
+   exit 1
+fi
+
+PROMPTFILE=etc/txt.done.data
+if [ $# = 1 ]
+then
+   PROMPTFILE=$1
+fi
+
+SILENCE=pau
+
+F0MIN=50
+F0MAX=400
+
+NUMPROMPTS=`cat $PROMPTFILE | wc -l | awk '{print $1}'`
+
+cat $PROMPTFILE |
+awk 'BEGIN { NP='$NUMPROMPTS';
+             ENOUGH=100.0
+             if (NP/ENOUGH > 2)
+             {
+                f=int(NP/ENOUGH)
+             }
+             else
+                f = 1;
+           }
+    { if (NR%f == 0)
+          print $2
+    }' |
+while read i
+do
+  $ESTDIR/bin/ch_wave -scaleN 0.9 wav/$i.wav -F 16000 |
+  $ESTDIR/bin/pda -otype ascii -fmin $F0MIN -fmax $F0MAX
+done |
+awk '{
+      if ($1 > 0.0)
+      {
+        count += 1
+	sum += $1
+	sumsq += $1*$1
+      }
+     }
+     function std (sum, sumx, n)
+     {
+	if (n==1) n=2;
+        return sqrt(((n*sumx)-(sum*sum)) / (n*(n-1)))
+     }
+     function mean (sum,n)
+     {
+           return sum/n;
+     }
+     END { m=mean(sum,count);
+           s=std(sum,sumsq,count);
+           printf("F0MEAN=%d\n",m);
+           printf("F0STD=%d\n",s);
+           printf("F0MAX=%d\n",m+(3*s));
+           if (m-(3*s) < 50)
+              printf("F0MIN=%d\n",50);
+           else
+              printf("F0MIN=%d\n",m-(3*s));
+         }' >etc/f0.params
+
+
+
+
+

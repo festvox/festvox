@@ -1,0 +1,225 @@
+How to Build a Voice Transformation model from one voice
+to another.
+
+If you want to build a FestVox voice with a transformation filter
+see below.
+
+If you want to build a transformation filter for a clustergen voice
+see below below.
+
+========
+TRAINING
+========
+
+For example suppose you wanted to convert some a database of waveform
+files to a new voice.  Let's call the databases awb, and the target
+speaker bdl.
+
+First select 30-40 sentences from the awb database, and have
+speaker bdl record these, so you have the same recordings of teh
+30-40 senetcnes for both the original (awb) and target (bdl) speakers
+
+Set up the following directory structure
+
+    mkdir voice_conversion
+    cd voice_conversion
+    mkdir list
+    mkdir wav
+
+Put your waveforms in wav/ with each voice in different sub-directories, e.g.
+
+    wav/awb/arctic_a0001.wav
+    wav/awb/arctic_a0002.wav
+    wav/awb/arctic_a0003.wav
+    wav/awb/... etc
+
+    wav/bdl/arctic_a0001.wav
+    wav/bdl/arctic_a0002.wav
+    wav/bdl/arctic_a0003.wav
+    wav/bdl/... etc
+
+Create two list files in the list/ directory identifying the files
+for each speakers e.g. in list/awb_tr.list 
+    awb/arctic_a0001
+    awb/arctic_a0002
+    awb/arctic_a0003
+    ...
+and in list/bdl_tr.list
+    bdl/arctic_a0001
+    bdl/arctic_a0002
+    bdl/arctic_a0003
+    ...
+Put in all file names you wish to be used in training.
+
+To run the training in the directory containing you wav/ and list/
+directories
+
+    $FESTVOXDIR/src/vc/scripts/VCTrain train awb bdl
+
+Naming the original and target voice names.
+
+The build takes some time depending on the number of files in the training
+set, it could take tens of minutes to hours.
+
+TESTING
+
+Given the model you have just built, you can test it by converting some
+other awb waveform files
+
+    mkdir test
+    mkdir test/wav
+    mkdir test/wav/awb
+
+Copy any files spoken by awb into test/wav/awb/
+
+Then
+    $FESTVOXDIR/src/vc/scripts/VCTrain test awb bdl
+
+Converted waveforms will be generated in
+    test/wav/awb-bdl/
+
+=============================
+FESTVOX Transformation Voice
+=============================
+
+These instructions help you build a full festival voice for the
+target speaker based on an existing Festival diphone voice.
+
+We assume the environment variables ESTDIR and FESTVOXDIR are set
+to your versions of the Edinburgh Speech Tools code and FestVox
+code, e.g.
+
+   export ESTDIR=/home/awb/projects/speech_tools
+   export FESTVOXDIR=/home/awb/projects/festvox
+
+In order to get the basic directory structure we setup a
+unit selection voice (even though we wont build one)
+
+   mkdir cmu_us_awb
+   cd cmu_us_awb
+   $FESTVOXDIR/src/unitsel/setup_clunits cmu us awb
+   
+We then setup this voice for transformation
+
+   $FESTVOXDIR/src/vc/build_transform setup
+
+If we are to build a US English voice, we can use the default_us
+option which set up the first 30 sentences of the CMU arctic databases
+and synthesize them with the default diphone voice (kal_diphone) to
+be used as the source voice for conversion.  This diphone voice will 
+be used and the constructed transformation filter will act on it.
+
+   $FESTVOXDIR/src/vc/build_transform default_us
+
+Generate the diphone versions of the prompts (that will be the source
+waveform files for the transformation)
+
+   ./bin/do_build build_prompts_waves etc/txt.transform.data
+
+Now we must collect the target speech, the prompts are in
+etc/txt.transform.data and we can collect the using prompt_them
+or any other waveform recording tool, the resulting waveform
+files should be in wav/.
+
+   ./bin/prompt_them etc/txt.transform.data
+
+Once collected, check they are recorded properly.   Now we can start
+the actual training which may take up to an hour (for 30 sentences, or
+can take longer for larger training sets).
+
+   $FESTVOXDIR/src/vc/build_transform train
+
+Once finished we can build the festvox voice wrapper for the constructed
+transformation filter
+
+   $FESTVOXDIR/src/vc/build_transform festvox
+
+We can now run the voice
+
+   festival festvox/cmu_us_awb_transform.scm
+   ..
+   festival> (voice_cmu_us_awb_transform)
+   voice_cmu_us_awb_transform
+   festival> (SayText "Hello, This is an example of a transformed voice.")
+
+Finally you can build a distribution version of this voice.
+
+   $FESTVOXDIR/src/vc/build_transform festvox_dist
+
+The resulting distribution 
+
+   festvox_cmu_us_awb_transform.tar.gz
+
+Can be installed on other versions of festival, but because the filter
+use binary programs it will only run on the same architectures as you
+built the filter on.
+
+==========================================
+FESTVOX Transformation Voice in Clustergen
+==========================================
+
+This is much more experimental but this explains how to add a
+gmm-transformation filter to an existing clustergen voice
+
+In a newly built clustergen voice (or an existing one, by updating)
+
+  cp -p  $FESTVOXDIR/src/clustergen/clustergen.scm festvox/
+
+Note you technically don't need to build a complete voice you only need the
+runtime version (festival/trees/$VOICENAME* and festvox/*.scm)
+
+Setup the vc directories
+
+   $FESTVOXDIR/src/vc/build_transform setup
+
+Make a data file for the files you want to use for transformation
+
+   $FESTVOXDIR/src/vc/build_transform default_us
+
+This puts the first 30 utterances into etc/txt.transform.data
+
+Put the waveform files you want to use as targets in wav-target/
+
+Train the model, this synthesizes the utterances in
+etc/txt.transform.data with the current CG synthesizer and dumps the
+mcep, f0 and npow files ready for training the transformation model.
+This will take an hour or so
+
+   $FESTVOXDIR/src/vc/build_transform train_cg
+
+You need to copy in the various other runtime files
+
+   $FESTVOXDIR/src/vc/build_transform festvox
+
+If you now edit festvox/clustergen.scm and set 
+
+   (defvar cg:gmm_transform t)
+
+It should call the transformation model after synthesis of the base voice
+
+This still has issues on having multiple voices at once in festival.
+
+
+
+
+
+
+
+
+
+   
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+

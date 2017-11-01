@@ -1,0 +1,470 @@
+#!/bin/sh
+###########################################################################
+##                                                                       ##
+##                   Language Technologies Institute                     ##
+##                     Carnegie Mellon University                        ##
+##                         Copyright (c) 2014                            ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Random Forests for spectral and duration modeling                    ##
+##                                                                       ##
+##  For spectral modeling:                                               ##
+##     in festvox/clustergen.scm                                         ##
+##     (set! cg:mcep_clustersize 20)                                     ##
+##     (set! cg:rfs 20)                                                  ##
+##  We reduce the clustersize so it sort of over trains, and then build  ##
+##  20 spectral models with randomly different features                  ##
+##                                                                       ##
+##  Rebuild the cluster models                                           ##
+##     ./bin/do_clustergen parallel cluster etc/txt.done.data            ##
+##  This generates 20 different trees for each hmmstate so it takes 20   ##
+##  times longer than a non-rfs build                                    ##
+##     ./bin/do_rfs rf_post_build                                        ##
+##  Combine the 20 sets of trees into 20 models                          ##
+##                                                                       ##
+###########################################################################
+LANG=C; export LANG
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ ! "$FESTVOXDIR" ]
+then
+   echo "environment variable FESTVOXDIR is unset"
+   echo "set it to your local festvox directory e.g."
+   echo '   bash$ export FESTVOXDIR=/home/awb/projects/festvox/'
+   echo or
+   echo '   csh% setenv FESTVOXDIR /home/awb/projects/festvox/'
+   exit 1
+fi
+
+. ./etc/voice.defs
+
+if [ "$SIODHEAPSIZE" = "" ]
+then
+   SIODHEAPSIZE=20000000
+   export SIODHEAPSIZE
+fi
+HEAPSIZE=$SIODHEAPSIZE
+
+if [ $1 = "rf_post_build" ]
+then
+   ./bin/rf_post_build
+
+   exit 0
+fi
+
+if [ $1 = "build_dur_rfs" ]
+then
+   # Build a bunch of random models
+   if [ ! -d dur_rf_models ]
+   then
+      mkdir dur_rf_models 
+   fi
+   rm -rf dur_rf_models/*
+
+   num_models=20
+   if [ $# = 2 ]
+   then
+      num_models=$2
+   fi
+
+   # What about changing the stop value?
+   echo 1 $num_models |
+   awk '{for (i=$1; i<=$2; i++)
+            printf("%02d\n",i)}' |
+   while read i
+   do
+      ./bin/make_dur_model_mcep_rf etc/txt.done.data.train
+      cp -p festvox/$FV_VOICENAME"_dur.scm" festvox/$FV_VOICENAME"_durdata_cg.scm"
+
+      mkdir dur_rf_models/dur_$i
+      cp -pr festvox/${FV_VOICENAME}_durdata_cg.scm dur_rf_models/dur_$i
+      cp -pr festival/dur/etc/dur.desc dur_rf_models/dur_$i
+      cp -pr festival/dur/tree/dur.S*.tree dur_rf_models/dur_$i
+      cp -pr dur.dur.S*.out dur_rf_models/dur_$i
+   done
+
+   exit
+fi
+
+if [ $1 = "test_dur_rfs" ]
+then 
+  for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
+  do
+       echo $i | awk '{for (i=1; i<=$1; i++)
+                          printf("%02d ",i);
+                       printf("\n")}' >mlist
+       ml_start=`cat mlist | awk '{printf("%02d",$1)}'`
+       ml_end=`cat mlist | awk '{printf("%02d",$NF)}'`
+
+       rm -rf dur_rf_models/predictions
+       mkdir dur_rf_models/predictions
+       awk '{print $1}' festival/dur/data/dur.data.test >dur_rf_models/predictions/all.results
+       cat mlist
+       $0 test_dur_rfs_set mlist
+
+   done
+   exit 0
+fi
+
+if [ $1 = "test_dur_rfs_set" ]
+then 
+
+   awk '{print $1}' festival/dur/data/dur.data.test >dur_rf_models/predictions/all.results
+   for j in `cat $2`
+   do
+       if [ ! -f dur_rf_models/predictions/$j.results ]
+       then 
+          $ESTDIR/bin/wagon_test -heap $HEAPSIZE -tree dur_rf_models/dur_$j/dur.S*.tree -desc festival/dur/etc/dur.desc -data festival/dur/data/dur.data.test -predict_val -o dur_rf_models/predictions/$j.results
+       fi
+       paste dur_rf_models/predictions/all.results dur_rf_models/predictions/$j.results >dur_rf_models/predictions/all_n.results
+       mv dur_rf_models/predictions/all_n.results dur_rf_models/predictions/all.results
+   done
+   cat dur_rf_models/predictions/all.results |
+   awk '{s=0.0;
+          for (i=2; i<=NF; i++)
+            s+=$i
+         print $1,s/(NF-1)}' |
+   tee dur_rf_models/predictions/avg.results |
+   awk '{
+        x=$1
+        y=$2
+        xcount += 1
+	xsum += x
+	xsumsq += x*x
+        ycount += 1
+	ysum += y
+	ysumsq += y*y
+	se += (x-y)*(x-y)
+        xxcount += 1
+	xxsum += x*x
+	xxsumsq += (x*x)*(x*x)
+        yycount += 1
+	yysum += y*y
+	yysumsq += (y*y)*(y*y)
+        xycount += 1
+	xysum += x*y
+	xysumsq += (x*y)*(x*y)
+	}
+     function std (sum, sumx, n)
+     {
+	if (n==1)
+            n=2;
+        return sqrt(((n*sumx)-(sum*sum)) / (n*(n-1)))
+     }
+     function mean (sum,n)
+     {
+           return sum/n;
+     }
+     function correlation()
+     {
+	v1 = mean(xysum,xycount)-(mean(xsum,xcount)*mean(ysum,ycount));
+	v2 = mean(xxsum,xxcount)-(mean(xsum,xcount)*mean(xsum,xcount));
+	v3 = mean(yysum,yycount)-(mean(ysum,ycount)*mean(ysum,ycount));
+#        printf("xcount %f xsum %f\n",xcount,xsum);
+#        printf("ycount %f ysum %f\n",ycount,ysum);
+#        printf("xycount %f xysum %f\n",xycount,xysum);
+#	printf("vs %f %f %f\n",v1,v2,v3);
+	return  v1/(sqrt(v2*v3));
+     }
+     END {
+        printf("RMSE %3.4f Cor %3.4f 1mn %3.4f 1std %3.4f 2mn %3.4f 2std %3.4f n %d\n",
+               sqrt(se/xcount),correlation(),
+                    mean(xsum,xcount),std(xsum,xsumsq,xcount),
+                    mean(ysum,xcount),std(ysum,ysumsq,ycount),
+                    xcount);
+     }'
+  exit 0
+
+fi
+
+if [ $1 = "minimize_rfs_dur" ]
+then 
+   # Find smallest set of duration models
+
+   echo 1 20 | awk '{for (i=1; i<=$2; i++)
+                            printf("%02d ",i);
+                         printf("\n")}' >mlist_dur
+
+   rm -rf dur_rf_models/predictions
+   mkdir dur_rf_models/predictions
+   rm -rf mlist_dur.betters
+   for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19
+   do
+     cat mlist_dur
+     $0 test_dur_rfs_set mlist_dur
+
+     rm -f mlist_dur.x* mlist_dur.best*
+     # Find worst model to remove
+     for j in `cat mlist_dur`
+     do
+        cat mlist_dur | sed 's/'$j'//' | sed 's/  / /' >mlist_dur.x
+#        printf "   "
+#        cat mlist_dur.x
+        $0 test_dur_rfs_set mlist_dur.x >mlist_dur.x.score
+        if [ ! -f mlist_dur.best ]
+        then
+           cp -pr mlist_dur.x mlist_dur.best
+           cp -pr mlist_dur.x.score mlist_dur.best.score
+        fi
+
+        bbb=`awk '{print $4}' mlist_dur.best.score`
+        xxx=`awk '{print $4}' mlist_dur.x.score`
+        better=`echo $bbb $xxx | awk '{if ($2 > $1) print 1; else print 0}'` 
+#        echo "   "$bbb $xxx $better 
+        if [ "$better" = "1" ]
+        then
+           cp -pr mlist_dur.x mlist_dur.best
+           cp -pr mlist_dur.x.score mlist_dur.best.score
+        fi
+     done
+     cat mlist_dur.best >>mlist_dur.betters
+     cat mlist_dur.best.score >>mlist_dur.betters
+     cp -pr mlist_dur.best mlist_dur
+   done
+
+   # The best(greedily) single model
+   cat mlist_dur
+   $0 test_dur_rfs_set mlist_dur
+
+   rm -rf mlist_dur.x mlist_dur.x.score mlist_dur mlist_dur.best mlist_dur.score
+   exit 0
+
+fi
+
+if [ $1 = "minimize_rfs_mcep" ]
+then 
+   # Find smallest set of spectral models
+
+   echo 1 20 | awk '{for (i=1; i<=$2; i++)
+                            printf("%02d ",i);
+                         printf("\n")}' >mlist
+
+   head -50 etc/txt.done.data.test >etc/50.data.test
+
+   rm -rf mlist.betters
+   for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19
+   do
+     cat mlist
+     cp -pr mlist rf_models
+     rm -rf test/all
+     ./bin/do_clustergen parallel utt_by_utt_mcd etc/50.data.test 
+     rm -rf test/cgp_rf_${i}; mv test/all test/cgp_rf_${i}
+     grep MCD test/cgp_rf_${i}/*.scores |
+     awk '{m+=$3; s+=$5; v+=$7; n+=$9} 
+          END {printf("MCD  mean %f std %f var %f n %d\n",m/NR,s/NR,v/NR,n);}' >test/cgp_rf_${i}/scores
+
+     rm -f mlist.x* mlist.best*
+     # Find worst model to remove
+     for j in `cat mlist`
+     do
+        cat mlist | sed 's/'$j'//' | sed 's/  / /' >mlist.x
+        cp -pr mlist.x rf_models/mlist
+        rm -rf test/all
+        ./bin/do_clustergen parallel utt_by_utt_mcd etc/50.data.test 
+        rm -rf test/cgp_rf_${i}_${j}; mv test/all test/cgp_rf_${i}_${j}
+        grep MCD test/cgp_rf_${i}_${j}/*.scores |
+        awk '{m+=$3; s+=$5; v+=$7; n+=$9} 
+             END {printf("MCD  mean %f std %f var %f n %d\n",m/NR,s/NR,v/NR,n)}' >test/cgp_rf_${i}_${j}/scores
+
+        cp -pr mlist test/cgp_rf_${i}_${j}
+        cp -pr test/cgp_rf_${i}_${j}/scores mlist.x.score
+        if [ ! -f mlist.best ]
+        then
+           cp -pr mlist.x mlist.best
+           cp -pr mlist.x.score mlist.best.score
+        fi
+
+        bbb=`grep MCD mlist.best.score | awk '{print $3}'`
+        xxx=`grep MCD mlist.x.score | awk '{print $3}'`
+        better=`echo $bbb $xxx | awk '{if ($2 < $1) print 1; else print 0}'` 
+#        echo "   "$bbb $xxx $better 
+        if [ "$better" = "1" ]
+        then
+           cp -pr mlist.x mlist.best
+           cp -pr mlist.x.score mlist.best.score
+        fi
+     done
+     cat mlist.best >>mlist.betters
+     cat mlist.best.score >>mlist.betters
+     cp -pr mlist.best mlist
+   done
+
+   # The best(greedily) single model
+   cat mlist
+   # $0 test_dur_rfs_set mlist
+
+   rm -rf mlist.best mlist.best.score mlist.x mlist.x.score
+   exit 0
+
+fi
+
+if [ $1 = "minimize_rfs_mcep_3" ]
+then 
+   # Find smallest set of spectral models
+   # find best (rather than remove worst) (but it gives the same result)
+   # Stop when you've found the best 3 
+
+   echo 1 20 | awk '{for (i=1; i<=$2; i++)
+                            printf("%02d ",i);
+                         printf("\n")}' >mlist.list
+
+   head -50 etc/txt.done.data.test >etc/50.data.test
+   rm -rf mlist.betters
+   rm -rf mlist
+   rm -rf mlist.best
+   rm -rf mlist.best.all
+   touch mlist.best
+   for i in 1 2 3 
+   do
+     rm -rf mlist.better.score
+     for j in `cat mlist.list`
+     do
+        printf "$j " >mlist
+        cat mlist.best >>mlist
+        cp -pr mlist rf_models
+        rm -rf test/all
+        ./bin/do_clustergen parallel utt_by_utt_mcd etc/50.data.test 
+        rm -rf test/cgp_rf_${i}; mv test/all test/cgp_rf_${i}
+        grep MCD test/cgp_rf_${i}/*.scores |
+        awk '{m+=$3; s+=$5; v+=$7; n+=$9} 
+             END {printf("MCD  mean %f std %f var %f n %d\n",m/NR,s/NR,v/NR,n);}' >test/cgp_rf_${i}/scores
+        cp -pr mlist test/cgp_rf_${i}
+        cp -pr test/cgp_rf_${i}/scores mlist.x.score
+
+        if [ ! -f mlist.better.score ]
+        then
+           cp -pr mlist mlist.better
+           cp -pr mlist.x.score mlist.better.score
+           echo $j >mlist.better.x
+        fi
+        bbb=`grep MCD mlist.better.score | awk '{print $3}'`
+        xxx=`grep MCD mlist.x.score | awk '{print $3}'`
+        better=`echo $bbb $xxx | awk '{if ($2 < $1) print 1; else print 0}'` 
+#        echo "   "$bbb $xxx $better 
+        if [ "$better" = "1" ]
+        then
+           cp -pr mlist mlist.better
+           cp -pr mlist.x.score mlist.better.score
+           echo $j >mlist.better.x
+        fi
+     done
+     k=`cat mlist.better.x`
+     cat mlist.list | sed 's/'$k'//' | sed 's/  / /' >mlist.list.new
+     mv mlist.list.new mlist.list
+     cat mlist.better >>mlist.best.all
+     cat mlist.better.score >>mlist.best.all
+     cp -pr mlist.better mlist.best
+   done
+
+   # The best(greedily) single model
+   # cat mlist
+   # $0 test_dur_rfs_set mlist
+  
+   rm -rf mlist mlist.best mlist.better mlist.better.score mlist.x.score mlist.better.x
+   exit 0
+
+fi
+
+if [ $1 = "minimize_rfs_f0_3" ]
+then 
+   # Find smallest set of F0 models
+   # find best (rather than remove worst) (but it gives the same result)
+   # Stop when you've found the best 3 
+
+   echo 1 20 | awk '{for (i=1; i<=$2; i++)
+                            printf("%02d ",i);
+                         printf("\n")}' >mlistf0.list
+
+   head -50 etc/txt.done.data.test >etc/50.data.test
+   rm -rf mlistf0.betters
+   rm -rf mlistf0
+   rm -rf mlistf0.best
+   rm -rf mlistf0.best.all
+   touch mlistf0.best
+   for i in 1 2 3
+   do
+     rm -rf mlistf0.better.score
+     for j in `cat mlistf0.list`
+     do
+        printf "$j " >mlistf0
+        cat mlistf0.best >>mlistf0
+        cp -pr mlistf0 rf_models/mlistf0
+        rm -rf test/all
+        ./bin/do_clustergen parallel utt_by_utt_mcd etc/50.data.test 
+        rm -rf test/cgp_rf_${i}; mv test/all test/cgp_rf_${i}
+        grep "^F0" test/cgp_rf_${i}/*.scores |
+        awk '{m+=$3; s+=$5; v+=$7; n+=$9} 
+             END {printf("F0   mean %f std %f var %f n %d\n",m/NR,s/NR,v/NR,n);}' >test/cgp_rf_${i}/scores
+        cp -pr mlistf0 test/cgp_rf_${i}
+        cp -pr test/cgp_rf_${i}/scores mlistf0.x.score
+
+        if [ ! -f mlistf0.better.score ]
+        then
+           cp -pr mlistf0 mlistf0.better
+           cp -pr mlistf0.x.score mlistf0.better.score
+           echo $j >mlistf0.better.x
+        fi
+        bbb=`grep "F0" mlistf0.better.score | awk '{print $3}'`
+        xxx=`grep "F0" mlistf0.x.score | awk '{print $3}'`
+        better=`echo $bbb $xxx | awk '{if ($2 < $1) print 1; else print 0}'` 
+#        echo "   "$bbb $xxx $better 
+        if [ "$better" = "1" ]
+        then
+           cp -pr mlistf0 mlistf0.better
+           cp -pr mlistf0.x.score mlistf0.better.score
+           echo $j >mlistf0.better.x
+        fi
+     done
+     k=`cat mlistf0.better.x`
+     cat mlistf0.list | sed 's/'$k'//' | sed 's/  / /' >mlistf0.list.new
+     mv mlistf0.list.new mlistf0.list
+     cat mlistf0.better >>mlistf0.best.all
+     cat mlistf0.better.score >>mlistf0.best.all
+     cp -pr mlistf0.better mlistf0.best
+   done
+
+   # The best(greedily) single model
+   # cat mlistf0
+   # $0 test_dur_rfs_set mlistf0
+  
+   rm -rf mlistf0 mlistf0.best mlistf0.better mlistf0.better.score mlistf0.x.score mlistf0.better.x
+
+   exit 0
+fi
+
+

@@ -1,0 +1,190 @@
+#!/bin/sh
+###########################################################################
+##                                                                       ##
+##                   Carnegie Mellon University and                      ##
+##                   Alan W Black and Kevin A. Lenzo                     ##
+##                      Copyright (c) 1998-2006                          ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Build a duration model                                               ##
+##                                                                       ##
+##  Many parameterizations are possible and training techniques, many of ##
+##  which will be better than what is here, but from experience this     ##
+##  give a model that is substantially better than simply means durations##
+##  with hand speicifed modification factors at the phrasal boundaries   ##
+##                                                                       ##
+##  Builds CART tree that predicts zscores of durations                  ##
+##                                                                       ##
+##  This is the *whole* thing, you probably want to actually do each     ##
+##  stage by hand (the training itself can takes days)                   ##
+##                                                                       ##
+##  This is modified from make_dur_model, this version is for clustergen ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Random forest version -- that builds a random subset of the features ##
+##                                                                       ##
+###########################################################################
+
+LANG=C; export LANG
+
+#  if [ $# != 3 ]
+#  then
+#      echo "Build a duration model, requires basic utterances to be pre-built"
+#      echo "Usage: make_dur_model VOX PHONESET SILENCENAME"
+#      echo "INST is the insstitute building the language, e.g. cmu, cstr, ogi"
+#      echo "     if there isn't an appropriate institute use, net."
+#      echo "LANG is language identifier, e.g. japan, scotsgaelic"
+#      echo "VOX is speaker identifier e.g kal, awb"
+#      exit 1
+#  fi
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+. etc/voice.defs
+
+SILENCENAME=pau
+MODELNAME=$FV_VOICENAME
+VOICENAME="(voice_"$FV_VOICENAME"_cg)"
+VOICESCM=${3:-festvox/${MODELNAME}_cg.scm}
+
+NUM_CPUS=`./bin/find_num_available_cpu`
+OMP="-omp_nthreads ${NUM_CPUS}"
+DURMEANSTD=$ESTDIR/../festival/examples/durmeanstd
+DUMPFEATS=$ESTDIR/../festival/examples/dumpfeats
+WAGON=$ESTDIR/bin/wagon
+WAGON_TEST=$ESTDIR/bin/wagon_test
+
+PROMPTFILE=etc/txt.done.data
+if [ $# = 1 ]
+then
+   PROMPTFILE=$1
+fi
+cat $PROMPTFILE |
+awk '{printf("festival/utts_hmm/%s.utt\n",$2)}' >utthmmfile
+
+# rf (spectral) models are particularly big
+# try to guess the size of the database, but you might need to 
+# tune this yourself
+NUMLINES=`cat $PROMPTFILE | awk 'END {print NR}'`
+if [ "$SIODHEAPSIZE" = "" ]
+then
+   if [ $NUMLINES -gt 4500 ]
+   then
+      SIODHEAPSIZE=60000000
+   else
+      SIODHEAPSIZE=20000000
+   fi
+   export SIODHEAPSIZE
+fi
+HEAPSIZE=$SIODHEAPSIZE
+
+## find the means and stddev for durations in database
+echo ";;; Finding mean durations and standard deviation of each phone type"
+$DURMEANSTD -relation HMMstate -output festival/dur/etc/durs.meanstd -from_file utthmmfile || exit -1
+
+## extract the features
+echo ";;; Extracting features from utterances"
+find festival/dur/feats -name *.feats -exec rm {} \;
+$DUMPFEATS -relation HMMstate -eval $VOICESCM -eval $VOICENAME -feats festival/dur/etc/statedur.feats -output festival/dur/feats/%s.feats -eval festival/dur/etc/logdurn.scm -from_file utthmmfile || exit -1
+
+## Save all features in one file removing silence phones
+echo ";;; Collecting features in training and test data"
+cat utthmmfile |
+while read x
+do
+  fname=`basename $x .utt`
+  cat festival/dur/feats/$fname.feats |
+  awk '{if ($2 != "'$SILENCENAME'") print $0}'
+done >festival/dur/data/dur.data
+bin/traintest festival/dur/data/dur.data
+bin/traintest festival/dur/data/dur.data.train
+
+# Build description file
+echo ";;; Build feature description file"
+$ESTDIR/bin/make_wagon_desc festival/dur/data/dur.data festival/dur/etc/statedur.feats festival/dur/etc/dur.desc
+
+#  Random feature part
+SEED=`echo $$ | awk '{ print $1%10000 }'`
+mv festival/dur/etc/dur.desc festival/dur/etc/dur.desc.all
+cat festival/dur/etc/dur.desc.all |
+   awk 'BEGIN {for (i=1;i<'$SEED'; i++)
+                      randint(10)}
+        function randint(n) { return int(n * rand()) }
+        {if (NR < 3)
+         {
+            print $0
+         }
+         else if (substr($0,1,1) == "(")
+         {
+            p = randint(100);
+            if (p < 30) # 20150407 tests
+            {
+               printf("%s %s ignore ",$1,$2);
+               for (i=3; i<=NF; i++)
+                  printf("%s ",$i);
+               printf("\n");
+            }
+            else
+               print $0
+         }
+         else
+            print $0
+        }' >festival/dur/etc/dur.desc
+
+$ESTDIR/../festival/bin/festival --heap $SIODHEAPSIZE -b festvox/build_prosody.scm $VOICESCM $VOICENAME '(build_dur_feats_desc)'
+
+# emacs festival/dur/etc/dur.desc
+
+# 20150407 tested on some arctics
+STOP=15
+PREF=dur
+rm -f festival/dur/tree/$PREF.S*.tree
+
+(
+echo ";;; Build the duration model itself"
+$WAGON $OMP -data festival/dur/data/dur.data.train.train -desc festival/dur/etc/dur.desc -test festival/dur/data/dur.data.train.test -stop $STOP -output festival/dur/tree/$PREF.S$STOP.tree || exit -1
+
+echo ";;; Test the duration model"
+$WAGON_TEST -heap $SIODHEAPSIZE -data festival/dur/data/dur.data.test -desc festival/dur/etc/dur.desc -tree festival/dur/tree/$PREF.S$STOP.tree ) |
+tee dur.$PREF.S$STOP.out
+
+echo ";;; Constructing the duration model as a loadable scheme file"
+$ESTDIR/../festival/bin/festival --heap $SIODHEAPSIZE -b festvox/build_prosody.scm $VOICESCM $VOICENAME '(finalize_dur_model "'$MODELNAME'" "'$PREF.S$STOP.tree'")'
+
+exit
+

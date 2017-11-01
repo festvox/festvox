@@ -1,0 +1,148 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                     Carnegie Mellon University                        ##
+##                         Copyright (c) 2016                            ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Setup the current directory for building a clustergen INDIC synth    ##
+##                                                                       ##
+##  Its sets up a standard cg voice, but sets the variant value for the  ##
+##  language (beyond the generic indic class of languages)               ##
+##                                                                       ##
+##  Call as:                                                             ##
+##  $FESTVOXDIR/src/clustergen/setup_cg_indic INST indic VARIANT SPEAKER ##
+##                                                                       ##
+##  For example                                                          ##
+##  $FESTVOXDIR/src/clustergen/setup_cg_indic cmu indic mar aup          ##
+##                                                                       ##
+##  It will abort if you name a variant not in the SUPPORTED_VARIANTS    ##
+##                                                                       ##
+###########################################################################
+
+LANG=C; export LANG
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ ! "$FESTVOXDIR" ]
+then
+   echo "environment variable FESTVOXDIR is unset"
+   echo "set it to your local festvox directory e.g."
+   echo '   bash$ export FESTVOXDIR=/home/awb/projects/festvox/'
+   echo or
+   echo '   csh% setenv FESTVOXDIR /home/awb/projects/festvox/'
+   exit 1
+fi
+
+if [ $# = 0 ]
+then
+    echo "Build dirs, and setup scripts and scm files for a clustergen voice "
+    echo "Usage: setup_cg_indic INST indic VARIANT VOX"
+    echo "INST is the institute building the language, e.g. cmu, cstr, ogi"
+    echo "     if there isn't an appropriate institute use, net."
+    echo "LANG must be indic"
+    echo "VARIANT three letter language id: hin, mar, tam, kan etc"
+    echo "SPEAKER is speaker/style identifier e.g kal, awb, golem"
+    echo "You can extend the VOX with a dataset e.g. awb_arctic"
+    echo "Arguments must match \"^[A-Za-z][A-Za-z0-9_]*\$\""
+    exit 1
+fi
+
+SUPPORTED_VARIANTS="asm ben guj hin kan mar pan raj tam tel"
+
+FV_INST=$1
+FV_LANG=indic
+FV_VOX=${4}
+
+check=`echo $FV_INST | grep "^[A-Za-z][A-Za-z0-9_]*$"`
+if [ "$check" = "" ]
+then
+    echo "Invalid INST name, not matching \"^[A-Za-z][A-Za-z0-9_]*\$\""
+    exit 1
+fi
+check=`echo $FV_LANG | grep "^indic$"`
+if [ "$check" = "" ]
+then
+    echo "Invalid LANG name, not matching \"indic\""
+    exit 1
+fi
+
+fv_actual_variant=unknown
+for i in `echo $SUPPORTED_VARIANTS`
+do
+   if [ $i = "$3" ]
+   then
+      fv_actual_variant=$i
+   fi
+done
+if [ $fv_actual_variant = "unknown" ]
+then
+    echo "Invalid VARIANT name \"$3\", not matching any of: $SUPPORTED_VARIANTS"
+    exit 1
+fi
+FV_INDIC_VARIANT=$fv_actual_variant
+
+check=`echo $FV_VOX | grep "^[A-Za-z][A-Za-z0-9_]*$"`
+if [ "$check" = "" ]
+then
+    echo "Invalid VOX name, not matching \"^[A-Za-z][A-Za-z0-9_]*\$\""
+    exit 1
+fi
+
+$FESTVOXDIR/src/clustergen/setup_cg $FV_INST indic ${FV_INDIC_VARIANT}_${FV_VOX}
+echo "FV_INDIC_VARIANT=$FV_INDIC_VARIANT" >>etc/voice.defs
+
+echo $FV_INDIC_VARIANT >festvox/language_variant.scm
+
+# Add english/native language flag for words
+mv festival/clunits/mcep.desc festival/clunits/mcep.desc.old 
+tac festival/clunits/mcep.desc.old |
+    sed 1d |
+    awk 'BEGIN { printf(")\n");
+                 printf("0 1)\n");
+                 printf("( R:mcep_link.parent.R:segstate.parent.R:SylStructure.parent.parent.lisp_is_english\n");
+                 printf("0 1)\n");
+                 printf("( R:mcep_link.parent.R:segstate.parent.R:SylStructure.parent.parent.R:Word.p.lisp_is_english\n");
+                 printf("0 1)\n");
+                 printf("( R:mcep_link.parent.R:segstate.parent.R:SylStructure.parent.parent.R:Word.n.lisp_is_english\n"); }
+         {print $0}' | tac >festival/clunits/mcep.desc
+
+echo "Set up for "$FV_INST"_indic_"$FV_INDIC_VARIANT"_"$FV_VOX" indic clustergen complete"
+
+
+
+

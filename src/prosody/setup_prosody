@@ -1,0 +1,101 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                   Carnegie Mellon University and                      ##
+##                   Alan W Black and Kevin A. Lenzo                     ##
+##                      Copyright (c) 1998-2000                          ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Setup (or add) prosody related scripts                               ##
+##                                                                       ##
+###########################################################################
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ ! "$FESTVOXDIR" ]
+then
+   echo "environment variable FESTVOXDIR is unset"
+   echo "set it to your local festvox directory e.g."
+   echo '   bash$ export FESTVOXDIR=/home/awb/projects/festvox/'
+   echo or
+   echo '   csh% setenv FESTVOXDIR /home/awb/projects/festvox/'
+   exit 1
+fi
+
+LANG=C; export LANG
+. etc/voice.defs
+
+# if [ -d etc ]
+# then
+#    echo "I'm going to make a whole bunch of new directories in"
+#    echo `pwd`
+#    echo "This directory currently non-empty, are you sure this is "
+#    echo "directory you want these new directories built in?"
+#    echo -n "Answer y/n? "
+#    read answer
+#    if [ "$answer" != "y" ]
+#    then
+#        echo "setup aborted"
+#        exit -1
+#    fi
+# fi
+
+$FESTVOXDIR/src/prosody/make_dirs_prosody
+CURRENTDIR=`pwd`
+
+echo Copying general files
+cp -p $FESTVOXDIR/src/prosody/build_prosody.scm festvox
+
+echo Copying intonation files
+cp -p $FESTVOXDIR/src/intonation/make_f0_pm bin
+cp -p $FESTVOXDIR/src/intonation/make_f0_pm_get_f0 bin
+cp -p $FESTVOXDIR/src/intonation/find_f0_stats bin
+cp -p $FESTVOXDIR/src/intonation/make_f0_model bin
+cp -p $FESTVOXDIR/src/intonation/make_f0_v_sptk bin
+cp -p $FESTVOXDIR/src/intonation/f0.feats festival/f0/etc
+cp -p $FESTVOXDIR/src/intonation/tree_f0.scm festvox
+
+echo Copying duration files
+cp -p $FESTVOXDIR/src/duration/make_dur_model bin
+cp -p $FESTVOXDIR/src/duration/logdurn.scm festival/dur/etc
+cp -p $FESTVOXDIR/src/duration/dur.feats festival/dur/etc
+
+echo "Set up for "$FV_VOICENAME" prosody complete"
+
+
+
+

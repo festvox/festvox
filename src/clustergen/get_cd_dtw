@@ -1,0 +1,115 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                     Carnegie Mellon University                        ##
+##                         Copyright (c) 2012                            ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Author: Gopala Anumanchipalli (gopalakr@cs.cmu.edu)                  ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Give cepstral distortion between two waveform files (using dtw)      ##
+##                                                                       ##
+##  $FESTVOXDIR/src/clustergen/get_cd_dtw a.wav b.wav                    ##
+##  or                                                                   ##
+##  $FESTVOXDIR/src/clustergen/get_cd_dtw txt.done.data.test dir1 dir2   ##
+##  Find average CD between set of files in dir1 and dir2                ##
+##                                                                       ##
+###########################################################################
+LANG=C; export LANG
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ ! "$FESTVOXDIR" ]
+then
+   echo "environment variable FESTVOXDIR is unset"
+   echo "set it to your local festvox directory e.g."
+   echo '   bash$ export FESTVOXDIR=/home/awb/projects/festvox/'
+   echo or
+   echo '   csh% setenv FESTVOXDIR /home/awb/projects/festvox/'
+   exit 1
+fi
+
+if [ $# = 2 ]
+then
+   nm=/tmp/tmp_$$
+   sr=`$ESTDIR/bin/ch_wave -info $1 | grep "Sample rate:" | awk '{print $NF}'`
+   $FESTVOXDIR/src/vc/src/analysis/analysis -f $sr -nmsg -mcep -order 24 $1 $nm.mcep1
+   sr=`$ESTDIR/bin/ch_wave -info $2 | grep "Sample rate:" | awk '{print $NF}'`
+   $FESTVOXDIR/src/vc/src/analysis/analysis -f $sr -nmsg -mcep -order 24 $2 $nm.mcep2
+   cdist=`$FESTVOXDIR/src/vc/src/dtw/dtw -nmsg -getcd -dim 24 -sdim 0 -ldim 23 $nm.mcep1 $nm.mcep2`
+   echo $cdist
+   rm -f $nm.mcep1 $nm.mcep2
+
+   exit
+fi
+
+if [ $# = 3 ]
+then
+   rm -f tts.$$.scores
+   awk '{print $2}' $1 |
+   while read x
+   do
+      echo $x scoring tts MCEP
+      $0 $2/$x.wav $3/$x.wav >>tts.$$.scores
+   done
+   cat tts.$$.scores |
+   awk '{ count += 1
+   	  sum += $NF
+	  sumsq += $NF*$NF
+     }
+     function std (sum, sumx, n)
+     {
+	if (n==1)
+            n=2;
+        return sqrt(((n*sumx)-(sum*sum)) / (n*(n-1)))
+     }
+     function mean (sum,n)
+     {
+           return sum/n;
+     }
+     END {
+        printf "DTWMCD %3.3f std %3.3f var %3.3f rms %3.3f n %d\n",mean(sum,count),std(sum,sumsq,count),std(sum,sumsq,count)*std(sum,sumsq,count),sqrt(sumsq/count),count
+     }'
+   rm -f tts.$$.scores
+
+   exit
+fi
+
+
+

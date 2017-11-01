@@ -1,0 +1,303 @@
+<chapter id="bsv-sps-ch">
+<title>Statistical Parametric Synthesis</title>
+
+<sect1><title>Building a CLUSTERGEN Statistical Parametric Synthesizer</title>
+
+<para>
+<indexterm><primary> CLUSTERGEN</primary></indexterm>
+<indexterm><primary> statistical parametric synthesis</primary></indexterm>
+
+This method, inspired the work of Keiichi Tokuda and NITECH's HMM
+Speech Synthesis Toolkit, is a method for building statistical
+parametric synthesizers from databases of natural speech.  Although
+the result is still not as crisp as a well done unit selection voice,
+this method is much easier to get a nice clear synthetic voice that
+models the original speaker well.
+
+</para><para>
+
+Although this method is partially "tagged on to" the clunits method,
+it is actually quite independent.  The tasks are as follows.
+
+<itemizedlist mark=bullet>
+<listitem><para>
+Read and understand all the issues regarding the following
+steps
+</para></listitem>
+<listitem><para>
+Set up the directory structure
+</para></listitem>
+<listitem><para>
+Record or import the prompts and prompt list
+</para></listitem>
+<listitem><para>
+Label the data with the HMM-state sized segments
+</para></listitem>
+<listitem><para>
+Build utterance structures for recorded utterances
+</para></listitem>
+<listitem><para>
+Extract F0, voicing and mcep coefficients.
+</para></listitem>
+<listitem><para>
+Build a CLUSTERGEN voice
+</para></listitem>
+<listitem><para>
+Build an HMM-state duration model
+</para></listitem>
+<listitem><para>
+Testing
+</para></listitem>
+</itemizedlist>
+
+We assume you have read the rest of this chapter (though, in reality,
+we know you probably haven't), thus the descriptions here are quite
+minimal.
+
+</para><para>
+
+First make an empty directory and in it run the
+<filename>setup_cg</filename> setup command.
+<blockquote><literallayout>
+    mkdir cmu_us_awb_arctic
+    cd cmu_us_awb_arctic
+    $FESTVOXDIR/src/clustergen/setup_cg cmu us awb_arctic
+</literallayout></blockquote>
+In you already have an existing voice running
+<filename>setup_cg</filename> will only copy in the necessary files
+for clustergen, however I recommend starting from scratch as I don't
+know when you created your previous voice and I'm not sure of its
+exact state.
+
+</para><para>
+
+Now you need to get your waveform files and prompt file.  Put your
+waveform files in the <filename>wav/</filename> and your prompt file
+in <filename>etc/txt.done.data</filename>.  Note you should probably
+use <filename>bin/get_wavs</filename> to copy the wavefiles so that
+they get power normalized and get changed to a reasonable format
+(16KHz, 16bit, RIFF format).
+
+</para><para>
+
+In you are going to record them in your current directory, you should
+call 
+<blockquote><literallayout>
+    ./bin/do_build build_prompts_waves
+</literallayout></blockquote>
+first to generate example waveforms, then use
+<blockquote><literallayout>
+    ./bin/prompt_them etc/txt.done.data 1
+</literallayout></blockquote>
+
+To prompt you and record the prompts.  You <emphasis>must</emphasis> check
+that the recording actually works.  It should generate recordings in
+the <filename>wav/</filename>.  You can
+use <filename>$ESTDIR/bin/na_play</filename> to play the waveform
+files.  <filename>prompt_them</filename> can be stopped with ctrl-c
+and restarted at the line number given as the second argument.
+
+</para><para>
+
+If you have collected the waveform files by some other process you do
+not need to generate the prompt waveform files thus you just use
+<blockquote><literallayout>
+    ./bin/do_build build_prompts
+</literallayout></blockquote>
+which will generate the prompt utterances (which are used to find the
+expected phones), but more the prompt waveforms.
+
+</para><para>
+
+The next stage is to label the data.  If you aren't
+<emphasis>very</emphasis> knowledgeable about labeling in clustergen, you
+should use the EHMM labeler.  EHMM constructs the labels in the right
+format for segments and HMM states. and matches them properly with
+what the synthesizer generates for the prompts.  Using other labels is
+likely to cause more problems.  Even if you already have other labels
+use EHMM first.
+<blockquote><literallayout>
+    ./bin/do_build build_prompts
+    ./bin/do_build label
+    ./bin/do_build build_utts
+</literallayout></blockquote>
+
+The EHMM labeler has been shown to be very reliable, and can nicely
+deal with silence insertion.  It isn't very fast though and will take
+several hours.  You can check the file
+<filename>ehmm/mod/log100.txt</filename> to see the Baum-Welch
+iterations, there will probably be 20-30.  The ARCTIC a-set takes
+about 3-4 hours to label.
+
+</para><para>
+
+Parametric synthesis require a reversible parameterization, this set
+up here uses a form of mel cepstrum, the same version that is used by
+NITECH's basic HTS build.  Parameter build is in two parts building
+the F0 and building the mceps themselves.  Then these are combined
+into a single parameter file for each utterance in the database.
+
+<blockquote><literallayout>
+    ./bin/do_clustergen f0
+    ./bin/do_clustergen mcep
+    ./bin/do_clustergen voicing
+    ./bin/do_clustergen combine_coeffs_v
+</literallayout></blockquote>
+
+The mcep part takes the longest.  Note that the F0 part now tries to
+estimate the range of the F0 on the speaker and modifies parameters
+for the F0 extraction program.  (The F0 params are saved in 
+<filename>etc/f0.params</filename>.)
+
+</para><para>
+
+If you want to have a test set of utterances, you can separate out
+some of your prompt list.  The test set should be put in the file
+<filename>etc/txt.done.data.test</filename> The follow commands will
+make a training and test set (every 10th prompt in the test set, the
+other 9 in the training set).
+
+<blockquote><literallayout>
+    ./bin/traintest etc/txt.done.data
+    cat etc/txt.done.data.train >etc/txt.done.data
+</literallayout></blockquote>
+</para><para>
+
+The next stage is to generate is to build the parametric model.  There
+parts are required for this.  This first is very quick and simply puts
+the state (and phone) names into their respective files.  It assumes a
+file <filename>etc/statenames</filename> which is generate by EHMM.
+The second stage build the parametric models itself.  The last builds
+a duration model for the state names
+
+<blockquote><literallayout>
+   ./bin/do_clustergen generate_statenames
+   ./bin/do_clustergen generate_filters
+   ./bin/do_clustergen cluster
+   ./bin/do_clustergen dur
+</literallayout></blockquote>
+
+</para><para>
+The resulting voice should now work
+<blockquote><literallayout>
+   festival festvox/cmu_us_awb_arctic_cg.scm
+   ...
+   festival> (voice_cmu_us_awb_arctic_cg)
+   ...
+   festival> (SayText "This is a little example.")
+</literallayout></blockquote>
+</para><para>
+The voice can be packaged for distribution by the command
+<blockquote><literallayout>
+   ./bin/do_clustergen festvox_dist
+</literallayout></blockquote>
+
+This will generation
+<filename>festvox_cmu_us_awb_arctic_cg.tar.gz</filename> which will be
+quite small compared to a clunit voice made with the same databases.
+Because only the parameters are kept (in fact only means and standard
+deviations of clusters of of parameters) which do not include residual
+or excitation information the result is something orders of magnitude
+smaller that a full unit selection voices.
+
+</para><para>
+
+There two other options in the clustergen voice build.  These involve
+modeling trajectories rather than individual vectors.  They give
+objectively better results (though marginal subjectively better
+results for the voices we have tested).  Instead of the line
+
+<blockquote><literallayout>
+   ./bin/do_clustergen cluster
+</literallayout></blockquote>
+You can run
+<blockquote><literallayout>
+   ./bin/do_clustergen trajectory
+</literallayout></blockquote>
+or the slightly better
+<blockquote><literallayout>
+   ./bin/do_clustergen trajectory_ola
+</literallayout></blockquote>
+These two options may run after the simple version of the voice.
+
+</para><para>
+You can test your voice with held out data, if you did this in the above 
+step that created <filename>etc/txt.done.data.test</filename>
+You can run
+<blockquote><literallayout>
+   $FESTVOXDIR/src/clustergen/cg_test resynth cgp
+</literallayout></blockquote>
+NOTE: This no longer works automatically, as you need static mceps and ccoefs for this to work.
+
+This will create parameter files (and waveform files) in
+<filename>test/cgp</filename>.  The output of the
+<filename>cg_test</filename> is also four measures the mean difference
+for all features in the parameter vector, for F0 alone, for all but
+F0, and MCD (mel ceprstral distortion).
+</para>
+
+</sect1>
+<sect1><title>Making it better:Mixed excitation and Random Forests</title>
+
+<para>
+Given the base form of a clustergen voice, you can make better, both
+in using better signal parameterization, and/or better machine
+learning techniques.  There is actually a large number of options
+available here, many of which are experimental, and some are dependent
+on the particualr voice (and the quality of the recordings) and some
+are just experimental, and don't actually making it better.
+</para>
+<para>
+Adding <filename>parallel</filename> as the first argument
+to <filename>do_clustergen</filename> will make the script us all
+processors on the current machines.  This will typically make builds
+much faster.
+</para>
+<para>
+On important technique is mixed-excitation, this provides a better
+model for the excitation of the spectral signal.  This can be used by
+first generating the the mixed-excitation strengths.  You must have 
+NITECH's SPTK3.6 (or later) installed to do this.
+<blockquote><literallayout>
+    export SPTKDIR=/usr/local/SPTK
+    ./bin/do_clustergen parallel str_sptk
+</literallayout></blockquote>
+Then you need to combine these extra (5 coefficients per frame) to
+the standard combined coefficients.
+<blockquote><literallayout>
+    ./bin/do_clustergen parallel combine_coeffs_me
+</literallayout></blockquote>
+
+Then you need to set the lisp variable
+in <filename>festvox/clustergen.scm</filename> to use mixed excitation
+<blockquote><literallayout>
+    (set! cg:mixed_excitation t)
+</literallayout></blockquote>
+Then you can cluster the new set of parameters
+<blockquote><literallayout>
+    ./bin/do_clustergen parallel cluster etc/txt.done.data.train
+</literallayout></blockquote>
+You can generate an MCD for the text set with
+<blockquote><literallayout>
+    ./bin/do_clustergen cg_test resynth cgp etc/txt.done.data.test
+</literallayout></blockquote>
+</para>
+<para>
+We also support using random forests to get a better use of the
+limited data in a voice.  We have scripts to build random forests, by
+randomly varying which features to use, for spectrum and duration
+prediction.  We also include scripts to subselect the from the set of
+models generated to find an almost optimal set.  This is best shown in
+the script <filename>build_cg_rfs_voice</filename> this somewhat
+ambitious script does a full build (with mixed excitation, move label
+and random forests), as well as build flite versions of the voice on
+the way.  We have used this script for the released version of voices
+in festival 2.4 (and flite 2.0).  We have used this for arctic type
+voices, large 20 hour voices and a large number of other language
+voices, both with crafted language components and grapheme based
+versions.
+</para>
+</sect1>
+
+</chapter>
+

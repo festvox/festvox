@@ -1,0 +1,86 @@
+#!/bin/sh
+###########################################################################
+##                                                                       ##
+##                   Language Technologies Institute                     ##
+##                     Carnegie Mellon University                        ##
+##                         Copyright (c) 2014                            ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Collect together each of the sets of the trees for the random forest ##
+##                                                                       ##
+###########################################################################
+
+. ./etc/voice.defs
+
+if [ "$SIODHEAPSIZE" = "" ]
+then
+   SIODHEAPSIZE=20000000
+   export SIODHEAPSIZE
+fi
+HEAPSIZE=$SIODHEAPSIZE
+
+rm -f rf_models/mlist
+
+Ntimes=20
+echo 1 $Ntimes |
+awk '{for (i=$1; i<=$2; i++)
+         printf("%02d\n",i)}' |
+while read i
+do
+   echo Iteration $i
+   
+   # Collate mcep trees and build raw_params
+   for j in rf_models/trees_$i/*_?_mcep.tree rf_models/trees_$i/*_?_f0.tree
+   do
+      # sometimes the tree is zero size -- so we don't copy it in, and 
+      # use the previous tree. (you should catch this earlier in wagon_rf)
+      l=`cat $j | wc -l`
+      if [ $l != "0" ]
+      then
+         cp -pr $j festival/trees/
+      fi
+   done
+
+   $ESTDIR/../festival/bin/festival --heap $SIODHEAPSIZE -b festvox/${FV_VOICENAME}_cg.scm festvox/clustergen_build.scm '(begin
+     (set! cg:rfs nil)
+     (set! '$FV_VOICENAME':rfs_models nil)
+     (set! '$FV_VOICENAME':rfs_dur_models nil)
+     (voice_'$FV_VOICENAME'_cg)
+     (clustergen:collect_trees 
+        '$FV_VOICENAME'::clustergen_f0_trees clustergen_params "f0")
+     (clustergen:collect_mcep_trees 
+        '$FV_VOICENAME'::clustergen_f0_trees clustergen_params "mcep")
+   )'
+   cp -pr festival/trees/${FV_VOICENAME}_mcep.tree rf_models/trees_$i
+   cp -pr festival/trees/${FV_VOICENAME}_mcep.params rf_models/trees_$i
+   cp -pr festival/trees/${FV_VOICENAME}_f0.* rf_models/trees_$i
+
+   lastnum=$i;
+
+done

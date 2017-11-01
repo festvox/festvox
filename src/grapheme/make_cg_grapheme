@@ -1,0 +1,214 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                    Carnegie Mellon University 
+##                        Copyright (c) 2011                             ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Given a standard (new) language set of templates make it grapheme    ##
+##  based                                                                ##
+###########################################################################
+
+LANG=C; export LANG
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ ! "$FESTVOXDIR" ]
+then
+   echo "environment variable FESTVOXDIR is unset"
+   echo "set it to your local festvox directory e.g."
+   echo '   bash$ export FESTVOXDIR=/home/awb/projects/festvox/'
+   echo or
+   echo '   csh% setenv FESTVOXDIR /home/awb/projects/festvox/'
+   exit 1
+fi
+
+TTD=etc/txt.done.data
+if [ $# = 1 ]
+then
+    TTD=$1
+fi    
+
+. etc/voice.defs
+
+##
+## Use mcep.desc features for the broader phonetic features in sampa
+cp -pr $FESTVOXDIR/src/clustergen/mcep.desc.graph festival/clunits/mcep.desc
+
+##
+## Process the txt.done.data to get the raw chars out of it
+   cat $TTD |
+   sed 's/^[^"]* "//g;s/" *)[ ]*$//' |
+   awk '{printf("%s\n\n",$0)}' |
+   sed 's/\\"/"/g' >etc/raw.txt
+
+   cat etc/raw.txt |
+   sed 's/"/\\"/g' |
+   awk '{for (i=1; i<=NF; i++)
+            printf("\"%s\"\n",$i);}' >utf8.scm
+   $ESTDIR/../festival/bin/festival -b '(begin
+               (mapcar 
+                   (lambda (l) 
+                    (mapcar (lambda (k) (format t "%l\n" k)) (utf8explode l)))
+                   (load "utf8.scm" t)) )' |
+   awk '{ for (i = 1; i <= NF; i++)
+             freq[$i]++
+        }
+        END { for (word in freq)
+             printf "%s\t%d\n", word, freq[word]
+   }' | sort --key=2 -gr |
+   awk '{if ($2 > 2) print $0}' >data.chars
+
+   if [ -f extra_chars ]
+   then
+      cat extra_chars >>data.chars
+   fi
+
+##
+## Get ascii hexvalues for each unicode character
+##
+   cat data.chars |
+   awk 'BEGIN { 
+           while (getline <"'$FESTVOXDIR'/src/grapheme/grapheme_unicode.scm")
+           {
+              if (NF==4){uni[$2]=$3;}
+           }}
+        {  if((1==1) && uni[$1])
+           {
+              printf("( %s %s )\n",$1,uni[$1])
+           }
+           else
+           {
+              printf("( %s x%03dp )\n",$1,NR);
+           }
+        }' >festvox/${FV_INST}_${FV_LANG}_${FV_NAME}_char_phone_map.scm
+
+## Create etc/phone.freq with each phoneme (or asciified grapheme if 
+## is not mappable) -- but we don't have frequencies
+awk '{printf("( %s %s )\n",$3,$2)}' festvox/${FV_INST}_${FV_LANG}_${FV_NAME}_char_phone_map.scm >unicode_chars.scm
+$FESTVOXDIR/src/promptselect/dataset_subset $FESTVOXDIR/src/grapheme/unicode_sampa_mapping.scm unicode_chars.scm | 
+tr '()' '  ' |
+sed 's/;.*$//' |
+awk '{for (i=2; i<=NF; i++)
+         print $i}' |
+sort | uniq |
+awk '{printf("( %s 1 )\n",$1)}' >etc/phones.freq
+## And unicode chars that have no mapping in the unicode sampa mapping
+## **This takes more time than I'd like -- but it is necessary sometimes
+cat unicode_chars.scm |
+   awk 'BEGIN { 
+           while (getline <"'$FESTVOXDIR'/src/grapheme/unicode_sampa_mapping.scm")
+           {
+              uni[$2]=1;
+           }}
+        {  if (!uni[$2])
+           {
+              printf("( %s 1 )\n",$2,NR);
+           }
+        }' >>etc/phones.freq
+
+if [ -f festvox/lex_lts_rules.scm ]
+then
+   # There is a more specific set of LTS rules
+   awk '{print $NF}' festvox/lex_lts_rules.scm | 
+   grep "))" | sed 's/[01])//;s/)//g' | sed 's/-/ /g' |
+   awk '{
+         for (i = 1; i <= NF; i++)
+             freq[$i]++
+        }
+        END {
+         for (word in freq)
+             printf "( %s 1 )\n", word
+     }' | grep -v "_epsilon_" | grep -v '#'  >>etc/phones.freq
+fi
+
+mv etc/phones.freq etc/phones.freq.all
+sort -u etc/phones.freq.all >etc/phones.freq
+
+##
+## Create festvox/X_phoneset.scm phoneme table
+##
+if [ ! -f festvox/${FV_INST}_${FV_LANG}_${FV_NAME}_phoneset.scm-orig ]
+then
+   mv festvox/${FV_INST}_${FV_LANG}_${FV_NAME}_phoneset.scm festvox/${FV_INST}_${FV_LANG}_${FV_NAME}_phoneset.scm-orig
+fi
+
+   awk '{print $2}' etc/phones.freq |
+   while read p
+   do
+      cat $FESTVOXDIR/src/grapheme/sampa.table |
+      awk -v p=$p '{if ($2 == p) 
+            {
+                found=1;
+                print $0;
+            }}
+            END {if (found != 1)
+                    printf("   ( %s - - 0 0 0 0  0 0  0 0 0 )\n",p)}'
+   done >festvox/phone.table
+   if [ ! -f festvox/phone.top ]
+   then
+      cat $FESTVOXDIR/src/grapheme/sampa.top |
+      sed 's/INST/'$FV_INST'/g' |
+      sed 's/VOX/'$FV_NAME'/g' |
+      sed 's/LANG/'$FV_LANG'/g' >festvox/phone.top
+   fi
+   if [ ! -f festvox/phone.bottom ]
+   then
+      cat $FESTVOXDIR/src/grapheme/sampa.bottom |
+      sed 's/INST/'$FV_INST'/g' |
+      sed 's/VOX/'$FV_NAME'/g' |
+      sed 's/LANG/'$FV_LANG'/g' >festvox/phone.bottom
+   fi
+
+   cat festvox/phone.top festvox/phone.table festvox/phone.bottom >festvox/${FV_VOICENAME}_phoneset.scm-new
+   cp -p festvox/${FV_VOICENAME}_phoneset.scm-new festvox/${FV_VOICENAME}_phoneset.scm
+
+rm -f festvox/unicode_sampa_mapping.scm
+## Get the UIUC license too 
+head -n 26 $FESTVOXDIR/src/grapheme/unicode_sampa_mapping.scm > festvox/unicode_sampa_mapping.scm
+awk 'BEGIN{while(getline<"festvox/'${FV_INST}'_'${FV_LANG}'_'${FV_NAME}'_char_phone_map.scm")
+        {graph[$3]=1;}}
+    {if (graph[$2]==1){print $0}}' $FESTVOXDIR/src/grapheme/unicode_sampa_mapping.scm >> festvox/unicode_sampa_mapping.scm
+tail -n 1 $FESTVOXDIR/src/grapheme/unicode_sampa_mapping.scm >> festvox/unicode_sampa_mapping.scm
+
+## Mark this language as a grapheme based voice
+## This is mainly for Flite to link the right lang/lex libraries
+echo "FV_LANG_TYPE=grapheme" >>etc/voice.defs
+
+#rm -f 1.out 2.out 1_uni.out unicode_chars.scm
+
+

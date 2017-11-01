@@ -1,0 +1,133 @@
+#!/bin/sh
+####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                   Carnegie Mellon University and                      ##
+##                   Alan W Black and Kevin A. Lenzo                     ##
+##                      Copyright (c) 1998-2000                          ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+
+LANG=C; export LANG
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ ! "$FESTVOXDIR" ]
+then
+   echo "environment variable FESTVOXDIR is unset"
+   echo "set it to your local festvox directory e.g."
+   echo '   bash$ export FESTVOXDIR=/home/awb/projects/festvox/'
+   echo or
+   echo '   csh% setenv FESTVOXDIR /home/awb/projects/festvox/'
+   exit 1
+fi
+
+F0MIN=50
+F0MAX=200
+F0MEAN=110
+if [ -f etc/f0.params ]
+then
+   . etc/f0.params
+fi
+
+F0_ARGS=`echo $F0MIN $F0MAX $F0MEAN | awk '{printf("-min %f -max %f -def %f",1.0/$2,1.0/$1,1.0/$3)}'`
+
+PM_ARGS='-wave_end -lx_lf 140 -lx_lo 111 -lx_hf 80 -lx_ho 51 -med_o 0'
+
+# Old values
+#MALE_PM_ARGS='-min 0.0057 -max 0.012 -def 0.01 -wave_end -lx_lf 140 -lx_lo 111 -lx_hf 80 -lx_ho 51 -med_o 0'
+#FEMALE_PM_ARGS='-min 0.00333 -max 0.0075 -def 0.006 -wave_end -lx_lf 140 -lx_lo 111 -lx_hf 80 -lx_ho 51 -med_o 0'
+
+EPOCHS=$ESPS_BASE/bin/epochs
+PLAIN=$ESPS_BASE/bin/pplain
+EFREE=$ESPS_BASE/bin/efree
+# Free version doesn't require efree anymore
+EFREE=/bin/true
+
+if [ ! -f etc/silence ]
+then
+   $ESTDIR/../festival/bin/festival -b festvox/build_clunits.scm "(find_silence_name)"
+fi
+SILENCE=`awk '{print $1}' etc/silence`
+
+PROMPTFILE=etc/txt.done.data
+if [ $# = 1 ]
+then
+   PROMPTFILE=$1
+fi
+
+awk '{print $2}' $PROMPTFILE |
+while read i
+do
+  fname=$i
+
+  echo $fname F0_PM
+
+  $ESTDIR/bin/ch_wave -scaleN 0.9 wav/$fname.wav -F 16000 | 
+# If you have epoch
+#   $EPOCHS -P etc/Pepochs tmp_epoch.wav tmp_epoch.epc
+#   $PLAIN tmp_epoch.epc |
+#   gawk '{if ($0==0) 
+#          {
+#            count = count + 1
+#          } 
+#          else 
+#           if ($0 != 0) 
+#           {
+#             printf("%f\t%s\n", count/16000.0,"p"); 
+#             count = count + 1
+#           }}' >tmp_epoch.pm
+#    cat tmp_epoch.pm |
+#    gawk 'BEGIN {printf("EST_File Track\n");
+#                 printf("DataType ascii\n");
+#                 printf("NumFrames XXX_XXX\n");
+#                 printf("NumChannels 0\n");
+#                 printf("BreaksPresent true\n");
+#                 printf("EST_Header_End\n");
+#                 last=0 }
+#          {
+#   	    printf("%f 1\n",$1);
+#          }' >tmp_epoch.est
+#    numframes=`gawk 'END {print NR-6}' tmp_epoch.est`
+#    sed 's/XXX_XXX/'$numframes'/' tmp_epoch.est >pm_unfilled/$fname.pm
+
+  $ESTDIR/bin/pitchmark -o pm_unfilled/$fname.pm -otype est $PM_ARGS $F0_ARGS
+
+  $FESTVOXDIR/src/general/smooth_f0 -o f0/$fname.f0 -pm_input -pm_min_f0 $F0MIN -otype ssff pm_unfilled/$fname.pm -lab lab/$fname.lab -silences $SILENCE -interpolate -postsmooth -postwindow 0.025
+
+#  rm -f tmp_epoch.*
+done
+
+

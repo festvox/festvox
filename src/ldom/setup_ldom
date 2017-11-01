@@ -1,0 +1,168 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                   Carnegie Mellon University and                      ##
+##                   Alan W Black and Kevin A. Lenzo                     ##
+##                      Copyright (c) 1998-2000                          ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Setup the current directory for building a limited domain synth      ##
+##                                                                       ##
+###########################################################################
+
+LANG=C; export LANG
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ ! "$FESTVOXDIR" ]
+then
+   echo "environment variable FESTVOXDIR is unset"
+   echo "set it to your local festvox directory e.g."
+   echo '   bash$ export FESTVOXDIR=/home/awb/projects/festvox/'
+   echo or
+   echo '   csh% setenv FESTVOXDIR /home/awb/projects/festvox/'
+   exit 1
+fi
+
+if [ $# != 3 ]
+then
+    echo "Build dirs, and setup scripts and scm files for a new ldom voice "
+    echo "Usage: setup_ldom INST DOMAIN VOX"
+    echo "INST is the institute building the language, e.g. cmu, cstr, ogi"
+    echo "     if there isn't an appropriate institute use, net."
+    echo "DOMAIN is the domain identifier, e.g. time, eliza etc"
+    echo "SPEAKER is speaker/style identifier e.g kal, awb, golem"
+    exit 1
+fi
+
+FV_INST=$1
+FV_LDOM=$2
+FV_VOX=$3
+
+if [ "0" != `ls | wc -l` ]
+then
+   echo "I'm going to make a whole bunch of new directories in"
+   echo "    "`pwd`
+   echo "This directory is currently non-empty, are you sure this is "
+   echo "the directory you want these new directories built in?"
+   echo -n "Answer y/n? "
+   read answer
+   if [ "$answer" != "y" ]
+   then
+       echo "setup aborted"
+       exit -1
+   fi
+fi
+
+echo Making directories
+$FESTVOXDIR/src/general/make_dirs
+CURRENTDIR=`pwd`
+
+echo Copying relevant script files
+cp -p $FESTVOXDIR/src/unitsel/make_mcep bin
+
+# General utilities
+cp -p $FESTVOXDIR/src/general/make_labs bin
+cp -p $FESTVOXDIR/src/general/prompt_them bin
+cp -p $FESTVOXDIR/src/general/make_lpc bin
+cp -p $FESTVOXDIR/src/general/make_pm bin
+cp -p $FESTVOXDIR/src/general/make_pm_wave bin
+cp -p $FESTVOXDIR/src/general/make_pmlab_pm bin
+cp -p $FESTVOXDIR/src/general/make_pm_pmlab bin
+cp -p $FESTVOXDIR/src/general/make_pm_fix bin
+cp -p $FESTVOXDIR/src/general/make_f0 bin
+cp -p $FESTVOXDIR/src/general/get_lars bin
+cp -p $FESTVOXDIR/src/general/get_wavs bin
+cp -p $FESTVOXDIR/src/general/do_build bin
+cp -p $FESTVOXDIR/src/general/find_powerfactors bin
+cp -p $FESTVOXDIR/src/general/simple_powernormalize bin
+cp -p $FESTVOXDIR/src/general/find_powercontours bin
+cp -p $FESTVOXDIR/src/general/contour_powernormalize bin
+cp -p $FESTVOXDIR/src/general/make_dist bin
+cp -p $FESTVOXDIR/src/general/make_cmn bin
+cp -p $FESTVOXDIR/src/general/traintest bin
+cp -p $FESTVOXDIR/src/general/emu_lab.tpl etc/emu_lab.tpl
+cp -p $FESTVOXDIR/src/general/emu_pm.tpl etc/emu_pm.tpl
+cp -p $FESTVOXDIR/src/general/emu_f0.tpl etc/emu_f0.tpl
+cp -p $FESTVOXDIR/src/st/sphinxtrain bin
+cp -p $FESTVOXDIR/src/st/sphinx_lab bin
+cp -p $FESTVOXDIR/src/st/build_st.scm festvox
+
+echo Copying domain specific parameters
+if [ -f $FESTVOXDIR/src/vox_files/prompts/$FV_LDOM.data ]
+then
+    cp -p $FESTVOXDIR/src/vox_files/prompts/$FV_LDOM.data etc/txt.done.data
+else
+    echo "***"
+    echo "*** Unknown domain \""$FV_LDOM"\" you must create "etc/$FV_LDOM.data" yourself"
+    echo "***"
+fi
+
+echo "FV_INST=$FV_INST" >etc/voice.defs
+echo "FV_LANG=$FV_LDOM" >>etc/voice.defs
+echo "FV_NAME=$FV_VOX" >>etc/voice.defs
+echo "FV_TYPE=ldom" >>etc/voice.defs
+echo "FV_VOICENAME=\$FV_INST\"_\"\$FV_LANG\"_\"\$FV_NAME" >>etc/voice.defs
+echo "FV_FULLVOICENAME=\$FV_VOICENAME\"_\"\$FV_TYPE" >>etc/voice.defs
+
+if [ -f $FESTVOXDIR/src/ldom/$FV_LDOM.scm ]
+then
+    cp -p $FESTVOXDIR/src/ldom/$FV_LDOM.scm festvox/$FV_INST"_"$FV_LDOM"_"$FV_VOX.scm
+else
+    touch festvox/$FV_INST"_"$FV_LDOM"_"$FV_VOX.scm
+fi
+
+# This is way too specific for the particular feature set
+cp -p $FESTVOXDIR/src/ldom/ldom.desc festival/clunits/all.desc
+
+echo Generating ldom specific voice and build files
+for i in $FESTVOXDIR/src/ldom/LDOM_ldom.scm \
+         $FESTVOXDIR/src/ldom/build_ldom.scm
+do
+   f=`basename $i | sed 's/LDOM/'$FV_INST"_"$FV_LDOM"_"$FV_VOX'/'`
+   cat $i |
+   sed 's%LDOM%'$FV_LDOM'%g' |
+   sed 's%INST%'$FV_INST'%g' |
+   sed 's%VOX%'$FV_VOX'%g' |
+   sed 's%CURRENTDIR%'"$CURRENTDIR"'%g' >festvox/$f
+done
+
+echo "Set up for "$FV_INST"_"$FV_LDOM"_"$FV_VOX" complete"
+
+
+
+

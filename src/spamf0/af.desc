@@ -1,0 +1,7 @@
+( 
+(occurid vector)
+(tpeak float)
+(tamp  float)
+(tdur  float)
+(ttilt float)
+)

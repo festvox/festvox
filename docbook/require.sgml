@@ -1,0 +1,701 @@
+<chapter><title>Basic Requirements</title>
+
+<para>
+<indexterm><primary> requirements </primary></indexterm>
+This section identifies the basic requirements for building a voice 
+in a new language, and adding a new voice in a language already 
+supported by Festival. 
+</para>
+<sect1><title>Hardware/software requirements</title>
+
+<para>
+<indexterm><primary> WIN32 </primary></indexterm>
+<indexterm><primary> Unix </primary></indexterm>
+Because we are most familiar with a Unix environment the scripts, tools 
+etc. assume such a basic environment. This is not to say you couldn't 
+run these scripts on other platforms as many of these tools are 
+supported on platforms like WIN32, its just that in our normal work 
+environment, Unix is ubiquitous and we like working in it. Festival 
+also runs on Win32 platforms. 
+</para>
+<para>
+Much of the testing was done under Linux; wherever possible, 
+we are using freely available tools. We are happy to say that 
+no non-free tools are required to build voices, and we have 
+included citations and/or links to everything needed in this 
+document. 
+</para>
+<para>
+We assume Festival 2.4 and the Edinburgh Speech Tools 2.4.
+</para>
+<para>
+Note that we make an extensive use of the Speech Tools programs, and you 
+will need the full distribution of them as well as Festival, rather than 
+the run-time (binary) only versions which are available for some Linux 
+platforms. If you find the task of compiling Festival and the speech 
+tools daunting, you will probably find the rest of the tasks specified 
+in this document more so. However, it is not necessary for you to have 
+any knowledge of C++ to make voices, though familiarity with text 
+processing techniques (e.g. awk, sed, perl) will make understanding the 
+examples given much easier. 
+</para>
+<para>
+We also assume a basic knowledge of Festival, and of speech processing 
+in general. We expect the reader to be familiar with basic terms such as 
+<emphasis>F0</emphasis>, <emphasis>phoneme</emphasis>, and <emphasis>cepstrum</emphasis>, but not in any real 
+detail. References to general texts are given (when we know them to 
+exist). A basic knowledge of programming in Scheme (and/or Lisp) will 
+also make things easier. A basic capability in programming in general 
+will make defining rules, etc., much easier. 
+</para>
+<para>
+<indexterm><primary> recording </primary></indexterm>
+If you are going to record your own database, you will need recording 
+equipment: the higher quality, the better. A proper recording studio is 
+ideal, though may not be available for everyone. A cheap microphone 
+stuck on the back of standard PC is not ideal, though we know most of 
+you will end up doing that. A high quality sound board, close-talking, 
+high quality microphone and a nearly soundproof recording environment 
+will often be the compromise between these two extremes. 
+</para>
+<para>
+<indexterm><primary> CPU time </primary></indexterm> Many of the
+techniques described in here require a fair amount of processing time
+to achieve, though machines are indeed getting faster and this is
+becoming less of an issue (though we always find ways to use up the
+more CPU time that is available). If you use the provided aligner for
+labeling diphones you will need a processor of reasonable speed,
+likewise for the various training techniques for intonation, duration
+modeling and letter-to-sound rules. Nothing presented here takes weeks
+though a number of processes may be over-night jobs, depending on the
+speed of your machine, and size of your database.
+</para>
+<para>
+Also we think that you will need a little patience. The process of 
+building a voice is not necessarily going to work first time. It may 
+even fail completely, so if you don't expect anything special, you wont 
+be disappointed. 
+</para>
+</sect1>
+
+<sect1><title>Voice in a new language</title>
+
+<para>
+The following list is a basic check list of the core areas you will need 
+to provide pieces for. You may, in some cases, get away with very 
+simple solutions (e.g. fixed phone durations), or be able to borrow from 
+other voices/languages, but whatever you end up doing, you will need to 
+provide something for each part. 
+</para>
+<para>
+You will need to define 
+<itemizedlist mark=bullet>
+<listitem><para>
+Phone set
+</para></listitem>
+<listitem><para>
+Token processing rules (numbers etc)
+</para></listitem>
+<listitem><para>
+Prosodic phrasing method
+</para></listitem>
+<listitem><para>
+Word pronunciation (lexicon and/or letter-to-sound rules)
+</para></listitem>
+<listitem><para>
+Intonation (accents and F0 contour)
+</para></listitem>
+<listitem><para>
+Durations
+</para></listitem>
+<listitem><para>
+Waveform synthesizer
+</para></listitem>
+</itemizedlist>
+</para>
+</sect1>
+
+<sect1><title>Voice in an existing language</title>
+
+<para>
+The most common case is when someone wants to make their own voice into 
+a synthesizer. Note that the issues in voice modeling of a particular 
+speaker are still open research problems. Much of the quality of a 
+particular voice comes mostly from the waveform generation method, but 
+other aspects of a speaker such as intonation and duration, and 
+pronunciation are all part of what makes that person's voice sound like 
+them. All of the general-purpose voices we have heard in Festival sound 
+like the speaker they were record from (at least as far as we know all 
+the speakers), but they also don't have all the qualities of that 
+person's voice, though they can be quite convincing for limited-domain 
+synthesizers. 
+</para>
+<para>
+As a practical recommendation to make a new speaker in an existing 
+supported language, you will need to consider 
+<itemizedlist mark=bullet>
+<listitem><para>
+Waveform synthesis
+</para></listitem>
+<listitem><para>
+Speaker specific intonation
+</para></listitem>
+<listitem><para>
+Speaker specific duration
+</para></listitem>
+</itemizedlist>
+<xref linkend="bsv-usukdiphone-ch"> deals with specifically building 
+a new US or UK English voice. This is a relatively easy place to start, 
+though of course we encourage reading this entire document. 
+</para>
+<para>
+Another possible solution to getting a new or particular voice is to do 
+voice conversion, as is done at the Oregon Graduate Institute (OGI) 
+<citation>kain98</citation> and elsewhere. OGI have already released new voices based 
+on this conversion and may release the conversion code itself, though 
+the license terms are not the same as those of Festival or this document. 
+</para>
+<para>
+<indexterm><primary> voice in new dialect </primary></indexterm>
+<indexterm><primary> dialect </primary></indexterm>
+Another aspect of a new voice in an existing language is a voice in a 
+new dialect. The requirements are similar to those of creating a voice 
+in a new language. The lexicon and intonation probably need to change 
+as well as the waveform generation method (a new diphone database). 
+Although much of the text analysis came probably be borrowed, be aware 
+that simple things like number pronunciation can often change between 
+dialects (cf. US and UK English). 
+</para>
+<para>
+<indexterm><primary> limited domain </primary></indexterm>
+We also do work on limited domain synthesis in the same framework. For 
+limited domain synthesis, a reasonably small corpus is collected, and 
+used to synthesize a much larger range of utterances in the same basic 
+style. We give an example of recording a talking clock, which, although 
+built from only 24 recordings, generates over a thousand unique 
+utterances; these capture a lot of the latent speaker characteristics 
+from the data. 
+</para>
+</sect1>
+
+<sect1><title>Selecting a speaker</title>
+
+<para>
+<indexterm><primary> selecting a speaker </primary></indexterm>
+<indexterm><primary> choosing a speaker </primary></indexterm>
+We have found that choosing the right speaker to record, is actually as 
+important as all the the other processes we describe. Some people just 
+have better voices that are better for synthesis than others. In 
+general people with, clearer, more consistent voices are better than 
+others but unfortunately its not as clear as that. Professional 
+speakers are in general better for synthesis that non-professional. Though 
+not all professional voices work, and many non-professional speakers give 
+good results. 
+</para>
+<para>
+In general you are looking for clear speakers, who don't mumble and 
+don't have any speech impediments. It helps if they are aware of speech 
+technology, i.e. have some vague idea of what a phoneme is. A 
+consistent deliver is important. As different parts of speech from 
+different parts of the recorded database are going to be extracted and 
+put together you what the speech to be as consistent as possible. This 
+is usually the quality that professional speakers have (or any one used 
+to public speaking). Also note most people can't actually talk for long 
+periods without practice. Lectures/Teachers are actually much more used 
+to this than students, though this ability can be learned quite easily. 
+</para>
+<para>
+Note choosing the right speaker, if its important to you, can be 
+a big project. For example, an experiment done at AT&amp;T to 
+select good speakers for synthesis involved recording fair sized 
+databases for a number of professional speakers (20 or so) and 
+building simple synthesis example from their voice and submitting 
+these to a large number of human listeners to get them to evaluate 
+quality <citation>syrdal??</citation>. Of course most of us don't have the resources 
+to do searches like that but it is worth taking a little time to 
+think of the best speaker before investing the considerable time in 
+takes in building a speaker. 
+</para>
+<para>
+Note that trying to capture a particular voice is still somewhat 
+difficult. You will always capture some of that persons voice but its 
+unlikely a synthesizer built from recordings of a person will always 
+sound just like that person. However you should note that voice you 
+think are distinctive may be so because of lots variation. For example 
+Homer Simpson's voice is distinctive but it would be difficult to built 
+a synthesizer from. The Comic Book Guy (also from the Simpsons) also 
+has a very distinctive voice but is much less varied prosodically than 
+Homer's and hence it is likely to be easier to build a synthesizer from 
+his voice. Likewise, Patrick Stewart's voice should be easier than Jim 
+Carey's. 
+</para>
+<para>
+However as it is usually the case that you just have to take any speaker 
+you have willing to do it (often yourself), there are still things you 
+should do that will help the quality. It is best is recording is done 
+in the same session, as it is difficult to set up the same recording 
+environment (even when you are very careful). We recommend recording 
+some time in the morning (not immediately you get up), and if you must 
+re-record do so at the same time of day. Avoid recording when the 
+speaker has a cold, or a hangover as it can be difficult to recreate 
+that state if multiple sessions are required. 
+</para>
+</sect1>
+
+<sect1><title>Who owns a voice</title>
+
+<para>
+<indexterm><primary> voice copyright </primary></indexterm>
+<indexterm><primary> owning a voice </primary></indexterm>
+It is very important that your speaker and you understand the legal 
+status of the recorded database. It is very wise that the speaker 
+signs a statement before you start recording or at least talk to them 
+ensuring they understand what you want to do with the data and what 
+restrictions if any they require. Remember in recording their 
+voice you are potentially allowing anyone (who gets access to the 
+database) to fake that person's voice. The whole issue of 
+building a synthetic voice from recordings is still actually an 
+uninvestigated part of copyright but there are clear ways to ensure you 
+wont be caught out by a law suit, or a disgruntled subject later. 
+</para>
+<para>
+Explain what you going to do with the database. Get the speaker 
+to agree to the level use you may make of the recordings (and any 
+use of them). This will roughly be: 
+<itemizedlist mark=bullet>
+<listitem><para>
+free for any use
+</para></listitem>
+<listitem><para>
+free to distribute to anyone but cannot be used for commercial purposes without further contract.
+</para></listitem>
+<listitem><para>
+research use only (does this allow public demos?)
+</para></listitem>
+<listitem><para>
+fully proprietary
+</para></listitem>
+</itemizedlist>
+You must find out what the speaker agrees to before you start spending 
+your time recording. There is nothing worse than spending weeks 
+on building a good voice only to discover that you don't have rights 
+to do anything with it. 
+</para>
+<para>
+Also, don't lie to the speaker make it clear, what it means if their 
+voice is to be released for free. If you release the voice on the net 
+(as we do with our voices), <emphasis>anyone</emphasis> may use it. It could be used 
+anywhere, from reading porn stories to emergency broadcast systems. 
+Also note that effectively building a voice from a synthesizer means 
+that the person will no longer be able to use voice id systems as a 
+password protection (actually that depends on the type of voice id 
+system). However also reassure them that these extremes are very 
+unlikely and actually they will be contributing to world of speech 
+science and people will use their voice because they like it. 
+</para>
+<para>
+We (KAL and AWB) have already given up the idea that our voices are in
+anyway ours and have recorded databases and made them public (even
+though AWB has a funny accent). When recording others we ensure they
+understand the consequences and get them to explicitly sign a license that 
+gives us (and/or our institution) the rights to do anything they wish,
+but the intention is the voice will be released for free without
+restriction. From our point of view, having no restrictions is by far
+the easiest. We also give (non-exclusive) commercial rights to the
+voice to the speaker themselves. This actually costs us nothing, and
+given most of our recorded voices are for free the speaker could
+re-release the free version and use it commercially (as can anyone
+else) but its nice that the original license allows the speaker direct
+commercial rights (none that I know of have actually done anything
+with those rights).
+</para>
+<para>
+There may be other factors though. Someone else may be paying for the 
+database so they need to be accommodated on any such license. Also a 
+database may already be recorded under some license and you wish to use 
+it to build a synthetic voice, make sure you have the rights to do this. 
+Its amazing how mainly people record speech databases and don't take 
+into account the fact that someone else may build a general TTS systems 
+from their voice. Its better that you check that have to deal with 
+problems later. 
+</para>
+<para>
+An example of the license we use at CMU is given in the festvox 
+distribution <filename>festvox/src/vox_files/speaker.licence</filename>. 
+</para>
+<para>
+Also note that there are legal aspects to other parts of a synthetic 
+voice the builder must also ensure they have rights to. Lexicons may 
+have various restrictions. The Oxford Advanced Learners' Dictionary 
+that we currently use for UK English voices is free for non-commercial 
+use only, thus effectively imposing the same restriction on the complete 
+voice even though the prosodic models and diphone databases are free. 
+Also be careful you check the rights when building models from existing 
+data. Some databases are free for research only and even data derived 
+from them (e.g. duration models) may not be further distributed. Check 
+at the start, question all pieces of the system to make sure you know 
+who owns what and what restrictions they impose. This process is worth 
+doing at the start of a project so things are always clear. 
+</para>
+</sect1>
+
+<sect1 id="bsv-recording-sect">
+<title>Recording under Unix</title>
+
+<para>
+Although the best recording conditions can't probably be achieved 
+recording directly to a computer (under Unix or some other operating 
+systems). We accept that in many cases recording directly to a 
+computer has many conveniences outweighing its disadvantages. 
+</para>
+<para>
+The disadvantages are primarily in quality, the electromagnetic noise 
+generated by a machine is large and most computers have particularly poor 
+shielding of there audio hardware such that noise always gets added to 
+the recorded signal. But there are ways to try to minimize this. 
+Getting better quality sound cards helps, but they can be very 
+expensive. "Professional" sound cards can go for as much as a 
+thousand dollars. 
+</para>
+<para>
+The advantage of using a computer directly is that you have much more 
+control over the recording session and first line processing can down at 
+record-time. In recent years we found the task of transferring the 
+recorded data from DAT tapes to a computer, and splitting them into 
+individual files, even before phonetic, labeled a significantly 
+laborious task, often larger and resource intensive than the rest 
+of the voice building process. So recently we've accept that direct 
+recording to disk using a machine worthwhile, except for voices that 
+require the highest quality (and when we have the money to take 
+more time). This section describes the issues in recording 
+under Unix, though they mostly apply under Windows too if you 
+go that route. 
+</para>
+<para>
+The first thing you'll find out about recording on a computer is that 
+no one knows how to do it, and probably no-one has actually used 
+the microphone on the machine at all before (or even knows if there 
+is a microphone). Although we believe we are living in a multi-media 
+computer age, setting up audio is still a tricky thing and even when 
+it works its often still flakey. 
+</para>
+<para>
+First you want to ensure that audio works on the machine at all. Find 
+out if anyone has actually heard any audio coming from it. Even though 
+there may be an audio board in there, it may not have any drivers 
+installed or the kernel doesn't know about it. In general, audio 
+rarely, "just works" under Linux in spite of people claiming Linux is 
+ready for the desktop. But before you start claiming Windows is better, 
+we've found that audio rarely "just works" there too. Under Windows 
+when it works its often fine, but when it doesn't the general Windows 
+user is much less likely to have any knowledge about how to fix it, 
+while at least in the Linux world, users have more experience in getting 
+recalcitrant devices to come to life. 
+</para>
+<para>
+Its difficult to name products here as the turn over in PC hardware is 
+frantic. Generally newer audio cards wont work and older card do. For 
+audio recording, we <emphasis>only</emphasis> require 16bit PCM, and none of the 
+fancy, FM synthesizers and wavetable devices, those are irrelevant and 
+often make card difficult or very hard to use. Laptops are particular 
+good for recording, as they generally add less noise to the signal 
+(especially if run on the battery) and they are portable enough to take 
+into a quite place that doesn't have desktop cooling fan running in the 
+background. However sound on Laptops under Unix (Linux, FreeBSD, 
+Solaris etc) is unfortunately even less likely to work, due to leading 
+edge technology and proprietary audio chips. Linux is improving in this 
+area but although we are becoming relatively good at getting audio to 
+work on new machines, its still quite a skill. 
+</para>
+<para>
+In general search the net for answers here. Linux offers both
+<ulink url="http://www.alsa-project.org/">ALSA
+</ulink> and <ulink url="http://www.opensound.com/">the Open Sound 
+drivers</ulink> drivers which go a long way to help. 
+Note though even when these work there may be other problems (e.g. on 
+one laptop you can have either sound working or suspend working but not 
+both at once). 
+</para>
+<para>
+To test audio you'll need something to modify the basic gain on 
+the audio drivers (e.g. <filename>xmixer</filename> under Linux/FreeBSD, or 
+<filename>gaintool</filename> under Solaris). And you can test audio out 
+with the command (assuming you've set <filename>ESTDIR}</filename> 
+<blockquote><literallayout>
+$ESTDIR/bin/na_play $ESTDIR/lib/example_data/kdt_001.wav
+</literallayout></blockquote>
+which should play a US male voice saying "She had your dark suit in 
+greasy washwater all year." 
+</para>
+<para>
+To test audio in you can use the command 
+<blockquote><literallayout>
+$ESTDIR/bin/na_record -o file.wav -time 3
+</literallayout></blockquote>
+where the time given is the number of seconds to record. Note you may 
+need to change the microphone levels and/or input gain to make this work. 
+</para>
+<para>
+You should <emphasis>look</emphasis> at the audio signal as well as listen to it. Its 
+often quite easy to see noise in a signal than hear it. The human ear 
+has developed so that it can mask out noise, but unfortunately not 
+developed enough to mask all noise in synthesis. But in synthesis when 
+we are going to concatenated different parts of the signal the human ear 
+isn't as forgiving. 
+</para>
+<para>
+The following is a recording made with background noise, (probably a 
+computer). 
+<mediaobject>
+<imageobject>
+<imagedata fileref="figures/wave_noisey.eps" format="eps">
+</imageobject>
+<imageobject>
+<imagedata fileref="figures/wave_noisey.gif" format="gif">
+</imageobject>
+<textobject>
+<phrase>Waveform with background noise</phrase>
+</textobject>
+<caption>
+<para>
+Example waveform recorded with lots of background noise
+</para>
+</caption>
+</mediaobject>
+The same piece of speech (re-iterated) in a quiet environment 
+looks like 
+<mediaobject>
+<imageobject>
+<imagedata fileref="figures/wave_clean.eps" format="eps">
+</imageobject>
+<imageobject>
+<imagedata fileref="figures/wave_clean.gif" format="gif">
+</imageobject>
+<textobject>
+<phrase>Waveform without background noise</phrase>
+</textobject>
+<caption>
+<para>
+Example waveform recorded in clean environment
+</para>
+</caption>
+</mediaobject>
+As you can see the quiet parts of the speech are much quieter 
+in the clean case than the noise case. 
+</para>
+<para>
+Under Linux there is a <emphasis>Audio-Quality-HOWTO</emphasis> document that 
+helps get audio up and running. AT time of writting it 
+can be found <ulink url="http://audio.netpedia.net/aqht.html">
+http://audio.netpedia.net/aqht.html</ulink> 
+</para>
+</sect1>
+
+<sect1 id="bsv-pitchmarks-sect">
+<title>Extracting pitchmarks from waveforms</title>
+
+<para>
+Although never as good as extracting pitchmarks from an EGG signal, 
+we have had a fair amount of success in extracting pitchmarks from 
+the raw waveform. This area is somewhat a research area but in 
+this section we'll give some general pointers about how to get 
+pitchmarks form waveforms, or if not at least be able to tell 
+if you are getting reasonable pitchmarks from waveforms or not. 
+</para>
+<para>
+The basic program which we use for the extraction is <filename>pitchmark</filename> 
+which is part of the Speech Tools distribution. We include the 
+script <filename>bin/make_pm_wave</filename> (which is copied by ldom and diphone 
+setup process). The key line in the script is 
+<blockquote><literallayout>
+$ESTDIR/bin/pitchmark tmp$$.wav -o pm/$fname.pm -otype est \
+   -min 0.005 -max 0.012 -fill -def 0.01 -wave_end \
+   -lx_lf 200 -lx_lo 51 -lx_hf 80 -lx_ho 51 -med_o 0
+</literallayout></blockquote>
+This program filters in incoming waveform (with a low and a high band 
+filter, then uses autocorellation to find the pitch mark peaks with the 
+min and max specified. Finally it fills in the unvoiced section with 
+the default pitchmarks. 
+</para>
+<para>
+For debugging purposes you should remove the <filename>-fill</filename> option 
+so you can see where it is finding pitchmarks. Next you should modify 
+the min and max values to fit the range of your speaker. The defaults 
+here (0.005 and 0.012) are for a male speaker in about the range 200 to 
+80 Hz. For a female you probably want values about 0.0033 and 0.7 
+(300Mhz to 140Hz). 
+</para>
+<para>
+Modify the script to your approximate needs, and run it on 
+a single file, then run the script that translates the pitchmark 
+file into a labeled file suitable for emulabel 
+<blockquote><literallayout>
+bin/make_pm_wave wav/awb_0001.wav
+bin/make_pm_pmlab pm/awb_0001.pm
+</literallayout></blockquote>
+You can the display the pitchmark with 
+<blockquote><literallayout>
+emulabel etc/emu_pm awb_0001
+</literallayout></blockquote>
+This should should a number of pitchmarks over the voiced 
+sections of speech. If there are none, or very few it definitely 
+means the parameters are wrong. For example the above parameters 
+on this file <varname>taataataa</varname> properly find pitchmarks in the three vowel 
+sections 
+<mediaobject>
+<imageobject>
+<imagedata fileref="figures/pm_raw_01.eps" format="eps">
+</imageobject>
+<imageobject>
+<imagedata fileref="figures/pm_raw_01.gif" format="gif">
+</imageobject>
+<textobject>
+<phrase>Pitchmarks</phrase>
+</textobject>
+<caption>
+<para>
+Pitchmarks in waveform signal
+</para>
+</caption>
+</mediaobject>
+It the high and low pass filter values <varname>-lx_lf 200 -lx_hf 80</varname> 
+are in appropriate for the speakers pitch range you may get either 
+too many, or two few pitch marks. For example if we change the 
+200 to 60, we find only two pitch marks in the third vowel. 
+<mediaobject>
+<imageobject>
+<imagedata fileref="figures/pm_bad_01.eps" format="eps">
+</imageobject>
+<imageobject>
+<imagedata fileref="figures/pm_bad_01.gif" format="gif">
+</imageobject>
+<textobject>
+<phrase>bad pitchmarks</phrase>
+</textobject>
+<caption>
+<para>
+Bad pitchmarks in waveform signal
+</para>
+</caption>
+</mediaobject>
+If we zoom in our first example we get the following 
+<mediaobject>
+<imageobject>
+<imagedata fileref="figures/pm_raw_zoom01.eps" format="eps">
+</imageobject>
+<imageobject>
+<imagedata fileref="figures/pm_raw_zoom01.gif" format="gif">
+</imageobject>
+<textobject>
+<phrase>zoomed pitchmarks</phrase>
+</textobject>
+<caption>
+<para>
+Close-up of pitchmarks in waveform signal
+</para>
+</caption>
+</mediaobject>
+The pitch marks should be aligned to the largest (above zero) 
+peak in each pitch period. Here we can see there are too many pitchmarks 
+(effectively twice as many). The pitchmarks at 0.617, 0.628, 0.639 and 
+0.650 are extraneous. This means our pitch range is too wide. If 
+we rerun changing the min size, and the low frequency filter 
+<blockquote><literallayout>
+$ESTDIR/bin/pitchmark tmp$$.wav -o pm/$fname.pm -otype est \
+   -min 0.007 -max 0.012 -fill -def 0.01 -wave_end \
+   -lx_lf 150 -lx_lo 51 -lx_hf 80 -lx_ho 51 -med_o 0
+</literallayout></blockquote>
+We get the following 
+<mediaobject>
+<imageobject>
+<imagedata fileref="figures/pm_raw_zoom02.eps" format="eps">
+</imageobject>
+<imageobject>
+<imagedata fileref="figures/pm_raw_zoom02.gif" format="gif">
+</imageobject>
+<textobject>
+<phrase>zoomed pitchmarks</phrase>
+</textobject>
+<caption>
+<para>
+Close-up of pitchmarks in waveform signal (2)
+</para>
+</caption>
+</mediaobject>
+Which is better but its now missing pitchmarks towards the end of 
+the vowel, at 0.634, 0.644 and 0.656. Giving more range 
+for the min (0.005) gives slight better results, but still we 
+get bad pitchmarks. The double pitch mark problem can be lessened by 
+not only changing the range but also the amount order of the high 
+and low pass filters (effectively allowing more smoothing). Thus 
+when secondary pitchmarks appear increasing the <varname>-lx_lo</varname> parameter 
+often helps 
+<blockquote><literallayout>
+$ESTDIR/bin/pitchmark tmp$$.wav -o pm/$fname.pm -otype est \
+   -min 0.005 -max 0.012 -fill -def 0.01 -wave_end \
+   -lx_lf 150 -lx_lo 91 -lx_hf 80 -lx_ho 51 -med_o 0
+</literallayout></blockquote>
+We get the following 
+<mediaobject>
+<imageobject>
+<imagedata fileref="figures/pm_raw_zoom03.eps" format="eps">
+</imageobject>
+<imageobject>
+<imagedata fileref="figures/pm_raw_zoom03.gif" format="gif">
+</imageobject>
+<textobject>
+<phrase>zoomed pitchmarks</phrase>
+</textobject>
+<caption>
+<para>
+Close-up of pitchmarks in waveform signal (3)
+</para>
+</caption>
+</mediaobject>
+This is satisfactory this file and probably for the whole databases of 
+that speaker. Though it is worth checking a few other files to get he best 
+results. Note the by increasing the order of the filer the pitchmark 
+creep forward (which is bad). 
+</para>
+<para>
+If you feel brave (or are desperate) you can actually edit the 
+pitchmarks yourself with emulabel. We have done this occasionally 
+especially when we find persistent synthesis errors (spikes etc). 
+You can convert a pm_lab file back into its pitchmark format with 
+<blockquote><literallayout>
+bin/make_pm_pmlab pm_lab/*.lab
+</literallayout></blockquote>
+</para>
+<para>
+An post-processing step is provided that moves the predicted 
+pitchmarks to the nearest waveform peak. We find this useful for 
+both EGG extracted pitchmarks and waveform extracted ones. A 
+simple script is provided for this 
+<blockquote><literallayout>
+bin/make_pm_fix pm/*.pm
+</literallayout></blockquote>
+</para>
+<para>
+If you pitchmarks are aligning to the largest troughs rather than peaks 
+your signal is upside down (or you are erroneously using <varname>-inv</varname>. 
+If you are using <varname>-inv</varname>, don't, if you are not, then invert 
+the signal itself with 
+<blockquote><literallayout>
+for i in wav/*.wav
+do
+   ch_wave -scale -1.0 $i -o $i
+done
+</literallayout></blockquote>
+</para>
+<para>
+Note the above are quick heuristic hacks we have used when trying to 
+get pitchmarks out of wave signals. These require more work to offer a 
+more reliable solution, which we know exists. Extracting (fixed 
+frame) LPC coefficients and extracting a residual, then extracting 
+pitchmarks could give a more reliable solution but although all these 
+tools are available we have not experimented with that yet. 
+</para>
+
+</sect1>
+
+</chapter>

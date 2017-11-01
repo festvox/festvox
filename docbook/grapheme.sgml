@@ -1,0 +1,313 @@
+<chapter id="bsv-grapheme-ch">
+<title>Grapheme-based Synthesizer</title>
+
+<sect1><title>General Grapheme-based Voices</title>
+
+<para>
+This might be one of the easier ways to build a synthesizer in a
+language for which you do not have many resources.  In many cases the
+techniques described here will do well enough to provide an
+understandable useable synthesizer.  You will need audio, and
+orthography for your language though not anything else.  The
+techniques described in this chapter will provide generic phonetic
+support, but not require the construction of an explicit lexicon (though you
+could add explicit lexical entries for some words if you desire).
+</para>
+<para>
+The techniques described here are unlikely to be better than techniques that require more language support (such as phoneme sets, lexicons and higher level
+knowledge of the language) so we will also assume that the data you
+have is not the best, and will address some issues in improving the 
+quality of your data.
+</para>
+<para>
+As always, high quality recording of large phonetically balanced
+corpora by a good consistent speaker will always be best.  In our
+experience anything less that 30 minutes of actual speech (ignoring
+silence) will likely not give a good result.  Where possible the data
+must be recorded using the same channel.  Mixed-channel recordings 
+typically give much poorer results, e.g. multiple sessions, multiple
+room acoustics are likely to degrade quality.
+</para>
+<para>
+We break this chapter down into core (clustergen) building, and then
+discuss some further techniques that might be relevant to your particular
+language and how you might improve them.
+</para>
+<para>
+As with all parts of <filename>festvox</filename>: you must set the following 
+enviroment variables to where you have installed versions of 
+the Edinburgh Speech Tools, the FestVox distribution and NITECH's SPTK
+<blockquote><literallayout>
+export ESTDIR=/home/awb/projects/speech_tools
+export FESTVOXDIR=/home/awb/projects/festvox
+export SPTKDIR=/home/awb/projects/SPTK
+</literallayout></blockquote>
+</para>
+<para>
+We will use Thai as the example language, and "am" as the speaker name.
+<blockquote><literallayout>
+mkdir cmu_thai_am
+cd cmu_thai_am
+$FESTVOXDIR/src/clustergen/setup_cg cmu thai am
+</literallayout></blockquote>
+This will set up a base voice (that is incomplete, as the phoneme 
+definition is missing).  We will generate the appropriate additional
+information from the language data you have collected.
+</para>
+<para>
+We assume that you have already prepared a list of utterances and
+recorded them.  See <xref linkend="bsv-corpus-ch"> for instructions on
+designing a corpus.  We also assume that you have a prompt file is
+the txt.done.data format (with Thai encoded as unicode).
+<blockquote><literallayout>
+cp -p WHATEVER/txt.done.data etc/
+cp -p WHATEVER/wav/*.wav recording/
+</literallayout></blockquote>
+Assuming the recordings might not be as good as the could be you can
+power normalize them.
+<blockquote><literallayout>
+./bin/get_wavs recording/*.wav
+</literallayout></blockquote> 
+Also synthesis builds (especially labeling) work best if there is only
+a limited amount of leading and trailing silence.  We can do this by
+<blockquote><literallayout>
+./bin/prune_silence wav/*.wav
+</literallayout></blockquote> 
+This uses F0 extraction to estimate where the speech starts and ends.  This
+typically works well, but you should listen to the results to ensure it
+does the right thing.  The original unpruned files are saved
+in <filename>unpruned/</filename>.  A third pre-pocessing option is to shorted
+intrasentence silences, this is only desirable in non-ideal recorded data, but
+it can help labeling.
+<blockquote><literallayout>
+./bin/prune_middle_silence wav/*.wav
+</literallayout></blockquote> 
+Note if you do not require these three stages, you can put your wavefiles
+directly into <filename>wav/</filename>
+</para>
+<para>
+Now we can complete the voice templates, using the information in
+the <filename>etc/txt.done.data</filename> prompt list.
+<blockquote><literallayout>
+$FESTVOXDIR/src/grapheme/make_cg_grapheme
+</literallayout></blockquote> 
+This analyzes all the (unicode) characters in the prompt list and builds
+a mapping from the UNITRAN list of characters to phonemes.  This updates
+the templates in <filename>festvox/</filename> to prove a complete voice
+for that language.  Note that this only provides a default pronunciation
+for characters in the language, this certainly isn't suitable for numbers
+symbols etc, nor will it deal well with languages with more opaque writting
+systems (e.g. (English and Chinese).  But for many languages it gives
+a very good starting position. 
+</para>
+<para>
+Note it only deals with characters in your prompt list.  So you should ensure
+you have character coverage in your prompt list.
+</para>
+<para>
+Now you can build a voice as before.  Firsty build the prompts
+and label the data.
+<blockquote><literallayout>
+./bin/do_build build_prompts etc/txt.done.data
+./bin/do_build label etc/txt.done.data
+./bin/do_clustergen parallel build_utts etc/txt.done.data
+./bin/do_clustergen generate_statenames
+./bin/do_clustergen generate_filters
+</literallayout></blockquote> 
+Then do feature extraction
+<blockquote><literallayout>
+./bin/do_clustergen parallel f0_v_sptk
+./bin/do_clustergen parallel mcep_sptk
+./bin/do_clustergen parallel combine_coeffs_v
+</literallayout></blockquote> 
+Build the models
+<blockquote><literallayout>
+./bin/traintest etc/txt.done.data
+./bin/do_clustergen parallel cluster etc/txt.done.data.train
+./bin/do_clustergen dur etc/txt.done.data.train
+</literallayout></blockquote> 
+And generate some test examples, the first to give MCD and F0D objective
+measures, the second to generate standard tts output
+<blockquote><literallayout>
+./bin/do_clustergen cg_test resynth cgp etc/txt.done.data.test
+./bin/do_clustergen cg_test tts tts etc/txt.done.data.test
+</literallayout></blockquote> 
+</para>
+<para>
+This will generate aligned speech examples in test/cgp/*.wav, and an
+alignmend score of how well the synthesizer generated those examples in
+the text file test/cgp/scores.  Also it will generate a set of test to
+speech utterances in test/tts/*.wav which you should listen to.
+</para>
+<para>
+Note that for grapheme voices you can build with the random forest
+techniques, and it should work, though you should only try that 
+after confirming a base build works and that there are no prompts
+that cannot be processed properly.
+</para>
+
+</sect1>
+
+<sect1><title>Building Indic voices</title>
+
+<para>
+Languages of the Indian subcontinent have millions of speakers, but do not have a lot of resources and data. Some of the linguistic phenomena that occur in Indic languages include schwa deletion in Indo-Aryan languages, voicing rules in Tamil, stress patterns etc. We have a common Indic front end for building voices in these languages, with support for many of these phenomena.
+</para>
+
+<para>
+Currently, we have explicit support for Hindi, Bengali, Kannada, Tamil, Telugu and Gujarati. Rajasthani and Assamese are also included and they use the same rules as Hindi and Bengali respectively although this may not be completely accurate.
+</para>
+
+<para>This chapter describes how to build an Indic voice for the languages that are supported explicitly in Festvox and also how to add support for a new Indic language. We will use Hindi as the example language for this tutorial.
+</para>
+
+<para>
+Part 1: Building voices that have explicit support (Hindi, Bengali, Kannada, Tamil, Telugu, Gujarati, Rajasthani, Assamese)
+</para>
+
+<para>
+As with all parts of <filename>festvox</filename>: you must set the following 
+enviroment variables to where you have installed versions of 
+the Edinburgh Speech Tools, the FestVox distribution and NITECH's SPTK
+<blockquote><literallayout>
+export ESTDIR=/home/awb/projects/speech_tools
+export FESTVOXDIR=/home/awb/projects/festvox
+export SPTKDIR=/home/awb/projects/SPTK
+</literallayout></blockquote>
+</para>
+
+<para>
+<blockquote><literallayout>
+mkdir cmu_indic_ss
+cd cmu_indic_ss
+$FESTVOXDIR/src/clustergen/setup_cg cmu indic ss
+</literallayout></blockquote>
+This will set up a base Indic voice. The file that is Indic-voice specific is festvox/indic_lexicon.scm in the voice directory. The default language in the Indic lexicon is Hindi. You should change this to the language that you are working with so that the right language-specific rules are used.
+</para>
+
+<blockquote><literallayout>
+(defvar lex:language 'Hindi)
+</literallayout></blockquote>
+
+<para>
+We assume that you have already prepared a list of utterances and
+recorded them.  See <xref linkend="bsv-corpus-ch"> for instructions on
+designing a corpus.  We also assume that you have a prompt file is
+the txt.done.data format (with your Indic prompts encoded as unicode).
+<blockquote><literallayout>
+cp -p WHATEVER/txt.done.data etc/
+cp -p WHATEVER/wav/*.wav recording/
+</literallayout></blockquote>
+Assuming the recordings might not be as good as the could be you can
+power normalize them.
+<blockquote><literallayout>
+./bin/get_wavs recording/*.wav
+</literallayout></blockquote> 
+Also synthesis builds (especially labeling) work best if there is only
+a limited amount of leading and trailing silence.  We can do this by
+<blockquote><literallayout>
+./bin/prune_silence wav/*.wav
+</literallayout></blockquote> 
+This uses F0 extraction to estimate where the speech starts and ends.  This
+typically works well, but you should listen to the results to ensure it
+does the right thing.  The original unpruned files are saved
+in <filename>unpruned/</filename>.  A third pre-pocessing option is to shorted
+intrasentence silences, this is only desirable in non-ideal recorded data, but
+it can help labeling.
+<blockquote><literallayout>
+./bin/prune_middle_silence wav/*.wav
+</literallayout></blockquote> 
+Note if you do not require these three stages, you can put your wavefiles
+directly into <filename>wav/</filename>
+</para>
+
+<para>
+Now you can build a voice as before.  Firsty build the prompts
+and label the data. 
+<blockquote><literallayout>
+./bin/do_build build_prompts etc/txt.done.data
+./bin/do_build label etc/txt.done.data
+./bin/do_clustergen parallel build_utts etc/txt.done.data
+./bin/do_clustergen generate_statename
+./bin/do_clustergen generate_filters
+</literallayout></blockquote> 
+Then do feature extraction
+<blockquote><literallayout>
+./bin/do_clustergen parallel f0_v_sptk
+./bin/do_clustergen parallel mcep_sptk
+./bin/do_clustergen parallel combine_coeffs_v
+</literallayout></blockquote> 
+Build the models
+<blockquote><literallayout>
+./bin/traintest etc/txt.done.data
+./bin/do_clustergen parallel cluster etc/txt.done.data.train
+./bin/do_clustergen dur etc/txt.done.data.train
+</literallayout></blockquote> 
+And generate some test examples, the first to give MCD and F0D objective
+measures, the second to generate standard tts output
+<blockquote><literallayout>
+./bin/do_clustergen cg_test resynth cgp etc/txt.done.data.test
+./bin/do_clustergen cg_test tts tts etc/txt.done.data.test
+</literallayout></blockquote>
+This will generate aligned speech examples in test/cgp/*.wav, and an
+alignmend score of how well the synthesizer generated those examples in
+the text file test/cgp/scores.  Also it will generate a set of test to
+speech utterances in test/tts/*.wav which you should listen to.
+</para>
+
+</sect1>
+
+<sect1><title>Creating support for new Indic languages</title>
+
+<para>
+If you have a language that is not included in the set of languages with explicit support, you can add support quite easily. First, set up an Indic voice as described above and also complete steps till prune_silence with your wav files. There are three files in the festvox folder in the voice directory that you need to pay attention to: indic_lexicon.scm, indic_utf8_ord_map.scm and unicode_sampa_map_new.scm.
+</para>
+
+<para> As the names suggest, the indic_lexicon file is the one where many language-specific rules are specified. We will come back to this file later. The indic_utf8_ord_map is a mapping from the Unicode characters in the language to the corresponding ordinals. You will need to create this mapping for your language and add it to this file. You can use something like the ord() function in Python to generate this.
+</para>
+
+<para> Next, we need to map the characters in your language to the phonemes they correspond to. This is done in the unicode_sampa_map_new file. You need to map the list of ordinals that you generated earlier to SAMPA phones and add it to this file. 
+</para>
+
+<para> Lastly, you should now add language specific rules to the indic_lexicon file. First, change the name of the language which is by default Hindi. We will assume that our new language is called AnotherLang, and it has Tamil's voicing rules and Bengali's final schwa deletion rules.
+</para>
+
+<blockquote><literallayout>
+(defvar lex:language 'AnotherLang)
+</literallayout></blockquote>
+
+<blockquote><literallayout>
+(define (delete_final_schwa)
+  "(delete_final_schwa)
+Returns t if final schwa is deleted in the current language"
+  (member lex:language '(Hindi Gujarati Rajasthani Bengali Assamese AnotherLang)))
+</literallayout></blockquote>
+
+<blockquote><literallayout>
+        (if (eq lex:language 'Tamil)
+                (set! phones (tamil_voicing_postfixes phones)))
+        (if (eq lex:language 'AnotherLang)
+                (set! phones (tamil_voicing_postfixes phones)))
+</literallayout></blockquote>
+
+<para> Next, you need to define ranges of characters in your language that fall into categories like independent vowels, consonants, nukta etc. Once again, you will use the ordinals that you mapped for this. See the section of the file that begins with
+
+<blockquote><literallayout>
+(set! indic_char_type_ranges
+</literallayout></blockquote>
+</para>
+
+<para> You can also add support for saying English words that appear in your Indic language document. You can do this by mapping the SAMPA phonemes in your language to English phonemes. See the section of the file that begins with
+
+<blockquote><literallayout>
+;;; CMU SAMPA   Comments
+</literallayout></blockquote>
+</para> 
+
+<para> 
+Make other language-specific changes as shown above. Then, you can continue as usual from the build_prompts step to build your voice. If the build_prompts step has errors it means that some characters are probably missing from your mapping.
+</para>
+
+</sect1>
+
+</chapter>

@@ -1,0 +1,346 @@
+<chapter id="bsv-usukdiphone-ch">
+<title>US/UK English Diphone Synthesizer</title>
+
+<para>
+<indexterm><primary> US English voice </primary></indexterm>
+<indexterm><primary> UK English voice </primary></indexterm>
+When building a new diphone based voice for a supported language, such 
+as English, the upper parts of the systems can mostly be taken from 
+existing voices, thus making the building task simpler. Of course, 
+things can still go wrong, and its worth checking everything at each 
+stage. This section gives the basic walkthrough for building a new US 
+English voice. Support for building UK (southern, RP dialect) is also 
+provided this way. For building non-US/UK synthesizers see 
+<xref linkend="bsv-jpdiphone-ch">
+for a similar walkthrough but also covering the full text, lexicona
+nd prosody issues which we can subsume in this example. 
+</para>
+<para>
+Recording a whole diphone set usually takes a number of hours, <emphasis>if</emphasis> 
+everything goes to plan. Construction of the voice after recording may 
+take another couple of hours, though much of this is CPU bound. Then 
+hand-correction may take at least another few hours (depending on the 
+quality). Thus if all goes well it is possible to construct a new voice 
+in a day's work though usually something goes wrong and it takes longer. 
+The more time you spend making sure the data is correctly aligned and 
+labeled, the better the results will be. While something can be made 
+quickly, it can take much longer to do it very well. 
+</para>
+<para>
+For those of you who have ignored the rest of this document and are just 
+hoping to get by by reading this, good luck. It may be possible to do 
+that, but considering the time you'll need to invest to build a voice, 
+being familar with the comments, at least in the rest of this chapter, 
+may be well worth the time invested. 
+</para>
+<para>
+The tasks you will need to do are: 
+<itemizedlist mark=bullet>
+<listitem><para>
+construct basic template files
+</para></listitem>
+<listitem><para>
+generate prompts
+</para></listitem>
+<listitem><para>
+record nonsense words
+</para></listitem>
+<listitem><para>
+autolabel nonsense words
+</para></listitem>
+<listitem><para>
+generate diphone index
+</para></listitem>
+<listitem><para>
+generate pitchmarks and LPC coefficients
+</para></listitem>
+<listitem><para>
+Test, and hand fix diphones
+</para></listitem>
+<listitem><para>
+Build diphone group files and distribution
+</para></listitem>
+</itemizedlist>
+</para>
+<para>
+As with all parts of <filename>festvox</filename>, you must set the following 
+environment variables to where you have installed versions of 
+the Edinburgh Speech Tools and the festvox distribution 
+<blockquote><literallayout>
+export ESTDIR=/home/awb/projects/speech_tools
+export FESTVOXDIR=/home/awb/projects/festvox
+</literallayout></blockquote>
+The next stage is to select a directory to build the voice. You will 
+need in the order of 500M of diskspace to do this, it could 
+be done in less, but its better to have enough to start with. Make a 
+new directory and cd into it 
+<blockquote><literallayout>
+mkdir ~/data/cmu_us_awb_diphone
+cd ~/data/cmu_us_awb_diphone
+</literallayout></blockquote>
+By convention, the directory is named for the institution, the language 
+(here, <filename>us</filename> English) and the speaker 
+(<filename>awb</filename>, who actually 
+speaks with a Scottish accent). Although it can be fixed later, the 
+directory name is used when festival searches for available voices, so 
+it is good to follow this convention. 
+</para>
+<para>
+<indexterm><primary> diphone, generating skeleton files </primary></indexterm>
+<indexterm><primary> generating diphone skeleton files </primary></indexterm>
+<indexterm><primary> setup_diphone </primary></indexterm>
+Build the basic directory structure 
+<blockquote><literallayout>
+$FESTVOXDIR/src/diphones/setup_diphone cmu us awb
+</literallayout></blockquote>
+the arguments to <filename>setup_diphone</filename> are, the institution building the 
+voice, the language, and the name of the speaker. If you don't have a 
+institution we recommend you use <filename>net</filename>. There is an ISO standard 
+for language names, though unfortunately it doesn't allow distinction 
+between US and UK English, so in general we recommend you use the two 
+letter form, though for US English use <filename>us</filename> and UK English use 
+<filename>uk</filename>. The speaker name may or may nor be there actual name. 
+</para>
+<para>
+The setup script builds the basic directory structure and copies in various 
+skeleton files. For languages <filename>us</filename> and <filename>uk</filename> it copies in 
+files with much of the details filled in for those languages, for other 
+languages the skeleton files are much more skeletal. 
+</para>
+<para>
+<indexterm><primary> English voice requirements </primary></indexterm>
+For constructing a <filename>us</filename> voice you must have the following installed 
+in your version of festival 
+<blockquote><literallayout>
+festvox_kallpc16k
+festlex_POSLEX
+festlex_CMU
+</literallayout></blockquote>
+And for a UK voice you need 
+<blockquote><literallayout>
+festvox_rablpc16k
+festlex_POSLEX
+festlex_OALD
+</literallayout></blockquote>
+At run-time the two appropriate festlex packages (POSLEX + dialect 
+specific lexicon) will be required but not the existing kal/rab voices. 
+</para>
+<para>
+<indexterm><primary> diphone schema </primary></indexterm>
+<indexterm><primary> nonsense word list </primary></indexterm>
+To generate the nonsense word list 
+<blockquote><literallayout>
+festival -b festvox/diphlist.scm festvox/us_schema.scm \
+     '(diphone-gen-schema "us" "etc/usdiph.list")'
+</literallayout></blockquote>
+<indexterm><primary> nonsense word prompts </primary></indexterm>
+We use a synthesized voice to build waveforms of the prompts, both for 
+actual prompting and for alignment. If you want to 
+change the prompt voice (e.g. to a female) edit <filename>festvox/us_schema.scm</filename>. 
+Near the end of the file is the function <varname>Diphone_Prompt_Setup</varname>. 
+By default (for US English) the voice <varname>(voice_kal_diphone)</varname> is 
+called. Change that, and the F0 value in the following line, if appropriate, 
+to the voice use wish to follow. 
+</para>
+<para>
+Then to synthesize the prompts 
+<blockquote><literallayout>
+festival -b festvox/diphlist.scm festvox/us_schema.scm \
+      '(diphone-gen-waves "prompt-wav" "prompt-lab" "etc/usdiph.list")'
+</literallayout></blockquote>
+</para>
+<para>
+<indexterm><primary> recording nonsense words </primary></indexterm>
+Now record the prompts. Care should be taken to set up the recording 
+environment so it is best. Note all power levels so that if more than 
+one session is required you can continue and still get the same 
+recording quality. Given the length of the US English list, its 
+unlikely a person can say allow of these in one sitting without taking 
+breaks at least, so ensuring the environment can be duplicated is 
+important, even if it's only after a good stretch and a drink of water. 
+<blockquote><literallayout>
+bin/prompt_them etc/usdiph.list
+</literallayout></blockquote>
+Note a third argument can be given to state which nonse word to begin 
+prompting from. This if you have already recorded the first 100 you 
+can continue with 
+<blockquote><literallayout>
+bin/prompt_them etc/usdiph.list 101
+</literallayout></blockquote>
+See <xref linkend="bsv-usphoneset-sect"> for notes on pronunciation (or 
+<xref linkend="bsv-ukphoneset-sect"> for the UK version). 
+</para>
+<para>
+<indexterm><primary> autolabeling nonsense words </primary></indexterm>
+The recorded prompts can the be labeled by 
+<blockquote><literallayout>
+bin/make_labs prompt-wav/*.wav
+</literallayout></blockquote>
+Its is always worthwhile correcting the autolabeling. Use 
+<blockquote><literallayout>
+emulabel etc/emu_lab
+</literallayout></blockquote>
+and select <varname>FILE OPEN</varname> from the top menu bar and the place the 
+other dialog box and clink inside it and hit return. A list of all 
+label files will be given. Double-click on each of these to see the 
+labels, spectragram and waveform. (** reference to "How to correct 
+labels" required **). 
+</para>
+<para>
+Once the diphone labels have been corrected, the diphone index may be 
+built by 
+<blockquote><literallayout>
+bin/make_diph_index etc/usdiph.list dic/awbdiph.est
+</literallayout></blockquote>
+</para>
+<para>
+<indexterm><primary> pitchmarks from waveforms </primary></indexterm>
+If no EGG signal has been collected you can extract the 
+pitchmarks by (though read <xref linkend="bsv-pitchmarks-sect">
+to ensure you are getting the best exteraction). 
+<blockquote><literallayout>
+bin/make_pm_wave wav/*.wav
+</literallayout></blockquote>
+If you do have an EGG signal then use the following instead 
+<blockquote><literallayout>
+bin/make_pm lar/*.lar
+</literallayout></blockquote>
+A program to move the predicted pitchmarks to the nearest 
+peak in the waveform is also provided. This is almost always 
+a good idea, even for EGG extracted pitch marks 
+<blockquote><literallayout>
+bin/make_pm_fix pm/*.pm
+</literallayout></blockquote>
+Getting good pitchmarks is important to the quality of the synthesis, 
+see <xref linkend="bsv-pitchmarks-sect"> for more discussion. 
+</para>
+<para>
+Because there is often a power mismatch through a set of diphone 
+we provided a simple method for finding what general power difference 
+exist between files. This finds the mean power for each vowel in 
+each file and calculates a factor with respect to the overall mean 
+vowel power. A table of power modifiers for each file can 
+be calculated by 
+<blockquote><literallayout>
+bin/find_powerfactors lab/*.lab
+</literallayout></blockquote>
+The factors calculated by this are saved in <filename>etc/powfacts</filename>. 
+</para>
+<para>
+Then build the pitch-synchronous LPC coefficients, which use 
+the power factors if they've been calculated. 
+<blockquote><literallayout>
+bin/make_lpc wav/*.wav
+</literallayout></blockquote>
+</para>
+<para>
+<indexterm><primary> testing a generated voice </primary></indexterm>
+Now the database is ready for its initial tests. 
+<blockquote><literallayout>
+festival festvox/cmu_us_awb_diphone.scm '(voice_cmu_us_awb_diphone)'
+</literallayout></blockquote>
+When there has been no hand correction of the labels this stage may fail 
+with diphones not having proper start, mid and end values. This happens 
+when the automatic labeled has position two labels at the same point. 
+For each diphone that has a problem find out which file it comes from 
+(grep for it in <filename>dic/awbdiph.est</filename> and use <filename>emulabel</filename> to change 
+the labeling to as its correct. For example suppose "ah-m" is wrong 
+you'll find is comes from <filename>us_0314</filename>. Thus type 
+<blockquote><literallayout>
+emulabel etc/emu_lab us_0314
+</literallayout></blockquote>
+After correcting labels you must re-run the <filename>make_diph_index</filename> 
+command. You should also re-run the <filename>find_powerfacts</filename> stage 
+and <filename>make_lpc</filename> stages as these too depend on the labels, but 
+this takes longer to run and perhaps that need only be done when 
+you've corrected many labels. 
+</para>
+<para>
+To test the voice's basic functionality with 
+<blockquote><literallayout>
+festival> (SayPhones '(pau hh ax l ow pau))
+
+festival> (intro)
+</literallayout></blockquote>
+As the autolabeling is unlikely to work completely you should 
+listen to a number of examples to find out what diphones have 
+gone wrong. 
+</para>
+<para>
+<indexterm><primary> making a diphone group file </primary></indexterm>
+<indexterm><primary> group files </primary></indexterm>
+Finally, once you have corrected the errors (did we mention you need to 
+check and correct the errors?), you can build a final voice suitable for 
+distribution. First you need to create a group file which contains only 
+the subparts of spoken words which contain the diphones. 
+<blockquote><literallayout>
+festival festvox/cmu_us_awb_diphone.scm '(voice_cmu_us_awb_diphone)'
+...
+festival (us_make_group_file "group/awblpc.group" nil)
+...
+</literallayout></blockquote>
+The <varname>us_</varname> in this function name confusingly stands for 
+<varname>UniSyn</varname> (the unit concatenation subsystem in Festival) and nothing 
+to do with US English. 
+</para>
+<para>
+To test this edit <filename>festvox/cmu_us_awb_diphone.scm</filename> and 
+change the choice of databases used from separate to grouped. This is 
+done by commenting out the line (around line 81) 
+<blockquote><literallayout>
+(set! cmu_us_awb_db_name (us_diphone_init cmu_us_awb_lpc_sep))
+</literallayout></blockquote>
+and uncommented the line (around line 84) 
+<blockquote><literallayout>
+(set! cmu_us_awb_db_name (us_diphone_init cmu_us_awb_lpc_group))
+</literallayout></blockquote>
+<indexterm><primary> adding a voice to festival </primary></indexterm>
+The next stage is to integrate this new voice so that festival can find 
+it automatically. To do this, you should add a symbolic link from the 
+voice directory of Festival's English voices to the directory containing 
+the new voice. First cd to festival's voice directory (this will vary 
+depending on where you installed festival) 
+<blockquote><literallayout>
+cd /home/awb/projects/festival/lib/voices/english/
+</literallayout></blockquote>
+add a symbolic link back to where your voice was built 
+<blockquote><literallayout>
+ln -s /home/awb/data/cmu_us_awb_diphone
+</literallayout></blockquote>
+Now this new voice will be available for anyone runing that version festival 
+(started from any directory) 
+<blockquote><literallayout>
+festival
+...
+festival> (voice_cmu_us_awb_diphone)
+...
+festival> (intro)
+...
+</literallayout></blockquote>
+<indexterm><primary> building a voice distribution </primary></indexterm>
+The final stage is to generate a distribution file so the voice may 
+be installed on other's festival installations. Before you do 
+this you must add a file <filename>COPYING</filename> to the directory you 
+built the diphone database in. This should state the terms and conditions 
+in which people may use, distribute and modify the voice. 
+</para>
+<para>
+Generate the distribution tarfile in the directory above the festival 
+installation (the one where <filename>festival/</filename> and <filename>speech_tools/</filename> 
+directory is). 
+<blockquote><literallayout>
+cd /home/awb/projects/
+tar zcvf festvox_cmu_us_awb_lpc.tar.gz \
+  festival/lib/voices/english/cmu_us_awb_diphone/festvox/*.scm \
+  festival/lib/voices/english/cmu_us_awb_diphone/COPYING \
+  festival/lib/voices/english/cmu_us_awb_diphone/group/awblpc.group
+</literallayout></blockquote>
+</para>
+<para>
+<indexterm><primary> diphone example </primary></indexterm> The
+complete files from building an example US voice based on the KAL
+recordings is available at <ulink
+url="http://festvox.org/examples/cmu_us_kal_diphone/">http://festvox.org/examples/cmu_us_kal_diphone/</ulink>.
+</para>
+
+</chapter>

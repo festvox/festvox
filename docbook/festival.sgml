@@ -1,0 +1,1039 @@
+<chapter id="bsv-festival-ch">
+<title>A Practical Speech Synthesis System</title>
+
+<para>
+The <ulink url="http://www.cstr.ed.ac.uk/projects/festival/">
+Festival Speech Synthesis Systems</ulink> was developed at the <ulink
+url="http://www.cstr.ed.ac.uk">Centre for Speech Technology
+Reseach</ulink> at the <ulink url="http://www.ed.ac.uk/">University of
+Edinburgh</ulink> in the late 90's.  It offers a free, portable,
+language independent, run-time speech synthesis engine for verious
+platforms under various APIs.  This book is not about the Festival
+system itself, Festival is just the engine that we will use in the
+process of building voices, both as a run-time engine for the voices
+we build and as a tool in the building process itself.  This chapter
+gives a background on the philosophy of the system, its basic use, and
+some lower level details on its internals that will make the
+understanding of the whole synthesis task easier.
+</para>
+<para>
+The Festival Speech Synthesis System was designed to target three
+particular classes of speech synthesis user.
+<orderedlist numeration="arabic">
+<listitem>
+<para>
+Speech synthesis researchers: where they may use Festival as a vehicle
+for developmeent and testing of new research in synthesis technology.
+</para>
+</listitem>
+<listitem>
+<para>
+Speech application developers: where synthesis is not the primary
+interest, but Festival will be a substantial sub-component which may
+require significant integration and hence the system must be open and
+easily configurable.
+</para>
+</listitem>
+<listitem>
+<para>
+End user: where the system simple takes text and generates speech,
+requiring no or very little configuration from the user.
+</para>
+</listitem>
+</orderedlist>
+</para>
+<para>
+In the design of Festival it was important that all three classes of
+user were served as there needs to be a clear route from research work
+to practial usable systems as this not only encourages research to be
+focussed but also, as has been shown by the large uptake of the
+system, ensures there is a large user community interested in
+seeing improvements to the system.
+</para>
+<para>
+The Festival Speech Synthesis System was built based on the experience
+of previous synthesis engines.  Design of a key architecture is
+important as what may seem general to begin with can quickly become a
+limiting factor, as new and more ambitious techniques are attempted
+within it.  The basic architecture of Festival benefited mainly from
+previous synthesis engines developed at Edinburgh University,
+specifically Osprey <citation>taylor91</citation>.  ATR's CHATR
+system, <citation>black94</citation> was also a major influence on
+Festival, CHATR's original core architecture was also developed by the
+same authors as Festival.  In designing Festival, the intention was to
+avoid the previous limitations in the utterance
+representation and module specification, specifically in avoiding
+constraints on the types of modules and dependencies between them.
+However even with this intent, Festival went through a number of core
+changes before it settled.
+</para>
+<para>
+The Festival system consists of a set of C++ objects and core methods
+suitable for doing synthesis tasks.  These objects include synthesis
+specific objects like, waveforms, tracks and utterances as well as
+more general objects like feature sets, n-grams, and decision trees.
+</para>
+<para>
+In order to give parameters and specify flow of control Festival
+offers a scripting language based on the Scheme programming language
+<citation>Scheme96</citation>.  Having a scripting language is one of
+the key factors that makes Festival a useful system.  Most of the
+techniques in this book for building new voices within Festival can be
+done without any changes to the core C++ objects.  This makes
+development of new voices not only more accessible to a larger
+population or users, as C++ knowledge nor a C++ compiler is necessary,
+it also makes the distribution of voices built by these techniques
+easy as users do not require any recompilation to use newly created
+voices.
+</para>
+<para>
+Scheme offers a very simple syntax but powerful language for
+specifying parameters and simple functions.  Scheme was chosen as its
+implementation is small and would not increase the size of the
+Festival system unnecessarily.  Also, using an embedded Scheme
+component does not increase the requirements for installation as would
+the use of say Java, Perl or Python as the scripting language.  Scheme
+frightens some people as Lisp based languages have an unfair
+reputation for being slow.  Festival's use of Scheme is (in general)
+limited to simple functions and very little time is spent in the
+Scheme interpreter itself.  Automatic garbage collection also has a
+reputation for slowing systems down.  In Festival, garbage collection
+happens after each utterance is synthesized and again takes up only a
+small amount of time but allows the programmer nor to have to worry
+about explicitly freeing memory.
+</para>
+<para>
+For the most part the third type of user, defined above, will never
+need to change any part of the systems (though they usually find
+something they want to change, like adding new entries to the
+lexicon).  The second level of user typically does most of their
+customizing in Scheme, though this is usually just modifying existing
+pieces of Scheme in the way that people may add simple lines of Lisp
+to their <filename>.emacs</filename> file.  It is primarily only the
+synthesis research community that has to deal with the C++ end of the
+system, though C/C++ interfaces to the systems as a library are also
+provided (see <xref linkend="bsv-festman-ch"> for more discussions
+on APIs).
+</para>
+<para>
+This chapter covers the basic use of the system and is followed by
+more details of the internal structures, particularly the utterance
+sturcture, accessing methods and modules.  These later sections are
+probably more detail than one needs for building standard voices
+described in the book, but the is information is necessary when more
+ambituous voice building tasks are attempted.
+</para>
+
+<sect1><title>Basic Use</title>
+
+<para>
+The examples here are given based on a standard installation on a Unix
+system as described in <xref linkend="bsv-install-ch">, however the
+examples are likely to work under any platform Festival supports.
+</para>
+<para>
+The most simple way to use Festival to speak a file from
+the command line, is by the command
+<blockquote><literallayout>
+festival --tts example.txt
+</literallayout></blockquote>
+This will speak the text in <filename>example.txt</filename>
+using the default voice.
+</para>
+<para>
+Festival can also read text from <filename>stdin</filename> using
+a command like
+<blockquote><literallayout>
+echo "Hello world" | festival --tts
+</literallayout></blockquote>
+</para>
+<para>
+Festival actually offers two modes, a <firstterm>text mode</firstterm>
+and a <firstterm>command mode</firstterm>.  In text mode everything
+given to Festival is treated as text to be spoken.  In comamnd mode
+everything is treated as Scheme commands and interpreted.
+</para>
+<para>
+When festival is started with no arguments if goes into interactive
+command mode.  There you may type Scheme command and have Festival
+interpret them.  For example
+<blockquote><literallayout>
+$ festival
+....
+festival>
+</literallayout></blockquote>
+One simple command is <computeroutput>SayText</computeroutput> takes
+a single string argument and says its contents.
+<blockquote><literallayout>
+festival> (SayText "Hello world.")
+#&lt;Utterance 0x402a9ce8>
+festival>
+</literallayout></blockquote>
+You may select other voices for synthesis by calling the appropriate
+function.  For example
+<blockquote><literallayout>
+festival> (voice_cmu_sls_diphone)
+cmu_us_sls_diphone
+festival> (SayText "Hello world.")
+#&lt;Utterance 0x402f0648>
+festival> 
+</literallayout></blockquote>
+Will use a female US English voice (if installed).
+</para>
+<para>
+The command line interface offers comand line history though the up
+and down arrows (ctrl-P and ctrl-N) and editing through standard
+<command>emacs</command>-like commands.  Importantly the interface does
+function and filename completion too, using the <keycap>TAB</keycap>
+key.
+</para>
+<para>
+Any Scheme command may be typed at the command line for example
+<blockquote><literallayout>
+festival> (Parameter.set 'Duration_Stretch 1.5)
+1.5
+festival> 
+</literallayout></blockquote>
+Will make all durations longer for the current voice (making the voice 
+speak slower.
+<blockquote><literallayout>
+festival> (SayText "a very slow example.")
+#&lt;Utterance 0x402f564376>
+festival> 
+</literallayout></blockquote>
+Calling any specific voice will reset this value (or you
+may do it by hand).
+<blockquote><literallayout>
+festival> (voice_cmu_us_kal_diphone)
+cmu_us_kal_diphone
+festival> (SayText "a normal example.")
+#&lt;Utterance 0x402e3348>
+festival> 
+</literallayout></blockquote>
+</para>
+<para>
+The <computeroutput>SayText</computeroutput> is just a simple function
+that takes the given string, constructs an utterance object from is,
+synthesizes it and sends the resulting waveform to the audio device.
+This isn't really suitable for synthesizing anythign but very short
+utterances. The TTS process involves the more complex task of
+splitting text streams into utterance synthesizing them and sendthem
+to the audio device to they may play as the same time working on the
+next utterance to that the audio output is continuous.  Festival does
+this through the <computeroutput>tts</computeroutput> function (which
+is what is actually called when Festival is given the <computeroutput>
+--tts</computeroutput> argument on the command line.  In Scheme the
+<computeroutput>tts</computeroutput> funciton takes two arguments, a
+filename and a mode.  Modes are described in more detail in <xref
+linkend="bsv-ttsmodes-sect">, and can be used to allow special
+processing of text, such as respecting markup or particular styles of
+text like email etc.  In simple case the mode will be
+<computeroutput>nil</computeroutput> which denotes the basic raw
+or fundamental mode.
+<blockquote><literallayout>
+festival> (tts "WarandPeace.txt" nil)
+t
+festival> 
+</literallayout></blockquote>
+</para>
+<para>
+Commands can also be stored in files, which is normal when a number
+of function definitions and parameter settings are required.  These
+scheme files can be loaded by the function
+<computeroutput>SayText</computeroutput> as in
+<blockquote><literallayout>
+festival> (load "commands.scm")
+t
+festival> 
+</literallayout></blockquote>
+Arguments to Festival at startup time will normally
+be treated as command files and loaded.  
+<blockquote><literallayout>
+$ festival commands.scm
+...
+festival>
+</literallayout></blockquote>
+However if the argument starts with a left parenthesis
+<computeroutput>(</computeroutput> the argument is interpreted directly 
+as a Scheme command.
+<blockquote><literallayout>
+$ festival '(SayText "a short example.")'
+...
+festival>
+</literallayout></blockquote>
+If the <computeroutput>-b</computeroutput> (batch) option is
+specified Festival does not go into interactive mode and exits after
+processing all of the given arguments.
+</para>
+<blockquote><literallayout>
+$ festival -b mynewvoicedefs.scm '(SayText "a short example.")'
+</literallayout></blockquote>
+<para>
+Thus we can use Festival interactively or simple as a batch scripting
+language.  The batch format will be used often in the voice building
+process though the intereactive mode is useful for testing new voices.
+</para>
+
+</sect1>
+
+<sect1>
+<title>Utterance structure</title>
+
+<para>
+<indexterm><primary> utterance </primary></indexterm>
+<indexterm><primary> relations </primary></indexterm>
+<indexterm><primary> items </primary></indexterm>
+The basic building block for Festival is the <emphasis>utterance</emphasis>. The 
+structure consists of a set of <emphasis>relations</emphasis> over a set of 
+<emphasis>items</emphasis>. Each item represents a object such as a word, segment, 
+syllable, etc. while relations relate these items together. An item may 
+appear in multiple relations, such as a segment will be in a 
+<varname>Segment</varname> relation and also in the <varname>SylStructure</varname> relation. 
+Relations define an ordered structure over the items within them, in 
+general these may be arbitrary graphs but in practice so far we have 
+only used <emphasis>lists</emphasis> and <emphasis>trees</emphasis> Items may contain a number of 
+features. 
+</para>
+<para>
+There are no built-in relations in Festival and the names and use of 
+them is controlled by the particular modules used to do synthesis. 
+Language, voice and module specific relations can easy be created and 
+manipulated. However within our basic voices we have followed a number 
+of conventions that should be followed if you wish to use some of the 
+existing modules. 
+</para>
+<para>
+<indexterm><primary> basic relations </primary></indexterm>
+The relation names used will depend on the particular structure chosen 
+for your voice. So far most of our released voices have the same 
+basic structure though some of our research voices contain quite 
+a different set of relations. For our basic English voices the 
+relations used are as follows 
+<variablelist>
+<varlistentry>
+<term><varname>Text</varname></term>
+<listitem><para>
+<indexterm><primary> Text relation </primary></indexterm>
+Contains a single item which contains a feature with the input character 
+string that is being synthesized 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>Token</varname></term>
+<listitem><para>
+<indexterm><primary> Token relation </primary></indexterm>
+A list of trees where each root of each tree is the white space 
+separated tokenized object from the input character string. Punctuation 
+and whitespace has been stripped and placed on features on these token 
+items. The daughters of each of these roots are the list of words 
+that the token is associated with. In many cases this is a one 
+to one relationship, but in general it is one to zero or 
+more. For example tokens comprising of digits will typically 
+be associated with a number of words. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>Word </varname></term>
+<listitem><para>
+<indexterm><primary> Word relation </primary></indexterm>
+<indexterm><primary> words </primary></indexterm>
+The words in the utterance. By <emphasis>word</emphasis> we typically mean something 
+that can be given a pronunciation from a lexicon (or letter-to-sound 
+rules). However in most of our voices we distinguish pronunciation by 
+the words and a part of speech feature. Words with also be leaves of the 
+<varname>Token</varname> relation, leaves of the <varname>Phrase</varname> relation and roots of 
+the <varname>SylStructure</varname> relation. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>Phrase</varname></term>
+<listitem><para>
+<indexterm><primary> Phrase relation </primary></indexterm>
+A simple list of trees representing the prosodic phrasing on the 
+utterance. In our voices we only have one level of prosodic phrase 
+below the utterance (though you can easily add a deeper hierarchy 
+if your models require it). The tree roots are labeled with 
+the phrase type and the leaves of these trees are in the 
+<varname>Word</varname> relation. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>Syllable </varname></term>
+<listitem><para>
+<indexterm><primary> Syllable relation </primary></indexterm>
+A simple list of syllable items. These syllable items are intermediate 
+nodes in the <varname>SylStructure</varname> relation allowing access to the words 
+these syllables are in and the segments that are in these syllables. 
+In this format no further onset/coda distinction is made explicit but can 
+be derived from this information. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>Segment </varname></term>
+<listitem><para>
+<indexterm><primary> Segment relation </primary></indexterm>
+A simple list of segment (phone) items. These form the leaves of 
+the <varname>SylStructure</varname> relation through which we can find where each 
+segment is placed within its syllable and word. By convention 
+silence phones do not appear in any syllable (or word) but will 
+exist in the segment relation. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>SylStructure</varname></term>
+<listitem><para>
+<indexterm><primary> SylStructure relation </primary></indexterm>
+A list of tree structures over the items in the <varname>Word</varname>, 
+<varname>Syllable</varname> and <varname>Segment</varname> items. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>IntEvent</varname></term>
+<listitem><para>
+<indexterm><primary> IntEvent relation </primary></indexterm>
+A simple list of intonation events (accents and boundaries). 
+These are related to syllables through the <varname>Intonation</varname> relation. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>Intonation</varname></term>
+<listitem><para>
+<indexterm><primary> Intonation relation </primary></indexterm>
+A list of trees whose roots are items in the <varname>Syllable</varname> relation, 
+and daughters are in the <varname>IntEvent</varname> relation. It is assumed that a 
+syllable may have a number of intonation events associated with it (at 
+least accents and boundaries), but an intonation event may only by 
+associated with one syllable. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>Wave</varname></term>
+<listitem><para>
+<indexterm><primary> Wave relation </primary></indexterm>
+A relation consisting of a single item that has a feature with the 
+synthesized waveform. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>Target</varname></term>
+<listitem><para>
+<indexterm><primary> Target relation </primary></indexterm>
+A list of trees whose roots are segments and daughters are 
+F0 target points. This is only used by some intonation modules. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>Unit, SourceSegments, Frames, SourceCoef TargetCoef</varname></term>
+<listitem><para>
+A number of relations used the the <varname>UniSyn</varname> module. 
+</para></listitem></varlistentry>
+</variablelist>
+</para>
+</sect1>
+
+<sect1><title>Modules</title>
+
+<para>
+<indexterm><primary> modules </primary></indexterm>
+The basic synthesis process in Festival is viewed as applying 
+a set of <emphasis>modules</emphasis> to an utterance. Each module will access 
+various relations and items and potentially generate new features, 
+items and relations. Thus as the modules are applied the utterance 
+structure is filled in with more and more relations until 
+ultimately the waveform is generated. 
+</para>
+<para>
+<indexterm><primary> utterance types </primary></indexterm>
+Modules may be written in C++ or Scheme. Which modules are executed are 
+defined in terms of the utterance <varname>type</varname>, a simple feature on the 
+utterance itself. For most text-to-speech cases this is defined to be 
+of type <varname>Tokens</varname>. The function <varname>utt.synth</varname> simply looks up an 
+utterance's type and then looks up the definition of the defined 
+synthesis process for that type and applies the named modules. 
+Synthesis types maybe defined using the function <varname>defUttType</varname>. 
+For example definition for utterances of type <varname>Tokens</varname> 
+is 
+<blockquote><literallayout>
+(defUttType Tokens
+  (Token_POS utt) 
+  (Token utt)        
+  (POS utt)
+  (Phrasify utt)
+  (Word utt)
+  (Pauses utt)
+  (Intonation utt)
+  (PostLex utt)
+  (Duration utt)
+  (Int_Targets utt)
+  (Wave_Synth utt)
+  )
+</literallayout></blockquote>
+While a simpler case is when the input is phone names 
+and we don't wish to do all that text analysis and prosody 
+prediction. Then we use the type <varname>Phones</varname> which simply 
+loads the phones, applies fixed prosody and the synthesizes 
+the waveform 
+<blockquote><literallayout>
+(defUttType Phones
+  (Initialize utt)
+  (Fixed_Prosody utt)
+  (Wave_Synth utt)
+  )
+</literallayout></blockquote>
+In general the modules named in the type definitions are general and 
+actually allow further selection of more specific modules within 
+them. For example the <varname>Duration</varname> module respects the global 
+parameter <varname>Duration_Method</varname> and will call then desired duration 
+module depending on this value. 
+</para>
+<para>
+When building a new voice you will probably not need to change any of 
+these definitions, though you may wish to add a new module and we will 
+show how to do that without requiring any change to the synthesis 
+definitions in a later chapter. 
+</para>
+<para>
+There are many modules in the system, some simply wraparounds 
+to choose between other modules. However the basic modules 
+used for text-to-speech have the basic following function 
+<variablelist>
+<varlistentry>
+<term><varname>Token_POS</varname></term>
+<listitem><para>
+<indexterm><primary> Token_POS module </primary></indexterm>
+basic token identification, used for homograph disambiguation 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>Token</varname></term>
+<listitem><para>
+<indexterm><primary> Token module </primary></indexterm>
+Apply the token to word rules building the <varname>Word</varname> relation. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>POS</varname></term>
+<listitem><para>
+<indexterm><primary> POS module </primary></indexterm>
+<indexterm><primary> port of speech tagging </primary></indexterm>
+A standard part of speech tagger (if desired) 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>Phrasify</varname></term>
+<listitem><para>
+<indexterm><primary> Phrasify module </primary></indexterm>
+Build the <varname>Phrase</varname> relation using the specified method. Various 
+are offered, from statistically trained models to simple CART trees. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>Word</varname></term>
+<listitem><para>
+<indexterm><primary> Word module </primary></indexterm>
+Lexical look up building the <varname>Syllable</varname> and <varname>Segment</varname> 
+relations and the <varname>SylStructure</varname> related these together. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>Pauses</varname></term>
+<listitem><para>
+<indexterm><primary> Pauses module </primary></indexterm>
+Prediction of pauses, inserting silence into the <varname>Segment</varname> 
+relation, again through a choice of different prediction mechanisms. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>Intonation</varname></term>
+<listitem><para>
+<indexterm><primary> Intonation module </primary></indexterm>
+Prediction of accents and boundaries, building the <varname>IntEvent</varname> 
+relation and the <varname>Intonation</varname> relation that links IntEvents 
+to syllables. This can easily be parameterized for most practical 
+intonation theories. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>PostLex</varname></term>
+<listitem><para>
+<indexterm><primary> PostLex module </primary></indexterm>
+Post lexicon rules that can modify segments based on their 
+context. This is used for things like vowel reduction, 
+contractions, etc. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>Duration</varname></term>
+<listitem><para>
+<indexterm><primary> Duration module </primary></indexterm>
+Prediction of durations of segments. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>Int_Targets</varname></term>
+<listitem><para>
+<indexterm><primary> Int_Targets module </primary></indexterm>
+The second part of intonation. This creates the <varname>Target</varname> 
+relation representing the desired F0 contour. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>Wave_Synth</varname></term>
+<listitem><para>
+<indexterm><primary> Wave_Synth module </primary></indexterm>
+A rather general function that in turn calls the appropriate 
+method to actually generate the waveform. 
+</para></listitem></varlistentry>
+</variablelist>
+</para>
+</sect1>
+
+<sect1><title>Utterance access</title>
+
+<para>
+<indexterm><primary> utterance access </primary></indexterm>
+A set of simple access methods exist for utterances, relations, 
+items and features, both in Scheme and C++. As much as possible these 
+access methods are as similar as possible. 
+</para>
+<para>
+As the users of this document will primarily be accessing utterance via 
+Scheme we will describe the basic Scheme functions available for access 
+and give some examples of idioms to achieve various standard functions. 
+</para>
+<para>
+In general the required arguments to a lisp function are reflected in 
+the first parts of the name of the function. Thus 
+<varname>item.relation.next</varname> requires an item, and relation name and will 
+return the next item in that named relation from the given one. 
+</para>
+<para>
+A listing a short description of the major utterance access and 
+manipulation functions is given in the Festival manual. 
+</para>
+<para>
+An important notion to be aware of is that an item is always viewed 
+through so particular relation. For example, assuming 
+a typically utterance called <varname>utt1</varname>. 
+<blockquote><literallayout>
+(set! seg1 (utt.relation.first utt1 'Segment))
+</literallayout></blockquote>
+<varname>seg1</varname> is an item viewed from the <varname>Segment</varname> relation. Calling 
+<varname>item.next</varname> on this will return the next item in the <varname>Segment</varname> 
+relation. A <varname>Segment</varname> item may also be in the <varname>SylStructure</varname> 
+item. If we traverse it using next in that relation we will hit 
+the end when we come to the end of the segments in that syllable. 
+</para>
+<para>
+<indexterm><primary> item views </primary></indexterm>
+You may <emphasis>view</emphasis> a given item from a specified relation by 
+requesting a view from that. In Scheme <varname>nil</varname> will 
+be returned if the item is not in the relation. The 
+function <varname>item.relation</varname> takes an item and relation 
+name and returns the item as view from that relation. 
+</para>
+<para>
+Here is a short example to help illustrate the basic 
+structure. 
+<blockquote><literallayout>
+(set! utt1 (utt.synth (Utterance Text "A short example.")))
+</literallayout></blockquote>
+The first segment in <varname>utt!</varname> will be silence. 
+<blockquote><literallayout>
+(set! seg1 (utt.relation.first utt1 'Segment))
+</literallayout></blockquote>
+This item will be a silence as can shown by 
+<blockquote><literallayout>
+(item.name seg1)
+</literallayout></blockquote>
+If we find the next item we will get the schwa representing the 
+indefinite article. 
+<blockquote><literallayout>
+(set! seg2 (item.next seg1))
+(item.name seg2)
+</literallayout></blockquote>
+Let us move onto the "sh" to illustrate the different between 
+traversing the <varname>Segment</varname> relation as opposed to the 
+<varname>SylStructure</varname> 
+<blockquote><literallayout>
+(set! seg3 (item.next seg2))
+</literallayout></blockquote>
+Let use define a function which will take an item, print its 
+name name call next on it <emphasis>in the same relation</emphasis> and 
+continue until it reaches the end. 
+<blockquote><literallayout>
+(define (toend item) 
+  (if item
+      (begin
+       (print (item.name item))
+       (toend (item.next item)))))
+</literallayout></blockquote>
+If we call this function on <varname>seg3</varname> which is in the <varname>Segment</varname> 
+relation we will get a list of all segments until the end of the utterance 
+<blockquote><literallayout>
+festival> (toend seg3)
+"sh"
+"oo"
+"t"
+"i"
+"g"
+"z"
+"aa"
+"m"
+"p"
+"@"
+"l"
+"#"
+nil
+festival>
+</literallayout></blockquote>
+However if we first changed the view of seg3 to the <varname>SylStructure</varname> 
+relation we will be traversing the leaf nodes of the syllable structure 
+tree which will terminate at the end of that syllable. 
+<blockquote><literallayout>
+festival> (toend (item.relation seg3 'SylStructure)
+"sh"
+"oo"
+"t"
+nil
+festival> 
+</literallayout></blockquote>
+Note that <varname>item.next</varname> returns the item immediately to the next in 
+that relation. Thus it return <varname>nil</varname> when the end of a sub-tree is 
+found. <varname>item.next</varname> is most often used for traversing simple lists 
+through it is defined for any of the structure supported by relations. 
+The function <varname>item.next_item</varname> allows traversal of any relation 
+returning a next item until it has visiting them all. In the simple 
+list case this this equivalent to <varname>item.next</varname> but in the tree case 
+it will traverse the tree in <emphasis>pre-order</emphasis> that is it will visit 
+roots before their daughters, and before their next siblings. 
+</para>
+<para>
+<indexterm><primary> relation traversal </primary></indexterm>
+<indexterm><primary> traversing a relation </primary></indexterm>
+Scheme is particularly adept at using functions as first class 
+objects. A typical traversal idiom is to apply so 
+function to each item in a a relation. For example support 
+we have a function <emphasis>PredictDuration</emphasis> which takes a single item 
+and assigns a duration. We can apply this to each item in the 
+<varname>Segment</varname> relation 
+<blockquote><literallayout>
+(mapcar
+ PredictDuration
+ (utt.relation.items utt1 'Segment))
+</literallayout></blockquote>
+The function <varname>utt.relation.items</varname> returns all items in the 
+relation as a simple lisp list. 
+</para>
+<para>
+Another method to traverse the items in a relation is use 
+the <varname>while</varname> looping paradigm which many people are more 
+familiar with. 
+<blockquote><literallayout>
+(let ((f (utt.relation.first utt1 'Segment)))
+  (while f
+   (PredictDuration f)
+   (set! f (item.next_item f))))
+</literallayout></blockquote>
+</para>
+<para>
+If you wish to traverse only the leaves of a tree you 
+may call <varname>utt.relation.leafs</varname> instead of 
+<varname>utt.relation.items</varname>. A leaf is defined to be an item with 
+no daughters. Or in the <varname>while</varname> case, there isn't standardly 
+defined a <varname>item.next_leaf</varname> but code easily be defined 
+as 
+<blockquote><literallayout>
+(define (item.next_leaf i)
+  (let ((n (item.next_item i)))
+   (cond
+    ((null n) nil)
+    ((item.daughters n) (item.next_leaf n))
+    (t n))))
+</literallayout></blockquote>
+</para>
+<sect2><title>Features as pathnames</title>
+
+<para>
+<indexterm><primary> feature pathnames </primary></indexterm>
+Rather than explicitly calling a set of functions to find your way round 
+an utterance we also allow access through a linear flat <emphasis>pathname</emphasis> 
+mechanism. This mechanism is read-only but can succinctly access not 
+just features on a given item but features on related items too. 
+</para>
+<para>
+For example rather than calling an explicit next function 
+to find the name of the following item thus 
+<blockquote><literallayout>
+(item.name (item.next i))
+</literallayout></blockquote>
+You can access it via the pathname 
+<blockquote><literallayout>
+(item.feat i "n.name")
+</literallayout></blockquote>
+Festival will interpret the feature name as a pathname. In addition 
+to traversing the current relation you can switch between 
+relations via the element <varname>R:</varname><emphasis>
+relationname</emphasis>. Thus to 
+find the stress value of an segment item <varname>seg</varname> we need 
+to switch to the <varname>SylStructure</varname> relation, find its parent 
+and check the <varname>stress</varname> feature value. 
+<blockquote><literallayout>
+(item.feat seg "R:SylStructure.parent.stress")
+</literallayout></blockquote>
+Feature pathnames make the definition of various prediction 
+models much easier. CART trees for example simply specify 
+a pathname as a feature, dumping features for training is also 
+a simple task. Full function access is still useful when 
+manipulation of the data is required but as most access is 
+simply to find values pathnames are the most efficient way to 
+access information in an utterance. 
+</para>
+</sect2>
+
+<sect2><title>Access idioms</title>
+
+<para>
+For example suppose you wish to traverse each segment in an 
+utterance replace all vowels in unstressed syllables with a 
+schwa (a rather over-aggressive reduction strategy but it servers 
+for this illustrative example. 
+<blockquote><literallayout>
+(define (reduce_vowels utt)
+ (mapcar
+  (lambda (segment)
+   (if (and (string-equal "+" (item.feat segment "ph_vc"))
+            (string-equal 
+             "1" (item.feat segment "R:SylStructure.parent.stress")))
+        (item.set_name segment "@")))
+  (utt.relation.items 'Segment)))
+</literallayout></blockquote>
+</para>
+</sect2></sect1>
+
+<sect1 id="bsv-uttbuild-sect">
+<title>Utterance building</title>
+
+<para>
+<indexterm><primary> building utterances </primary></indexterm>
+<indexterm><primary> utterance building </primary></indexterm>
+<indexterm><primary> database as utterances </primary></indexterm>
+As well as using Utterance structures in the actual runtime 
+process of converting text-to-speech we also use them in 
+database representation. Basically we wish to build utterance 
+structures for each utterance in a speech database. Once they 
+are in that structure, as if they had been (correctly) synthesized, 
+we can use these structures for training various models. For example 
+given the actually durations for the segments in a speech database 
+and utterance structures for these we can dump the actual durations 
+and features (phonetic, prosodic context etc.) which we feel influence 
+the durations and train models on that data. 
+</para>
+<para>
+Obviously real speech isn't as clean as synthesized speech so its not 
+always easy to build (reasonably) accurate utterances for the real 
+utterances. However here we will itemize a number of functions that 
+will make the building of utterance from real speech easier. Building 
+utterance structures is probably worth the effort considering how 
+easy it is to build various models from them. Thus we recommend 
+this even though at first the work may not immediately seem 
+worthwhile. 
+</para>
+<para>
+In order to build an utterance of the type used for our English voices 
+(and which is suitable for most of the other languages we have done), 
+you will need label files for the following relations. Below 
+we will discuss how to get these labels, automatically, by 
+hand or derived from other label files in this list and the relative 
+merits of such derivations. 
+</para>
+<para>
+<indexterm><primary> basic labels </primary></indexterm>
+The basic label types required are 
+<variablelist>
+<varlistentry>
+<term><varname>Segment</varname></term>
+<listitem><para>
+segment labels with (near) correct boundaries, in the phone set 
+of your language. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>Syllable</varname></term>
+<listitem><para>
+Syllables, with stress marking (if appropriate) whose boundaries 
+are closely aligned with the segment boundaries. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>Word</varname></term>
+<listitem><para>
+Words with boundaries aligned (close) to the syllables and segments. 
+By <emphasis>words</emphasis> we mean the things which can be looked up in a lexicon 
+thus <quote><emphasis>1986</emphasis></quote> would not be considered a word and should be 
+rendered as three words <quote><emphasis>nineteen eighty six</emphasis></quote>. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>IntEvent</varname></term>
+<listitem><para>
+Intonation labels aligned to a syllable (either within the syllable 
+boundary or explicitly naming the syllable they should align to. If 
+using ToBI (or some derivative) these would be standard ToBI labels, 
+while in something like Tilt these would be <quote><emphasis>a</emphasis></quote> and <quote><emphasis>b</emphasis></quote> 
+marking accents and labels. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>Phrase</varname></term>
+<listitem><para>
+A name and marking for the end of each prosodic phrase. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><varname>Target</varname></term>
+<listitem><para>
+The mean F0 value in Hertz at the mid-point of each segment 
+in the utterance. 
+</para></listitem></varlistentry>
+</variablelist>
+</para>
+<para>
+<indexterm><primary> segment labeling </primary></indexterm>
+<indexterm><primary> autolabeling </primary></indexterm>
+<indexterm><primary> labeling speech </primary></indexterm>
+Segment labels are probably the hardest to generate. Knowing what 
+phones are there can only really be done by actually listening to the 
+examples and labeling them. Any automatic method will have to make low 
+level phonetic classifications which machines are not particularly good 
+at (nor are humans for that matter). Some discussion of autoaligning 
+phones is given in the diphone chapter where an aligner distributed with 
+this document is described. This may help but as much depends on the 
+segmental accuracy getting it right ultimately hand correction at least 
+is required. We have used that aligner on a speech database though we 
+already knew from another (not so accurate) aligner what the phone 
+sequences probably were. Our aligner improved the quality of exist 
+labels and the synthesizer (phonebox) that used it, but there are 
+external conditions that made this a reasonably thing to do. 
+</para>
+<para>
+<indexterm><primary> word labeling </primary></indexterm>
+Word labeling can most easily be done by hand, it is much 
+easier than to do than segment labeling. In the continuing process 
+of trying to build automatic labelers for databases we currently 
+reckon that word labeling could be the last to be done automatically. 
+Basically because with word labeling, segment, syllable and intonation 
+labeling becomes a much more constrained task. However it is 
+important that word labels properly align with segment labels even 
+when spectrally there may not be any real boundary between 
+words in continuous speech. 
+</para>
+<para>
+<indexterm><primary> syllable labeling </primary></indexterm>
+Syllable labeling can probably best be done automatically given segment 
+(and word) labeling. The actual algorithm for syllabification may 
+change but whatever is chosen (or defined from a lexicon) it is 
+important that that syllabification is consistently used throughout the 
+rest of the system (e.g. in duration modeling). Note that automatic 
+techniques in aligning lexical specifications of syllabification are in 
+their nature inexact. There are multiple acceptable ways to say words 
+and it is relatively important to ensure that the labeling reflects 
+what is actually there. That is simply looking up a word in a lexicon 
+and aligning those phones to the signal is not necessarily correct. 
+Ultimately this is what we would like to do but so far we have 
+discovered our unit selection algorithms are nowhere near robust enough 
+to do this. 
+</para>
+<para>
+<indexterm><primary> F0 targets </primary></indexterm>
+The Target labeling required here is a single average F0 value for each 
+segment. This currently is done fully automatically from the signal. 
+This is naive and a better representation of F0 could be more 
+appropriate, it is used only in some of the model building described 
+below. Ultimately it would be good if the F0 need not be explicitly 
+used at all but just use the factors that determine the F0 value, but 
+this is still a research topic. 
+</para>
+<para>
+<indexterm><primary> phrase labeling </primary></indexterm>
+Phrases could potentially be determined by a combination of F0 power and 
+silence detection but the relationship is not obvious. In general we 
+hand label phrases as part of the intonation labeling process. 
+Realistically only two levels of phrasing can reliably be labeled, even 
+though there are probably more. That is, roughly, sentence internal and 
+sentence final, what ToBI would label as (2 or 3) and 4. More exact 
+labelings would be useful. 
+</para>
+<para>
+<indexterm><primary> intonation labeling </primary></indexterm>
+<indexterm><primary> ToBI </primary></indexterm>
+<indexterm><primary> Tilt </primary></indexterm>
+For intonation events we have more recently been using Tilt accent 
+labeling. This is simpler than ToBI and we feel more reliable. The 
+hand labeling part marks <varname>a</varname> (for accent) and <varname>b</varname> for 
+boundary. We have also split boundaries into <varname>rb</varname> (rising 
+boundary) and <varname>fb</varname> (falling boundary). We have been experimenting 
+with autolabeling these and have had some success but that's still a 
+research issue. Because there is a well defined and fully automatic 
+method of going from a/b labeled waveforms to a parameterization of the 
+F0 contour we've found Tilt the most useful Intonation labeling. Tilt 
+is described in <citation>taylor00a</citation>. 
+</para>
+<para>
+ToBI accent/tone labeling <citation>silverman92</citation> is useful too but time 
+consuming to label. If it exists for the database then its usually 
+worth using. 
+</para>
+<para>
+<indexterm><primary> make_utts </primary></indexterm>
+In the standard Festival distribution there is a festival 
+script <filename>festival/examples/make_utts</filename> which will build 
+utterance structures from the labels for the six basic relations. 
+</para>
+<para>
+This function can most easily be used given the following 
+directory/file structure in the database directory. <filename>festival/relations/</filename> 
+should contain a directory for each set of labels named for the 
+utterance relation it is to be part of (e.g. <filename>Segment/</filename>, 
+<filename>Word/</filename>, etc. 
+</para>
+<para>
+The constructed utterances will be saved in <filename>festival/utts/</filename>. 
+</para>
+</sect1>
+
+<sect1><title>Extracting features from utterances</title>
+
+<para>
+<indexterm><primary> dumpfeats </primary></indexterm>
+Many of the training techniques that are described in the 
+following chapters extract basic features (via pathnames) from 
+a set of utterances. This can most easily be done by the 
+<filename>festival/examples/dumpfeats</filename> Festival script. It takes 
+a list of feature/pathnames, as a list or from a file and saves 
+the values for a given set of items in a single feature file (or 
+one for each utterance). Call <filename>festival/examples/dumpfeats</filename> 
+with the argument <varname>-h</varname> for more details. 
+</para>
+<para>
+For example suppose for all utterances we want the segment 
+duration, its name, the name of the segment preceding it 
+and the segment following it. 
+<blockquote><literallayout>
+dumpfeats -feats '(segment_duration name p.name n.name)' \
+    -relation Segment -output dur.feats festival/utts/*.utt
+</literallayout></blockquote>
+If you wish to save the features in separate files one 
+for each utterance, if the output filename contains a <quote><emphasis>%s</emphasis></quote> 
+it will be filled in with the utterance fileid. Thus to dump 
+all features named in the file <filename>duration.featnames</filename> we 
+would call 
+<blockquote><literallayout>
+dumpfeats -feats duration.featnames -relation Segment \
+         -output feats/%s.dur festival/utts/*.utt
+</literallayout></blockquote>
+The file <filename>duration.featnames</filename> should contain the features/pathnames 
+one per line (without the opening and closing parenthesis. 
+</para>
+<para>
+Other features and other specific code (e.g. selecting a 
+voice that uses an appropriate phone set), can be included in this 
+process by naming a scheme file with the <varname>-eval</varname> option. 
+</para>
+<para>
+The dumped feature files consist of a line for each 
+item in the named relation containing the requested feature values 
+white space separated. For example 
+<blockquote><literallayout>
+0.399028 pau 0 sh 
+0.08243 sh pau iy 
+0.07458 iy sh hh 
+0.048084 hh iy ae 
+0.062803 ae hh d 
+0.020608 d ae y 
+0.082979 y d ax 
+0.08208 ax y r 
+0.036936 r ax d 
+0.036935 d r aa 
+0.081057 aa d r 
+...
+</literallayout></blockquote>
+</para>
+
+</sect1>
+
+</chapter>

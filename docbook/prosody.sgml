@@ -1,0 +1,1737 @@
+<chapter><title>Building prosodic models</title>
+
+<sect1><title>Phrasing</title>
+
+<para>
+<indexterm><primary> prosodic phrasing </primary></indexterm>
+Prosodic phrasing in speech synthesis makes the whole speech more 
+understandable. Due to the size of peoples lungs there is 
+a finite length of time people can talk before they can take 
+a breath, which defines an upper bound on prosodic phrases. However 
+we rarely make our phrases this maximum length and use phrasing 
+to mark groups within the speech. There is the apocryphal story 
+of the speech synthesis example with an unnaturally long 
+prosodic phrase played at a conference presentation. At the end 
+of the phrase the audience all took a large in-take of breathe. 
+</para>
+<para>
+For the most case very simple prosodic phrasing is sufficient. 
+A comparison of various prosodic phrasing techniques is 
+discussed in <citation>taylor98a</citation>, though we will cover some 
+of them here also. 
+</para>
+<para>
+For English (and most likely many other language too) simple rules based 
+on punctuation is a very good predictor of prosodic phrase boundaries. 
+It is rare that punctuation exists where there is no boundary, but there 
+will be a substantial number of prosodic boundaries which are not 
+explicitly marked with punctuation. Thus a prosodic phrasing algorithm 
+solely based on punctuation will typically under predict but rarely make 
+a false insertion. However depending on the actual application you wish 
+to use the synthesizer for it may be the case that explicitly adding 
+punctuation at desired phrase breaks is possible and a prediction system 
+based solely on punctuation is adequate. 
+</para>
+<para>
+Festival basically supports two methods for predicting prosodic 
+phrases, though any other method can easily be used. Note that these do 
+not necessary entail pauses in the synthesized output. Pauses are 
+further predicted from prosodic phrase information. 
+</para>
+<para>
+The first basic method is by CART tree. A test is made on each 
+word to predict it is at the end of a prosodic phrase. The basic CART 
+tree returns <varname>B</varname> or <varname>BB</varname> (though may return what you consider 
+is appropriate form break labels as long as the rest of 
+your models support it). The two levels identify different 
+levels of break, <varname>BB</varname> being a used to denote a bigger 
+break (and end of utterance). 
+</para>
+<para>
+<indexterm><primary> punctuation </primary></indexterm>
+The following tree is very simple and simply adds a break 
+after the last word of a token that has following punctuation. 
+Note the first condition is done by a lisp function as we wand to 
+ensure that only the last word in a token gets the break. (Earlier 
+erroneous versions of this would insert breaks after each word 
+in <quote><emphasis>1984.</emphasis></quote> 
+<blockquote><literallayout>
+(set! simple_phrase_cart_tree
+'
+((lisp_token_end_punc in ("?" "." ":"))
+  ((BB))
+  ((lisp_token_end_punc in ("'" "\&quot;" "," ";"))
+   ((B))
+   ((n.name is 0)  ;; end of utterance
+    ((BB))
+    ((NB))))))
+</literallayout></blockquote>
+This tree is defined <filename>festival/lib/phrase.scm</filename> in the standard 
+distribution and is certainly a good first step in defining a phrasing 
+model for a new language. 
+</para>
+<para>
+To make a better phrasing model requires more information. As the basic 
+punctuation model underpredicts we need information that will find 
+reasonable boundaries within strings of words. In English, boundaries 
+are more likely between content words and function words, because most 
+function words are before the words they related to, in Japanese 
+function words are typically after their relate content words so breaks 
+are more likely between function words and content words. If you have 
+no data to train from, written rules, in a CART tree, can exploited this 
+fact and give a phrasing model that is better than a punctuation only. 
+Basically a rule could be if the current word is a content word and the 
+next is a function word (or the reverse if that appropriate for a 
+language) and we are more than 5 words from a punctuation symbol them 
+predict a break. We maybe also want to insure that we are also at least 
+five words from predicted break too. 
+</para>
+<para>
+Note the above basic rules aren't optimal but when you are building a 
+new voice in a new language and have no data to train from you will get 
+reasonably far with simple rules like that, such that phrasing 
+prediction will be less of a problem than the other problems you will 
+find in you voice. 
+</para>
+<para>
+<indexterm><primary> gpos </primary></indexterm>
+<indexterm><primary> guessing part of speech </primary></indexterm>
+<indexterm><primary> part of speech </primary></indexterm>
+To implement such a scheme we need three basic functions: one to 
+determine if the current word is a function of content word, one to 
+determine number of words since previous punctuation (or start of 
+utterance) and one to determine number of words to next punctuation (or 
+end of utterance. The first of these functions is already provided for 
+with a feature, through the feature function <varname>gpos</varname>. This uses 
+the word list in the lisp variable <varname>guess_pos</varname> to determine the 
+basic category of a word. Because in most languages the set of function 
+words is very nearly a closed class they can usually be explicitly 
+listed. The format of the <varname>guess_pos</varname> variable is a list of 
+lists whose first element is the set name and the rest of the list if 
+the words that are part of that set. Any word not a member of 
+any of these sets is defined to be in the set <varname>content</varname>. For 
+example the basic definition for this for English, 
+given in <filename>festival/lib/pos.scm</filename> is 
+<blockquote><literallayout>
+(set! english_guess_pos
+      '((in of for in on that with by at from as if that against about 
+	    before because if under after over into while without
+	    through new between among until per up down)
+	(to to)
+	(det the a an no some this that each another those every all any 
+	     these both neither no many)
+	(md will may would can could should must ought might)
+	(cc and but or plus yet nor)
+	(wp who what where how when)
+	(pps her his their its our their its mine)
+	(aux is am are was were has have had be)
+	(punc "." "," ":" ";" "\&quot;" "'" "(" "?" ")" "!")
+	))
+</literallayout></blockquote>
+The punctuation distance check can be written as a Lisp feature 
+function 
+<blockquote><literallayout>
+(define (since_punctuation word)
+ "(since_punctuation word)
+Number of words since last punctuation or beginning of utterance."
+ (cond
+   ((null word) 0) ;; beginning or utterance
+   ((string-equal "0" (item.feat word "p.lisp_token_end_punc")) 0)
+   (t
+    (+ 1 (since_punctuation (item.prev word))))))
+</literallayout></blockquote>
+The function looking forward would be 
+<blockquote><literallayout>
+(define (until_punctuation word)
+ "(until_punctuation word)
+Number of words until next punctuation or end of utterance."
+ (cond
+   ((null word) 0) ;; beginning or utterance
+   ((string-equal "0" (token_end_punc word)) 0)
+   (t
+    (+ 1 (since_punctuation (item.prev word))))))
+</literallayout></blockquote>
+The whole tree using these features that will insert a break at 
+punctuation or between content and function words more than 
+5 words from a punctuation symbol is as follows 
+<blockquote><literallayout>
+(set! simple_phrase_cart_tree_2
+'
+((lisp_token_end_punc in ("?" "." ":"))
+  ((BB))
+  ((lisp_token_end_punc in ("'" "\&quot;" "," ";"))
+   ((B))
+   ((n.name is 0)  ;; end of utterance
+    ((BB))
+    ((lisp_since_punctuation > 5)
+     ((lisp_until_punctuation > 5)
+      ((gpos is content)
+       ((n.gpos content)
+        ((NB))
+        ((B)))   ;; not content so a function word
+       ((NB)))   ;; this is a function word
+      ((NB)))    ;; to close to punctuation
+     ((NB)))     ;; to soon after punctuation
+    ((NB))))))
+</literallayout></blockquote>
+To use this add the above to a file in your <filename>festvox/</filename> 
+directory and ensure it is loaded by your standard voice file. 
+In your voice definition function. Add the following 
+<blockquote><literallayout>
+   (set! guess_pos english_guess_pos) ;; or appropriate for your language
+ 
+   (Parameter.set 'Phrase_Method 'cart_tree)
+   (set! phrase_cart_tree simple_phrase_cart_tree_2)
+</literallayout></blockquote>
+</para>
+<para>
+A much better method for predicting phrase breaks is using a full 
+statistical model trained from data. The problem is that you need a lot 
+of data to train phrase break models. Elsewhere in this document we 
+suggest the use of a timit style database or around 460 sentences, 
+(around 14500 segments) for training models. However a database such as 
+this as very few internal utterance phrase breaks. An almost perfect 
+model word predict breaks at the end of each utterances and never 
+internally. Even the f2b database from the Boston University Radio New 
+Corpus <citation>ostendorf95</citation> which does have a number of utterance internal 
+breaks isn't really big enough. For English we used the MARSEC database 
+<citation>roach93</citation> which is much larger (around 37,000 words). Finding such 
+a database for your language will not be easy and you may need to fall 
+back on a purely hand written rule system. 
+</para>
+<para>
+<indexterm><primary> syntax in phrasing </primary></indexterm>
+Often syntax is suggested as a strong correlate of prosodic phrase. 
+Although there is evidence that it influences prosodic phrasing, there 
+are notable exceptions <citation>bachenko90</citation>. Also considering how 
+difficult it is to get a reliable parse tree it is probably not worth 
+the effort, training a reliable parser is non-trivial, (though we 
+provide a method for training stochastic context free grammars in the 
+speech tools, see manual for details). Of course if your text to be 
+synthesized is coming from a language system such as machine translation 
+or language generation then a syntax tree may be readily available. In 
+that case a simple rule mechanism taking into account syntactic phrasing 
+may be useful 
+</para>
+<para>
+When only moderate amounts of data are available for training a simple 
+CART tree may be able to tease out a reasonable model. See 
+<citation>hirschberg94</citation> for some discussion on this. Here is a short example 
+of building a CART tree for phrase prediction. Let us assume you have a 
+database of utterances as described previously. By convention we 
+build models in directories under <filename>festival/</filename> in the main 
+database directory. Thus let us create <filename>festival/phrbrk</filename>. 
+</para>
+<para>
+<indexterm><primary> training phrasing models </primary></indexterm>
+First we need to list the features that are likely to be suitable 
+predictors for phrase breaks. Add these to a file <filename>phrbrk.feats</filename>, 
+what goes in here will depend on what you have, full part of speech 
+helps a lot but you may not have that for your language. The 
+<varname>gpos</varname> described above is a good cheap alternative. Possible 
+features may be 
+<blockquote><literallayout>
+word_break
+lisp_token_end_punc
+lisp_until_punctuation
+lisp_since_punctuation
+p.gpos
+gpos
+n.gpos
+</literallayout></blockquote>
+Given this list you can extract features form your database of 
+utterances with the Festival script <filename>dumpfeats</filename> 
+<blockquote><literallayout>
+dumpfeats -eval ../../festvox/phrbrk.scm -feats phrbrk.feats \
+   -relation Word -output phrbrk.data ../utts/*.utts
+</literallayout></blockquote>
+<filename>festvox/phrbrk.scm</filename> should contain the definitions of 
+the function <varname>until_punctuation</varname>, <varname>since_punctuation</varname> 
+and any other Lisp feature functions you define. 
+</para>
+<para>
+Next we want to split this data into test and train data. 
+We provide a simple shell script called <filename>traintest</filename> 
+which splits a given file 9:1, i.e every 10th line is put in 
+the test set. 
+<blockquote><literallayout>
+traintest phrbrk.data
+</literallayout></blockquote>
+As we intend to run <filename>wagon</filename> the CART tree builder on this data we 
+also need create the feature description file for the data. The feature 
+description file consists of a bracketed list of feature name and type. 
+Type may be <varname>int</varname> <varname>float</varname> or categorical where a list of 
+possible values is given. The script <filename>make_wagon_desc</filename> 
+(distributed with the speech tools) will make a reasonable approximation 
+for this file 
+<blockquote><literallayout>
+make_wagon_desc phrbrk.data phrbrk.feats phrbrk.desc
+</literallayout></blockquote>
+This script will treat all features as categorical. Thus any 
+<varname>float</varname> or <varname>int</varname> features will be treated categorically and 
+each value found in the data will be listed as a separate item. In our 
+example <varname>lisp_since_punctuation</varname> and <varname>lisp_until_punctuation</varname> 
+are actually float (well maybe even int) but they will be listed as 
+categorically in <filename>phrbrk.desc</filename>, something like 
+<blockquote><literallayout>
+...
+(lisp_since_punctuation
+0
+1
+2
+4
+3
+5
+6
+7
+8)
+...
+</literallayout></blockquote>
+You should change this entry (by hand) to be 
+<blockquote><literallayout>
+...
+(lisp_since_punctuation float )
+...
+</literallayout></blockquote>
+The script cannot work out the type of a feature automatically 
+so you must make this decision yourself. 
+</para>
+<para>
+Now that we have the data and description we can build 
+a CART tree. The basic command for <filename>wagon</filename> will be 
+<blockquote><literallayout>
+wagon -desc phrbrk.desc -data phrbrk.data.train -test phrbrk.data.test \
+   -output phrbrk.tree
+</literallayout></blockquote>
+<indexterm><primary> stop value </primary></indexterm>
+<indexterm><primary> wagon stop value </primary></indexterm>
+<indexterm><primary> CART stop value </primary></indexterm>
+You will probably also want to set a <emphasis>stop</emphasis> value. The default 
+stop value is 50, which means there must be at least 50 examples 
+in a group before it will consider looking for a question to 
+split it. Unless you have a <emphasis>lot</emphasis> of data this is probably 
+too large and a value of 10 to 20 is probably more reasonable. 
+</para>
+<para>
+Other arguments to <filename>wagon</filename> should also be considered. A stepwise 
+approach where all features are tested incrementally to find the best 
+set of features which give the best tree can give better results than 
+simply using all features. Though care should be taken with 
+this as the generated tree becomes optimized from the given 
+test set. Thus a further held our test set is required to 
+properly test the accuracy of the result. In the stepwise case 
+it is normal to split the train set again and call 
+wagon as follows 
+<blockquote><literallayout>
+traintest phrbrk.data.train
+wagon -desc phrbrk.desc -data phrbrk.data.train.train \
+   -test phrbrk.data.train.test \
+   -output phrbrk.tree -stepwise
+wagon_test -data phrbrk.data.test -desc phrbrk.desc \
+   -tree phrbrk.tree
+</literallayout></blockquote>
+Stepwise is particularly useful when features are highly correlated with 
+themselves and its not clear which is best general predictor. Note that 
+stepwise will take <emphasis>much</emphasis> longer to run as it potentially must 
+build a large number of trees. 
+</para>
+<para>
+Other arguments to <filename>wagon</filename> can be considered, refer to the 
+relevant chapter in speech tools manual for their details. 
+</para>
+<para>
+However it should be noted that without a good intonation and duration 
+model spending time on producing good phrasing is probably not worth it. 
+The quality of all these three prosodic components is closely related 
+such that if one is much better than there may not be 
+any real benefit. 
+</para>
+</sect1>
+
+<sect1><title>Accent/Boundary Assignment</title>
+
+<para>
+<indexterm><primary> accent assignment </primary></indexterm>
+<indexterm><primary> boundary assignment </primary></indexterm>
+Accent and boundary tones are what we will use, hopefully in a theory 
+independent way, to refer to the two main types of intonation event. 
+For English, and for many other languages the prediction of position of 
+the accents and boundaries can be done as an independent process from F0 
+contour generation itself. This is definite true from the major theories 
+we will be considering. 
+</para>
+<para>
+As with phrase break prediction there are some simple rules that will go 
+a surprisingly long way. And as with most of the other statistical 
+learning techniques simple rules cover most of the work, more complex 
+rules work better, but the best results are from using the sorts of 
+information you were using in rules but statistically training them from 
+a appropriate data. 
+</para>
+<para>
+<indexterm><primary> complex nominals </primary></indexterm>
+For English the placement of accents on stressed syllables in 
+all content words is a quite reasonable approximation achieving 
+about 80% accuracy on typical databases. <citation>hirschberg90</citation> 
+is probably the best example of a detailed rule driven approach 
+(for English). CART trees based on the sorts of features Hirschberg 
+uses are quite reasonable. Though eventual these rules become 
+limiting and a richer knowledge source is required to assign 
+accent patterns to complex nominals (see <citation>sproat90}</citation>. 
+</para>
+<para>
+However all these techniques quickly come to the stumbling block 
+that although simple so-called discourse neutral intonation is 
+relatively easy achieve, achieving realistic, natural accent 
+placement is still beyond our synthesis systems (though perhaps 
+not for much longer). 
+</para>
+<para>
+The simplest rule for English may be reasonable for other 
+languages. There are even simpler solutions to this, such 
+as fixed prosody, or fixed declination, but apart from 
+debugging a voice these are simpler than is required even 
+for the most basic voices. 
+</para>
+<para>
+For English, adding a simple hat accent on lexically stressed syllables 
+in all content words works surprisingly well. To do this in Festival you 
+need a CART tree to predict accentedness, and rules to add the hat 
+accent (though we will leave out F0 generation until the next section). 
+</para>
+<para>
+A basic tree that predicts accents of stressed syllables 
+in content words is 
+<blockquote><literallayout>
+(set! simple_accent_cart_tree
+  '
+  (
+   (R:SylStructure.parent.gpos is content)
+    ( (stress is 1)
+       ((Accented))
+       ((NONE))
+    )
+  )
+)
+</literallayout></blockquote>
+The above tree simply distinguishes accented syllables from 
+non-accented. In theories like ToBI <citation>silverman92</citation>, a number of 
+different types of accent are supported. ToBI, with variations, has been 
+applied to a number of languages and may be suitable for yours. 
+However, although accent and boundary types have been identified for 
+various languages and dialects, a computational mechanism for generating 
+and F0 contour from an accent specification often has not yet been 
+specified (we will discuss this more fully below). 
+</para>
+<para>
+If the above is considered too naive a more elaborate hand specified 
+tree can also be written, using relevant factors, probably similar to 
+those used in <citation>hirschberg90</citation>. Following that, training from 
+data is the next option. Assuming a database exists and has been 
+labeled with discrete accent classifications, we can extract 
+data from it for training a CART tree with <filename>wagon</filename>. We will 
+build the tree in <filename>festival/accents/</filename>. First we need 
+a file listing the features that are felt to affect accenting. 
+For this we will predict accents on syllables as that has been 
+used for the English voices created so far, but there is an 
+argument for predict accent placement on a word basis as although 
+accents will need to be syllable aligned, which syllable in a 
+word gets the accent is reasonably well defined (at least compared 
+with predicting accent placement). 
+</para>
+<para>
+A possible list of features for accent prediction is 
+put in the file <filename>accent.feats</filename>. 
+<blockquote><literallayout>
+R:Intonation.daughter1.name
+R:SylStructure.parent.R:Word.p.gpos
+R:SylStructure.parent.gpos
+R:SylStructure.parent.R:Word.n.gpos
+ssyl_in
+syl_in
+ssyl_out
+syl_out
+p.stress
+stress
+n.stress
+pp.syl_break
+p.syl_break
+syl_break
+n.syl_break
+nn.syl_break
+pos_in_word
+position_type
+</literallayout></blockquote>
+We can extract these features from the utterances using the 
+Festival script <filename>dumpfeats</filename> 
+<blockquote><literallayout>
+dumpfeats -feats accent.feats -relation Syllable \
+      -output accent.data ../utts/*.utts
+</literallayout></blockquote>
+We now need a description file for the features which can be 
+approximated by the speech tools script <filename>make_wagon_desc</filename> 
+<blockquote><literallayout>
+make_wagon_desc accent.data accent.feat accent.desc
+</literallayout></blockquote>
+Because this script cannot determine if a feature is categorical, 
+if takes an range of values you must hand edit the output 
+file and change any feature to <varname>float</varname> or <varname>int</varname> if that is what 
+it is. 
+</para>
+<para>
+The next stage is to split the data into training and test sets. If 
+stepwise training is to be used for building the CART tree (which is 
+recommended) then the training data should be further split 
+<blockquote><literallayout>
+traintest accent.data
+traintest accent.data.train
+</literallayout></blockquote>
+Deciding on a stop value for training depends on the number of 
+examples, though this can be tuned to ensure over-training isn't 
+happening. 
+<blockquote><literallayout>
+wagon -data accent.data.train.train -desc accent.desc \
+   -test accent.data.train.test -stop 10 -stepwise -output accent.tree
+wagon_test -data accent.data.test -desc  accent.desc \
+   -tree accent.tree
+</literallayout></blockquote>
+</para>
+<para>
+This above is designed to predict accents, and similar tree should be 
+used to predict boundary tones as well. For the most part intonation 
+boundaries are defined to occur at prosodic phrase boundaries so that 
+task is somewhat easier, though if you have a number of boundary tone 
+types in your inventory then the prediction is not so straightforward. 
+</para>
+<para>
+<indexterm><primary> accent type from discourse </primary></indexterm>
+<indexterm><primary> ToBI </primary></indexterm>
+When training ToBI type accent types it is not easy to get the right 
+type of variation in the accent types. Although some ToBI labels have 
+been associated with semantic intentions and including discourse 
+information has been shown help prediction (e.g. <citation>black97a}</citation>, 
+getting this acceptably correct is not easy. Various techniques 
+in modifying the training data do seem to help. Because of the 
+low incidence of <quote><emphasis>L*</emphasis></quote> labels in at least the f2b data, 
+duplicating all sample points in the training data with L's 
+does increase the likelihood of prediction and does seem to give 
+a more varied distribution. Alternatively wagon returns a 
+probability distribution for the accents, normally the most 
+probable is selected, this could be modified to select from 
+the distribution randomly based on their probabilities. 
+</para>
+<para>
+Once trees have been built they can be used in a voices 
+as follows. Within the voice definition function 
+<blockquote><literallayout>
+   (set! int_accent_cart_tree simple_accent_cart_tree)
+   (set! int_tone_cart_tree simple_tone_cart_tree)
+   (Parameter.set 'Int_Method Intonation_Tree)
+</literallayout></blockquote>
+or if only one tree is required you can use the simpler 
+intonation method 
+<blockquote><literallayout>
+   (set! int_accent_cart_tree simple_accent_cart_tree)
+   (Parameter.set 'Int_Method Intonation_Simple)
+</literallayout></blockquote>
+</para>
+</sect1>
+
+<sect1><title>F0 Generation</title>
+
+<para>
+<indexterm><primary> F0 generation </primary></indexterm>
+Predicting where accents go (and their types) is only half of the 
+problem. We also have build an F0 contour based on these. Note 
+intonation is split between accent placement and F0 generation as it is 
+obvious that accent position influences durations and an F0 contour 
+cannot be generated without knowing the durations of the segments the 
+contour is to be generated over. 
+</para>
+<para>
+There are three basic F0 generation modules available in Festival, 
+though others could be added, by general rule, by linear 
+regression/CART, and by Tilt. 
+</para>
+<sect2><title>F0 by rule</title>
+
+<para>
+<indexterm><primary> ToBI </primary></indexterm>
+<indexterm><primary> F0 by rule </primary></indexterm>
+The first is designed to be the most general and will always allow some 
+form of F0 generation. This method allows target points to be 
+programmatically created for each syllable in an utterance. The idea 
+follows closely a generalization of the implementation of ToBI type 
+accents in <citation>anderson84</citation>, where n-points are predicted for each 
+accent. They (and others in intonation) appeal to the notion of 
+baseline and place target F0 points above and below that line based on 
+accent type, position in phrase. The baseline itself is often defined 
+to decline over the phrase reflecting the general declination of F0 over 
+type. 
+</para>
+<para>
+The simple idea behind this general method is that a Lisp function is 
+called for each syllable in the utterance. That Lisp function returns a 
+list of target F0 points that lie within that syllable. Thus the 
+generality of this methods actual lies in the fact that it simply allows 
+the user to program anything they want. For example our simple hat 
+accent can be generated using this technique as follows. 
+</para>
+<para>
+This fixes the F0 range of the speaker so would need to 
+be changed for different speakers. 
+<blockquote><literallayout>
+(define (targ_func1 utt syl)
+  "(targ_func1 UTT STREAMITEM)
+Returns a list of targets for the given syllable."
+  (let ((start (item.feat syl 'syllable_start))
+        (end (item.feat syl 'syllable_end)))
+    (if (equal? (item.feat syl "R:Intonation.daughter1.name") "Accented")
+        (list
+         (list start 110)
+         (list (/ (+ start end) 2.0) 140)
+         (list end 100)))))
+</literallayout></blockquote>
+It simply checks if the current syllable is accented and if so returns 
+a list of position/target pairs. A value at the start of the 
+syllable or 110Hz, a value at 140Hz at the mid-point of the syllable 
+and a value of 100 at the end. 
+</para>
+<para>
+This general technique can be expanded with other rules as necessary. 
+Festival includes an implementation of ToBI using exactly this 
+technique, it is based on the rules described in <citation>jilka96</citation> and in 
+the file <filename>festival/lib/tobi_f0.scm</filename>. 
+</para>
+</sect2>
+
+<sect2><title>F0 by linear regression</title>
+
+<para>
+<indexterm><primary> F0 by linear regression </primary></indexterm>
+This technique was developed specifically to avoid the difficult 
+decisions of exactly what parameters with what value should be used in 
+rules like those of <citation>anderson84</citation>. The first implementation of this 
+work is presented <citation>black96</citation>. The idea is to find the appropriate F0 
+target value for each syllable based on available features by training 
+from data. A set of features are collected for each syllable and a 
+linear regression model is used to model three points on each syllable. 
+The technique produces reasonable synthesis and requires less analysis 
+of the intonation models that would be required to write a rule system 
+using the general F0 target method described in the previous section. 
+</para>
+<para>
+However to be fair, this technique is also much simpler and there are 
+are obviously a number of intonational phenomena which this cannot 
+capture (e.g. multiple accents on syllables and it will never really 
+capture accent placement with respect to the vowel). The previous 
+technique allows specification of structure but without explicit 
+training from data (though doesn't exclude that) while this technique 
+imposes almost no structure but depends solely on data. The Tilt 
+modeling discussed in the following section tries to balance these two 
+extremes. 
+</para>
+<para>
+The advantage of the linear regression method is very little 
+knowledge about the intonation the language under study needs to be 
+known. Of course if there is knowledge and theories it is usually 
+better to follow them (or at least find the features which influence 
+the F0 in that language). Extracting features for F0 modeling 
+is similar to extracting features for the other models. This 
+time we want the means F0 at the start middle and end of 
+each utterance. The Festival features <varname>syl_startpitch</varname>, 
+<varname>syl_midpitch</varname> and <varname>syl_endpitch</varname> proved this. Note 
+that <varname>syl_midpitch</varname> returns the pitch at the mid of the 
+vowel in the syllable rather than the middle of the syllable. 
+</para>
+<para>
+For a linear regression model all features <emphasis>must</emphasis> be continuous. 
+Thus features which are categorical that influence F0 need to be 
+converted. The standard technique for this is to introduce new features, 
+one for each possible value in the class and output values of 0 or 1 
+for these modified features depending on the value of the base features. 
+For example in a ToBI environment the output of the feature 
+<varname>tobi_accent</varname> will include <varname>H*</varname>, <varname>L*</varname>, <varname>L+H*</varname> etc. 
+In the modified form you would have features of the form 
+<varname>tobi_accent_H*</varname>, <varname>tobi_accent_L*</varname>, <varname>tobi_accent_L_H*</varname>, 
+etc. 
+</para>
+<para>
+<indexterm><primary> ols </primary></indexterm>
+<indexterm><primary> linear regression </primary></indexterm>
+<indexterm><primary> robust linear regression </primary></indexterm>
+The program <filename>ols</filename> in the speech tools takes feature files and 
+description files in exactly the same format as <filename>wagon</filename>, except 
+that all feature must be declared as type <filename>float</filename>. The standard 
+ordinary least squares algorithm used to find the coefficients 
+cannot, in general, deal with features that are directly correlated 
+with others as this causes a singularity when inverting the 
+matrix. The solution to this is to exclude such features. The 
+option <varname>-robust</varname> enables that though at the expense of a longer 
+compute time. Again like <filename>file</filename> a stepwise option is included 
+so that the best subset of features may be found. 
+</para>
+<para>
+The resulting models may be used by the <varname>Int_Targets_LR</varname> module 
+which takes its LR models from the variables <varname>f0_lr_start</varname>, 
+<varname>f0_lr_mid</varname> and <varname>f0_lr_end</varname>. The output of <varname>ols</varname> is a 
+list of coefficients (with the Intercept first). These need to be 
+converted to the appropriate bracket form including their feature names. 
+An example of which is in <filename>festival/lib/f2bf0lr.scm</filename>. 
+</para>
+<para>
+<indexterm><primary> F0 by CART models </primary></indexterm>
+If the conversion of categoricals to floats seems to much work 
+or would prohibitively increase the number of features you 
+could use <filename>wagon</filename> to generate trees to predict F0 values. 
+The advantage is that of a decision tree over the LR model is that 
+it can deal with data in a non-linear fashion, But this is 
+also the disadvantage. Also the decision tree technique may 
+split the data sub-optimally. The LR model is probably more 
+theoretically appropriate but ultimately the results depend on 
+how goods the models sound. 
+</para>
+<para>
+Dump features as with the LR models, but this time there is 
+no need convert categorical features to floats. A potential 
+set of features to do this from (substitute <varname>syl_midpitch</varname> 
+and <varname>syl_endpitch</varname> for the other two models is 
+<blockquote><literallayout>
+syl_endpitch
+pp.tobi_accent
+p.tobi_accent
+tobi_accent
+n.tobi_accent
+nn.tobi_accent
+pp.tobi_endtone
+R:Syllable.p.tobi_endtone
+tobi_endtone
+n.tobi_endtone
+nn.tobi_endtone
+pp.syl_break
+p.syl_break
+syl_break
+n.syl_break
+nn.syl_break
+pp.stress
+p.stress
+stress
+n.stress
+nn.stress
+syl_in
+syl_out
+ssyl_in
+ssyl_out
+asyl_in
+asyl_out
+last_accent
+next_accent
+sub_phrases
+</literallayout></blockquote>
+The above, of course assumes a ToBI accent labeling, modify that 
+as appropriate for you actually labeling. 
+</para>
+<para>
+Once you have generated three trees predicting values for start, mid and 
+end points in each syllable you will need to add some Scheme code to use 
+these appropriately. Suitable code is provided in 
+<filename>src/intonation/tree_f0.scm</filename> you will need to include that in your 
+voice. To use it as the intonation target module you will need to add 
+something like the following to your voice function 
+<blockquote><literallayout>
+(set! F0start_tree f2b_F0start_tree)
+(set! F0mid_tree f2b_F0mid_tree)
+(set! F0end_tree f2b_F0end_tree)
+(set! int_params
+	'((target_f0_mean 110) (target_f0_std 10)
+	  (model_f0_mean 170) (model_f0_std 40)))
+(Parameter.set 'Int_Target_Method Int_Targets_Tree)
+</literallayout></blockquote>
+The <varname>int_params</varname> values allow you to use the model with 
+a speaker of a different pitch range. That is all predicted 
+values are converted using the formula 
+<blockquote><literallayout>
+   (+ (* (/ (- value model_f0_mean) model_f0_stddev)
+       target_f0_stddev) target_f0_mean)))
+</literallayout></blockquote>
+Or for those of you who can't real Lisp expressions 
+<blockquote><literallayout>
+   ((value - model_f0_mean) / model_f0_stddev) * target_f0_stddev)+
+      target_f0_mean
+</literallayout></blockquote>
+The values in the example above are for converting a female speaker 
+(used for training) to a male pitch range. 
+</para>
+</sect2>
+
+<sect2><title>Tilt modeling</title>
+
+<para>
+<indexterm><primary> tilt intonation </primary></indexterm>
+Tilt modeling is still under development and not as mature as the other 
+methods as described above, but it potentially offers a more consistent 
+solution to the problem. A tilt parameterization of a natural F0 
+contour can be automatically derived from a waveform and a labeling of 
+accent placements (a simple <quote><emphasis>a</emphasis></quote> for accents and <quote><emphasis>b</emphasis></quote> of 
+boundaries) <citation>taylor99</citation>. Further work is being done on trying to 
+automatically find the accents placements too. 
+</para>
+<para>
+For each <quote><emphasis>a</emphasis></quote> in an labeling four continuous parameters are found: 
+height, duration, peak position with respect to vowel start, and tilt. 
+Prediction models may then be generate to predict these parameters which 
+we feel better capture the dimensions of F0 contour itself. We have had 
+success in building models for these parameters, <citation>dusterhoff97a</citation>, 
+with better results than the linear regression model on comparable data. 
+However so far we have not done any tests with Tilt on languages other 
+than English. 
+</para>
+<para>
+The speech tools include the programs <filename>tilt_analyse</filename> and 
+<filename>tilt_synthesize</filename> to aid model building but we do not yet include 
+fill Festival end support for using the generated models. 
+</para>
+</sect2></sect1>
+
+<sect1><title>Duration</title>
+
+<para>
+<indexterm><primary> duration models </primary></indexterm>
+Like the above prosody phenomena, very simple solutions to predicting 
+durations work surprisingly well, though very good solutions are 
+extremely difficult to achieve. 
+</para>
+<para>
+Again the basic strategy is assigning fixed models, simple rules models, 
+complex rule modules, and trained models using the features in the 
+complex rule models. The choice of where to stop depends on the 
+resources available to you and time you wish to spend on the problem. 
+Given a reasonably sized database training a simple CART tree for 
+durations achieves quite acceptable results. This is currently what we 
+do for our English voices in Festival. There are better models out 
+there but we have not fully investigated them or included easy scripts 
+to customize them. 
+</para>
+<para>
+The simplest model for duration is a fixed duration for each phone. A 
+value of 100 milliseconds is a reasonable start. This type of model is 
+only of use at initial testing of a diphone database beyond that it 
+sounds too artificial. The Festival function <varname>SayPhones</varname> uses a 
+fixed duration model, controlled by the value (in ms) in the variable 
+<varname>FP_duration</varname>. Although there is a fixed duration module in 
+Festival (see the manual) its worthwhile starting off with something 
+a little more interesting. 
+</para>
+<para>
+The next level for duration models is to use average durations for the 
+phones. Even when real data isn't available to calculate averages, 
+writing values by hand can be acceptable, basically vowels are longer 
+than consonants, and stops are the shortest. Estimating values for a 
+set of phones can be done by looking at data from another language, (if 
+you are really stuck, see <filename>festival/lib/mrpa_durs.scm}</filename>, to get the 
+basic idea of average phone lengths. 
+</para>
+<para>
+<indexterm><primary> Klatt durations </primary></indexterm>
+In most languages phones are longer at the phrase final and to a lesser 
+extent phrase initial positions. A simple multiplicative factor can be 
+defined for these positions. The next stage from this is a set of rules 
+that modify the basic average based on the context they occur in. For 
+English the best definition of such rules is the duration rules given in 
+chapter 9, <citation>allen87</citation> (often referred to as the Klatt duration 
+model). The factors used in this may also apply to other languages. A 
+simplified form of this, that we have successfully used for a number of 
+languages, and is often used as our first approximation for a duration 
+rule set is as follows. 
+</para>
+<para>
+Here we define a simple decision tree that returns a multiplication 
+factor for a segment 
+<blockquote><literallayout>
+(set! simple_dur_tree
+ '
+   ((R:SylStructure.parent.R:Syllable.p.syl_break > 1 ) ;; clause initial
+    ((R:SylStructure.parent.stress is 1)
+     ((1.5))
+     ((1.2)))
+    ((R:SylStructure.parent.syl_break > 1)   ;; clause final
+     ((R:SylStructure.parent.stress is 1)
+      ((1.5))
+      ((1.2)))
+     ((R:SylStructure.parent.stress is 1)
+      ((ph_vc is +)
+       ((1.2))
+       ((1.0)))
+      ((1.0))))))
+</literallayout></blockquote>
+You may modify this adding more conditions as much as you want. In 
+addition to the tree you need to define the averages for each phone in 
+your phone set. For reasons we will explain below the format of this 
+information is <quote><emphasis>segname 0.0 average</emphasis></quote> as in 
+<blockquote><literallayout>
+(set! simple_phone_data
+'(
+   (# 0.0 0.250)
+   (a 0.0 0.080)
+   (e 0.0 0.080)
+   (i 0.0 0.070)
+   (o 0.0 0.080)
+   (u 0.0 0.070)
+   (i0 0.0 0.040)
+   ...
+ ))
+</literallayout></blockquote>
+With both these expressions loaded in your voice you 
+may set the following in your voice definition function. 
+setting up this tree and data as the standard and the appropriate 
+duration module. 
+<blockquote><literallayout>
+  ;; Duration prediction
+  (set! duration_cart_tree simple_dur_tree)
+  (set! duration_ph_info simple_phone_data)
+  (Parameter.set 'Duration_Method 'Tree_ZScores)
+</literallayout></blockquote>
+Though in your voice use voice specific names for the <varname>simple_</varname> 
+variables otherwise you may class with other voices. 
+</para>
+<para>
+<indexterm><primary> zscores </primary></indexterm>
+It has been shown <citation>campbell91</citation> that a better representation for 
+duration for modeling is <emphasis>zscores</emphasis>, that is number of standard 
+deviations from the mean. The duration module used in the above is 
+actually designed to take a CART tree that returns zscores and uses the 
+information in <varname>duration_ph_info</varname> to change that into an absolute 
+duration. The two fields after the phone name are mean and standard 
+deviation. The interpretation of this tree and this phone info happens 
+to give the right result when we use the tree to predict factors and 
+have the stddev field contain the average duration, as we did above. 
+</para>
+<para>
+However no matter if we use zscores or absolutes, a better way to 
+build a duration model is to train from data rather than arbitrarily 
+selecting modification factors. 
+</para>
+<para>
+Given a reasonable sized database we can dump durations and features for 
+each segment in the database. Then we can train a model using those 
+samples. For our English voices we have trained regression models using 
+<filename>wagon</filename>, though we include the tools for linear regression models 
+too. 
+</para>
+<para>
+An initial set of features to dump might be 
+<blockquote><literallayout>
+segment_duration
+name
+p.name
+n.name
+R:SylStructure.parent.syl_onsetsize
+R:SylStructure.parent.syl_codasize
+R:SylStructure.parent.R:Syllable.n.syl_onsetsize
+R:SylStructure.parent.R:Syllable.p.syl_codasize
+R:SylStructure.parent.position_type
+R:SylStructure.parent.parent.word_numsyls
+pos_in_syl
+syl_initial
+syl_final
+R:SylStructure.parent.pos_in_word
+p.seg_onsetcoda
+seg_onsetcoda
+n.seg_onsetcoda
+pp.ph_vc 
+p.ph_vc 
+ph_vc 
+n.ph_vc 
+nn.ph_vc
+pp.ph_vlng 
+p.ph_vlng 
+ph_vlng 
+n.ph_vlng 
+nn.ph_vlng
+pp.ph_vheight
+p.ph_vheight
+ph_vheight
+n.ph_vheight
+nn.ph_vheight
+pp.ph_vfront
+p.ph_vfront
+ph_vfront
+n.ph_vfront
+nn.ph_vfront
+pp.ph_vrnd
+p.ph_vrnd
+ph_vrnd
+n.ph_vrnd
+nn.ph_vrnd
+pp.ph_ctype 
+p.ph_ctype 
+ph_ctype 
+n.ph_ctype 
+nn.ph_ctype
+pp.ph_cplace
+p.ph_cplace
+ph_cplace
+n.ph_cplace
+nn.ph_cplace
+pp.ph_cvox 
+p.ph_cvox 
+ph_cvox 
+n.ph_cvox 
+nn.ph_cvox
+R:SylStructure.parent.R:Syllable.pp.syl_break
+R:SylStructure.parent.R:Syllable.p.syl_break
+R:SylStructure.parent.syl_break
+R:SylStructure.parent.R:Syllable.n.syl_break
+R:SylStructure.parent.R:Syllable.nn.syl_break
+R:SylStructure.parent.R:Syllable.pp.stress 
+R:SylStructure.parent.R:Syllable.p.stress 
+R:SylStructure.parent.stress 
+R:SylStructure.parent.R:Syllable.n.stress 
+R:SylStructure.parent.R:Syllable.nn.stress 
+R:SylStructure.parent.syl_in
+R:SylStructure.parent.syl_out
+R:SylStructure.parent.ssyl_in
+R:SylStructure.parent.ssyl_out
+R:SylStructure.parent.parent.gpos
+</literallayout></blockquote>
+By convention we build duration models in <filename>festival/dur/</filename>. 
+We will save the above feature names in <filename>dur.featnames</filename>. 
+We can dump the features with the command 
+<blockquote><literallayout>
+dumpfeats -relation Segment -feats dur.featnames -output dur.feats \
+         ../utts/*.utt
+</literallayout></blockquote>
+This will put all the features in the file <filename>dur.feats</filename>. For 
+<varname>wagon</varname> we need to build a feature description file, we can 
+build a first approximation with the <filename>make_wagon_desc</filename> 
+script available with the speech tools 
+<blockquote><literallayout>
+make_wagon_desc dur.feats dur.featnames dur.desc
+</literallayout></blockquote>
+You will then need to edit <filename>dur.desc</filename> to change a number of 
+features from their categorical list (lots of numbers) into type 
+<varname>float</varname>. Specifically for the above list the features 
+<varname>segment_duration</varname>, 
+<varname>R:SylStructure.parent.parent.word_numsyls</varname>, <varname>pos_in_syl</varname>, 
+<varname>R:SylStructure.parent.pos_in_word</varname>, 
+<varname>R:SylStructure.parent.syl_in</varname>, 
+<varname>R:SylStructure.parent.syl_out</varname>, 
+<varname>R:SylStructure.parent.ssyl_in</varname> and 
+<varname>R:SylStructure.parent.ssyl_out</varname> should be declared as floats. 
+</para>
+<para>
+We then need to split the data into training and test sets (and further 
+split the train set if we are going to use stepwise CART building. 
+<blockquote><literallayout>
+traintest dur.feats
+traintest dur.feats.train
+</literallayout></blockquote>
+We can no build a model using wagon 
+<blockquote><literallayout>
+wagon -data dur.feat.train.train -desc dur.desc \
+        -test dur.feats.train.test -stop 10 -stepwise \
+        -output dur.10.tree 
+wagon_test -data dur.feats.test -tree dur.10.tree -desc dur.desc
+</literallayout></blockquote>
+You may wish to remove all examples of silence from the data as silence 
+durations typically has quite a different distribution from other 
+phones. In fact it is common that databases include many examples of 
+silence which are not of natural length as they are arbitrary parts of 
+the initial and following silence around the spoken utterances. Their 
+durations are not something that should be trained for. 
+</para>
+<para>
+These instructions above will build a tree that predicts absolute 
+values. To get such a tree to work with the zscore module simply make 
+the stddev field above 1. As stated above using zscores typically give 
+better results. Although the correlation of these duration models in 
+the zscore domain may not be as good as training models predicting 
+absolute scores when those predicted scores are convert back into the 
+absolute domain we have found (for English) that the correlations are 
+better, and RMSE smaller. 
+</para>
+<para>
+In order to train a zscore model you need to convert the absolute 
+segment durations, to do that you need the means and standard 
+deviations for each segment in your phoneset. 
+</para>
+<para>
+There is a whole branch of possible mappings for the distribution of 
+durations: zscores, logs, logs-zscores, etc or even more complex 
+functions <citation>bellegarda98</citation>. These variations do give some 
+improvements. The intention is to map the distribution to a normal 
+distribution which makes it easier to learn. 
+</para>
+<para>
+<indexterm><primary> Sums of products model </primary></indexterm>
+Other learning techniques, particularly Sums of Products model 
+(<citation>sproat98</citation> chapter 5), which has been shown to training 
+better even on small amounts of data. 
+</para>
+<para>
+<indexterm><primary> cross language duration modeling </primary></indexterm>
+Another technique, which although shouldn't work is to borrow 
+a models trained for another language for which data is available. 
+Actually the duration model used in Festival for the US and UK 
+voices is the same, it was in fact trained from the f2b database, 
+a US English database. As the phone sets are different for 
+US and UK English we trained the models using phonetic 
+features rather than phone names, and trained them in the zscore 
+domain keeping the actual phone names and means and standard 
+deviations separate. Although the models were slightly better 
+if we included the phone names themselves, it was only slightly 
+better and the models were also substantially larger (and took 
+longer to train). Using the phonetic feature offers a more 
+general model (it works for UK English), more compact, quicker 
+learning time and with only a small cost in performance. 
+</para>
+<para>
+Also in the German voice developed at OGI, the same English duration 
+model was used. The results are acceptable and are at least better than 
+any hand written rule system that could be written. Improvements in 
+that model are probably only possible by training on real German data. 
+Note however such cross language borrowing of models is unlikely to work 
+in general but there may be cases where it is a reasonable fall back 
+position. 
+</para>
+</sect1>
+
+<sect1><title>Prosody Research</title>
+
+<para>
+Note that the above descriptions are for the easy implementation of 
+prosody models which unfortunately means that the models will not 
+be perfect. Of course no models will be perfect but with some 
+work it is often possible to improve the basic models or at 
+least make them more appropriate to the synthesis task. For example 
+if your intend use of your synthesis voice is primarily for 
+dialog systems training one news caster speech will not give 
+the best effect. Festival is designed as a research system as 
+well as tool to build languages so it is well adapted to 
+prosody research. 
+</para>
+<para>
+<indexterm><primary> copy synthesis </primary></indexterm>
+One thing which clearly shows off how imporoverished our prosodic models 
+are is the comparing of predicted prosody with natural prosody. Given 
+a label file and an F0 Target file the following code will generate\ 
+that utterance using the current voice 
+<blockquote><literallayout>
+(define (resynth labfile f0file)
+  (let ((utt (Utterance SegF0))) ; need some u to start with
+    (utt.relation.load utt 'Segment labfile)
+    (utt.relation.load utt 'Target f0file)
+    (Wave_Synth utt))
+)
+</literallayout></blockquote>
+The format of the label file should be one that can be read into 
+Festival (e.g. the XLabel format) For example 
+<blockquote><literallayout>
+#
+	 0.02000 26 	pau ; 
+	 0.09000 26 	ih ; 
+	 0.17500 26 	z ; 
+	 0.22500 26 	dh ; 
+	 0.32500 26 	ae ; 
+	 0.35000 26 	t ; 
+	 0.44500 26 	ow ; 
+	 0.54000 26 	k ; 
+	 0.75500 26 	ey ; 
+	 0.79000 26 	pau ; 
+</literallayout></blockquote>
+The target file is a little more complex again it is 
+a label file but with features "pos" and "F0" at each stage. Thus 
+the format for a naturally rendered version of the above would 
+be. 
+<blockquote><literallayout>
+#
+0.070000 124 0 ; pos 0.070000 ; f0 133.045230 ; 
+0.080000 124 0 ; pos 0.080000 ; f0 129.067890 ; 
+0.090000 124 0 ; pos 0.090000 ; f0 125.364600 ; 
+0.100000 124 0 ; pos 0.100000 ; f0 121.554800 ; 
+0.110000 124 0 ; pos 0.110000 ; f0 117.248260 ; 
+0.120000 124 0 ; pos 0.120000 ; f0 115.534490 ; 
+0.130000 124 0 ; pos 0.130000 ; f0 113.769620 ; 
+0.140000 124 0 ; pos 0.140000 ; f0 111.513180 ; 
+0.240000 124 0 ; pos 0.240000 ; f0 108.386380 ; 
+0.250000 124 0 ; pos 0.250000 ; f0 102.564100 ; 
+0.260000 124 0 ; pos 0.260000 ; f0 97.383600 ; 
+0.270000 124 0 ; pos 0.270000 ; f0 97.199710 ; 
+0.280000 124 0 ; pos 0.280000 ; f0 96.537280 ; 
+0.290000 124 0 ; pos 0.290000 ; f0 96.784970 ; 
+0.300000 124 0 ; pos 0.300000 ; f0 98.328150 ; 
+0.310000 124 0 ; pos 0.310000 ; f0 100.950830 ; 
+0.320000 124 0 ; pos 0.320000 ; f0 102.853580 ; 
+0.370000 124 0 ; pos 0.370000 ; f0 117.105770 ; 
+0.380000 124 0 ; pos 0.380000 ; f0 116.747730 ; 
+0.390000 124 0 ; pos 0.390000 ; f0 119.252310 ; 
+0.400000 124 0 ; pos 0.400000 ; f0 120.735070 ; 
+0.410000 124 0 ; pos 0.410000 ; f0 122.259190 ; 
+0.420000 124 0 ; pos 0.420000 ; f0 124.512020 ; 
+0.430000 124 0 ; pos 0.430000 ; f0 126.476430 ; 
+0.440000 124 0 ; pos 0.440000 ; f0 121.600880 ; 
+0.450000 124 0 ; pos 0.450000 ; f0 109.589040 ; 
+0.560000 124 0 ; pos 0.560000 ; f0 148.519490 ; 
+0.570000 124 0 ; pos 0.570000 ; f0 147.093260 ; 
+0.580000 124 0 ; pos 0.580000 ; f0 149.393750 ; 
+0.590000 124 0 ; pos 0.590000 ; f0 152.566530 ; 
+0.670000 124 0 ; pos 0.670000 ; f0 114.544910 ; 
+0.680000 124 0 ; pos 0.680000 ; f0 119.156750 ; 
+0.690000 124 0 ; pos 0.690000 ; f0 120.519990 ; 
+0.700000 124 0 ; pos 0.700000 ; f0 121.357320 ; 
+0.710000 124 0 ; pos 0.710000 ; f0 121.615970 ; 
+0.720000 124 0 ; pos 0.720000 ; f0 120.752700 ; 
+</literallayout></blockquote>
+This file was generated from a waveform using the folloing 
+command 
+<blockquote><literallayout>
+pda -s 0.01 -otype ascii -fmax 160 -fmin 70 wav/utt003.wav | 
+awk 'BEGIN @{ printf("#\n") @}
+     @{ if ($1 > 0)
+         printf("%f 124 0 ; pos %f ; f0 %f ; \n",
+                NR*0.010,NR*0.010,$1) @}' >Targets/utt003.Target
+</literallayout></blockquote>
+The utetrance may then be rendered as 
+<blockquote><literallayout>
+festival> (set! utt1 (resynth "lab/utt003.lab" "Targets/utt003.utt"))
+</literallayout></blockquote>
+</para>
+<para>
+Note that this method will loose a little in diphone selection. If your 
+diphone database uses consonant cluster allophones it wont be possible 
+to properly detect these as there is no syllabic structure in this. 
+That may or may not be important to you. Even this simple 
+method however clearly shows how important the right prosody is 
+to the understandability of a string of phones. 
+</para>
+<para>
+We have successfully done this on a number of natural utterances. We 
+extracted the labels automatically by using the aligner discussed in the 
+diphone chapter. As we were using diphones from the same speaker as the 
+natural utterances (KAL) the alignment is surprisingly good and trivial 
+to do. You must however synthesis the utterance first and save the 
+waveform and labels. Note you should listen to ensure that the 
+synthesizer has generated the right labels (as much as that is 
+possible), including breaks in the same places. Comparing synthesized 
+utterances with natural ones quickly shows up many problems in 
+synthesis. 
+</para>
+</sect1>
+
+<sect1><title>Prosody Walkthrough</title>
+
+<para>
+This section gives a walkthrough of a set of basic scripts that can be 
+used to build duration and F0 models. The results will be reasonable 
+but they are designed to be language independent and hence more 
+appropriate models will almost certainly give better results. We have 
+used these methods when building diphone voices for new languages when 
+we know almost nothing explicit about the language structure. This 
+walkthrough however explcitly covers most of the major steps and hence 
+will be useful as a basis for building new better models. 
+</para>
+<para>
+In many ways this process is simialr to the limited domain voice 
+building process. here we will design a set of prompts which are 
+believed to cover the prosody that we wish to model, we record and label 
+the data and then build models from the utterances built from the 
+natural speech. In fact the basic structure for this uses the 
+limited domain scripts for the initial part of the process. 
+</para>
+<para>
+The basic stages of this task are 
+<itemizedlist mark=bullet>
+<listitem><para>
+Design database
+</para></listitem>
+<listitem><para>
+Setup directory structure
+</para></listitem>
+<listitem><para>
+Synthesizing prompts (for labeling)
+</para></listitem>
+<listitem><para>
+Recording prompts
+</para></listitem>
+<listitem><para>
+Phonetically label prompts
+</para></listitem>
+<listitem><para>
+Extract pitchmarks and F0 contour
+</para></listitem>
+<listitem><para>
+Build utterance structures
+</para></listitem>
+<listitem><para>
+For duration models
+<itemizedlist mark=bullet>
+   <listitem><para>
+   extract means and standard deviations of phone durations
+   </para></listitem>
+   <listitem><para>
+   extract features for prediction
+   </para></listitem>
+   <listitem><para>
+   build feature description files
+   </para></listitem>
+   <listitem><para>
+   Build regression model to predict durations
+   </para></listitem>
+   <listitem><para>
+   construct scheme file with duration model
+   </para></listitem>
+</itemizedlist>
+</para></listitem>
+<listitem><para>
+For F0 models
+<itemizedlist mark=bullet>
+   <listitem><para>
+   extract features for prediction
+   </para></listitem>
+   <listitem><para>
+   build feature description files
+   </para></listitem>
+   <listitem><para>
+   Build regression model to preict F0 at start, mid and end of syllable
+   </para></listitem>
+   <listitem><para>
+   construct scheme file with F0 model
+   </para></listitem>
+   </itemizedlist>
+</para></listitem>
+</itemizedlist>
+</para>
+
+<sect2><title>Design database</title>
+
+<para>
+The object here is to cpature enough speech in prosodic style that you 
+wish your syntehsizer to use. Note as prosodic modeling is still and 
+extremely difficult area all models are extremely imporerished 
+(especially the very simple models we are presenting here), thus do not 
+be too ambitious. However it is worthwhile consider if you wish dialog 
+(i.e. conversational speech) or prose (i.e. read speech). Prose can be 
+news reader style or story telling style. Most synthesizers are trained 
+on news reader style becuase its fairly consistent and believe to be 
+easier to model, and reading paragraphs of text is seens as a basic 
+apllication for text to speech synthesizers. However today with more 
+dialog systems such prosodic models are often not as appropriate. 
+</para>
+<para>
+Ideally your database will be marked up with prosodic tagging that 
+your voice talent will understand and be able to deliver appropriately. 
+Designing such a database isn't easy but when starting off in new 
+languages anything may be better than fixed durations and a naive 
+declining F0. Thus simply a list of 500 sentences from newspapers 
+may give rise to better models than. 
+</para>
+<para>
+Suppose you have your 500 sentences, construct a prompt list 
+as is done with the limited domain constuction. That is, you 
+need a file of the form. 
+<blockquote><literallayout>
+( sent_0001 "She had your dark suit in greasy washwater all year.")
+( sent_0002 "Don't make me carry an oily rag like that.")
+( sent_0003 "They wanted to go on a barge trip.")
+...
+</literallayout></blockquote>
+</para>
+</sect2>
+
+<sect2><title>Setup directory structure</title>
+
+<para>
+As with the rest of the festvox tools, you need to set 
+the following to environment variables to allow them to work 
+properly. In <varname>bash</varname> or other Bourne shell compatibles 
+type, with the appropriate pathnames for you installation of 
+the Edinburgh Speech Tools an Festvox itself. 
+<blockquote><literallayout>
+export FESTVOXDIR=/home/awb/projects/festvox
+export ESTDIR=/home/awb/projects/speech_tools
+</literallayout></blockquote>
+For <varname>csh</varname> and its derivative you should type 
+<blockquote><literallayout>
+setenv FESTVOXDIR /home/awb/projects/festvox
+setenv ESTDIR /home/awb/projects/speech_tools
+</literallayout></blockquote>
+As the basic structure is so similar to the limited 
+domain building structure, first you should all that 
+setup procedure. If you are building prosodic models for 
+an already existing limited domain then you do not 
+need this part. 
+<blockquote><literallayout>
+mkdir cmu_timit_awb
+cd cmu_timit_awb
+$FESTVOXDIR/src/ldom/setup_ldom cmu timit awb
+</literallayout></blockquote>
+The arguments are, institution, domain type, and speaker name. 
+</para>
+<para>
+After setting this up you need to also setup the extra 
+directories and scripts need to build prosody models. This 
+is done by the command 
+<blockquote><literallayout>
+$FESTVOXDIR/src/prosody/setup_prosody
+</literallayout></blockquote>
+</para>
+<para>
+You shold copy your database files as created in the previous section 
+into <filename>etc/</filename>. 
+</para>
+</sect2>
+
+<sect2><title>Synthesizing prompts</title>
+
+<para>
+We then synthesizer the prompts. As we are trying to collect natural 
+speech these prompts should not normally be presented to the voice 
+talent as they may then copy the syntehsizer intonation, which would 
+almost certainly be a bad thing. As this will sometimes be the first 
+serious use of a new diphone syntehsizerin a new language, (with 
+impoverished prosody models) it is important to check that the prompts 
+can be generate phonetically correct. This may require more additions 
+to the lexicon and/or more token to word rules. We synthesize the 
+prompts for two reasons. First, to use for autolabeling in that the 
+synthesized prompts will be aligned using dtw against what the speaker 
+actually says. Second we are trying to construct festival utterances 
+structures for each utterance in this database with natural durations 
+and F0. so we may learn from them. 
+</para>
+<para>
+You should change the line setting the "closest" voice 
+<blockquote><literallayout>
+(set! cmu_timit_awb::closest_voice 'voice_kal_diphone)
+</literallayout></blockquote>
+This is in the file <filename>festvox/cmu_timit_awb_ldom.scm</filename>. This is the 
+voice that will be used to syntehsized the prompts. Often this will be 
+your new diphone voice. 
+</para>
+<para>
+Ideally we would like these utterances to also have natural phone 
+sequences, such that schwas, allophones such as flaps, and post-lexical 
+rules have been applied. At present we do not include that here though 
+for more serious prosody modeling such phonomena should be included in 
+the utterance structures here. 
+</para>
+<para>
+The prompts can be synthesizer by the command 
+<blockquote><literallayout>
+festival -b festvox/build_ldom.scm '(build_prompts "etc/timit.data")'
+</literallayout></blockquote>
+</para>
+</sect2>
+
+<sect2><title>Recording the prompts</title>
+
+<para>
+The usual caveats apply to recording, (<xref
+linkend="bsv-recording-sect">) and the issues on selecting a speaker.
+</para>
+<para>
+As prosody modeling is difficult, and if you are inexperienced in 
+building such models, it is wise not to attempt anything hard. Just 
+building reliable models for default unmarked intonation is very useful 
+if your current models are simply the default fixed intonation. Thus 
+the senetences should be read in a natural but not too varied style. 
+</para>
+<para>
+Recording can be done with <varname>pointyclicky</varname> or <varname>prompt_them</varname>. 
+If you are using <varname>prompt_them</varname>, you should modify that script so 
+that it does not play the prompts, as they will confuse the speaker. 
+The speaker should simply read the text (and markup, if present). 
+<blockquote><literallayout>
+pointyclicky etc/timit.data
+</literallayout></blockquote>
+or 
+<blockquote><literallayout>
+bin/prompt_them etc/timit.data
+</literallayout></blockquote>
+</para>
+</sect2>
+
+<sect2><title>Phonetically label prompts</title>
+
+<para>
+After recording the spoken utterances must be labeled 
+<blockquote><literallayout>
+bin/make_labs prompt-wav/*.wav
+</literallayout></blockquote>
+This is one of the computationally expensive parts of the process and 
+for longer sentences it can require much memory too. 
+</para>
+<para>
+After autolabeling it is always worthwhiel to inspect the labels and 
+correct mistakes. Phrasing can particularly cause problems so adding or 
+deleting silences can make the derived prosody models much more 
+accurate. You can use emulabel to to this. 
+<blockquote><literallayout>
+emulabel etc/emu_lab
+</literallayout></blockquote>
+</para>
+</sect2>
+
+<sect2><title>Extract pitchmarks and F0</title>
+
+<para>
+At this point we diverge from the process used for building limited 
+domain synthesizers. You can construct such synthesizers from the same 
+recordings, maybe you wish more appropriate prosodic models for the 
+fallback synthesizer. But at this poijnt we need to extract the 
+pitchmark in a slightl different way. We are intending to extract F0 
+contours for all non-silence parts of the speech signal. We do 
+this by extracting pitchmarks for the voiced sections alone 
+then (in the next section) interpolating the F0 through the non-voiced 
+(but non-silence) sections. 
+</para>
+<para>
+<xref linkend="bsv-pitchmarks-sect">
+discusses the setting of
+parameters to get <filename>bin/make_pm_wave</filename> to work for a particular 
+voice. In this case we need those same parameters (which should be 
+found by experiment). These shold be copied from 
+<filename>bin/make_pm_wave</filename> and added to <filename>bin/make_F0_pm</filename> in the 
+variable <varname>PM_ARGS</varname>. The distribution contains something 
+like 
+<blockquote><literallayout>
+PM_ARGS='-min 0.0057 -max 0.012 -def 0.01 -wave_end -lx_lf 140 -lx_lo 111 -lx_hf 80 -lx_ho 51 -med_o 0'
+</literallayout></blockquote>
+Importnantly this differs from the parameters in <varname>bin/make_pm_wave</varname> 
+as we do not use the <varname>-fill</varname> option to fill in
+pitchmarks over the rest of the waveform.
+</para>
+<para>
+The second part of this section is the construction of an F0 contour 
+which is build from the extracted pitchmarks. Unvoiced speech sections 
+are assigned an F0 contour by interpolation from the voiced section 
+around it, and the result is smnoothed. The label files are used to 
+define which parts of the signal are silence and which are speech. 
+</para>
+<para>
+The variable <varname>SILENCE</varname> in <varname>bin/make_f0_pm</varname> must be modified to 
+reflect the symbol used for silence in your phoneset. 
+</para>
+<para>
+Once the pitchmark parameters have be determined, and the appropriate 
+<varname>SILENCE</varname> value set you can extract the smoothed F0 by the command 
+<blockquote><literallayout>
+bin/make_f0_pm wav/*.wav
+</literallayout></blockquote>
+</para>
+<para>
+You can view the F0 contrours with the command 
+<blockquote><literallayout>
+emulabel etc/emu_f0
+</literallayout></blockquote>
+</para>
+</sect2>
+
+<sect2><title>Build utterance structures</title>
+
+<para>
+With the labels and F0 created we can now rebuild the utterance 
+structures by syntehsizing the prompt snad merging in the values from 
+the natural durations and F0 from the naturally spoken utterances. 
+<blockquote><literallayout>
+festival -b festvox/build_ldom.scm '(build_utts "etc/timit.data")'
+</literallayout></blockquote>
+</para>
+</sect2>
+
+<sect2><title>Duration models</title>
+
+<para>
+The script <varname>bin/make_dur_model</varname> contains all of 
+the following commands but it is wise to understand the stages as 
+due to errors in labeling it may not all run completely smoothly 
+and small fixes may be required. 
+</para>
+<para>
+We are building a duration model using a CART tree to predict zscore 
+values for phones. Zscores (number of standard deviations from the 
+mean) have often been used in duration modeling as they allow a certain 
+amount of normalization over different phones. 
+</para>
+<para>
+You shold first look at the script <varname>bin/make_dur_model</varname> and 
+edit the following three variable values 
+<blockquote><literallayout>
+SILENCENAME=SIL
+VOICENAME='(kal_diphone)'
+MODELNAME=cmu_us_kal
+</literallayout></blockquote>
+these should contain the name for silence in your phoneset, the call for 
+the voice you are building the model for (or at least one that uses the 
+same phoneset), and finally the name for the model, which can be the 
+same <varname>INST_LANG_VOX</varname> part of the voice you call. 
+</para>
+<para>
+The first stage is to find the means and standard deviations for 
+each phone. A festival script in the festival distribution 
+is used to load in all the utetrances and a calculate these 
+values. With the command 
+<blockquote><literallayout>
+durmeanstd -output festival/dur/etc/durs.meanstd festival/utts/*.utt
+</literallayout></blockquote>
+You should check <filename>festival/dur/etc/durs.meanstd</filename>, the generated 
+file to ensure that the numbers look raosnable. If there is only one 
+example of a particular phone, the standard deviation cannot be 
+calculated and the value is given as <varname>nan</varname> (not-a-number). Thus 
+must be changed to a standard numeric value (say one-third or the mean). 
+Also some of the values in this table maybe adversely affected by bad 
+labeling so you may wish to hand modify the values, or go back and 
+correct the labeling. 
+</para>
+<para>
+The next stage is extract the features from which we will predict the 
+durations. The list of features extracted as in 
+<filename>festival/dur/etc/dur/feats</filename>. These cover phonetic context, 
+syllable, word position etc. These may or may not be appropriate for 
+your new language or domain and you you may wish to add to these before 
+doing the extraction. The extraction process takes each phoneme and 
+dumps the named feature values for that phone into a file. This uses 
+the standard festival script <varname>dumpfeats</varname> to do this. The command 
+looks like 
+<blockquote><literallayout>
+$DUMPFEATS -relation Segment -eval $VOICENAME \
+      -feats festival/dur/etc/dur.feats =
+      -output festival/dur/feats/%s.feats \
+      -eval festival/dur/etc/logdurn.scm \
+      festival/utts/*.utt
+</literallayout></blockquote>
+These feature files are then concatenated into a single file which is 
+then split (90/10) into traing and test sets. The training set is 
+further split force use as a held-out testset used in the training 
+phase. Also at this stage we remove all silence phones form the 
+training and test set. This is, perhaps naively, because the 
+distribution of silences is very wide and often files contain silences 
+at the start and end of utterances which themslves aren't part of the 
+speech content (they're just the edges) and having these in the training 
+set can skew the results. 
+</para>
+<para>
+This is done by the commands 
+<blockquote><literallayout>
+cat festival/dur/feats/*.feats | \
+      awk '{if ($2 != "'$SILENCENAME'") print $0}' >festival/dur/data/dur.data
+bin/traintest festival/dur/data/dur.data
+bin/traintest festival/dur/data/dur.data.train
+</literallayout></blockquote>
+</para>
+<para>
+For <varname>wagon</varname> the CART tree builder to work it needs to know what 
+possible values each feature can take. This can mostly be determined 
+automatically but some features may have values that could be either 
+numeric or classes, thus we use a post-processing function on the 
+automatically generated description file to get our desired result. 
+<blockquote><literallayout>
+$ESTDIR/bin/make_wagon_desc festival/dur/data/dur.data \
+       festival/dur/etc/dur.feats festival/dur/etc/dur.desc
+festival -b --heap 2000000 festvox/build_prosody.scm \
+      $VOICENAME '(build_dur_feats_desc)'
+</literallayout></blockquote>
+</para>
+<para>
+Now we can build the model itself. A key factor in the time this takes 
+(and the accuracy of the model) is the "stop" value, that is the number 
+of examples that must exist before a split searched for. The smaller 
+this number the longer the search will be, though up to a certasin point 
+the more accurate the model will be. But at some level this will over 
+train. The default in the distribution is 50 which may or may not be 
+appropriate. Not for large databases and for smaller values of 
+<varname>STOP</varname> the training may take days even on a fast processor. 
+</para>
+<para>
+Although we have guessed a reasonable value for this for databases of 
+around 50-1000 utterances it may not be appropriate for you. 
+</para>
+<para>
+The learning technique used is basic CART tree growing but with an 
+important extention which makes the process much more robust on unseen 
+data but unfortunately much more computationally expensive. The 
+<varname>-stepwise</varname> option on wagon incrementally searches for the best 
+features to use in building three, in addition to at each iteration 
+finding the best questions about each feature that best model data. 
+If you want a quicker result removing the <varname>-stepwise</varname> option 
+will give you that. 
+</para>
+<para>
+The basic wagon command is 
+<blockquote><literallayout>
+wagon -data festival/dur/data/dur.data.train.train \
+      -desc festival/dur/etc/dur.desc \
+      -test festival/dur/data/dur.data.train.test \
+      -stop $STOP \
+      -output festival/dur/tree/$PREF.S$STOP.tree \
+      -stepwise 
+</literallayout></blockquote>
+To tets the results on data not used inthe training we use 
+the command 
+<blockquote><literallayout>
+wagon_test -heap 2000000 -data festival/dur/data/dur.data.test \
+           -desc festival/dur/etc/dur.desc \
+           -tree festival/dur/tree/$PREF.S$STOP.tree
+</literallayout></blockquote>
+Interpreting the results isn't easy in isolation. The smaller the RMSE 
+(root mean squared error) the better and the larger the correlation is 
+the better (it should never be greater than 1, and should never be below 
+0, though if you model is very bad it can be below 0). For English, 
+with this script on a Timit database we get an RMSE value of 0.81 and 
+correlation of 0.58, on the test data. Note these values are not in the 
+abosolute domain (i.e. seconds) they are in the zscore domain. 
+</para>
+<para>
+The final stage, probably after a number of iterations of the build 
+process we must package model into a scheme file that can be used with a 
+voice. This scheme file contains the means and standard deviations (so 
+we can convert the predicted values back into seconds) and the 
+prediction tree itself. We also add in predictions for the silence 
+phone by hand. The comamnd to generate this is 
+<blockquote><literallayout>
+festival -b --heap 2000000 \
+         festvox/build_prosody.scm $VOICENAME \
+         '(finalize_dur_model "'$MODELNAME'" "'$PREF.S$STOP.tree'")'
+</literallayout></blockquote>
+</para>
+<para>
+This will generate a file <filename>festvox/cmu_timit_awb_dur.scm</filename>. If you 
+model name is the same as the basic diphone voice you intend to use it 
+in you cna simply copy this file to the <filename>festvox/</filename> directory of 
+your diphone voice and it will automatically work. But it is worth 
+explaining what this install process really is. The duration model 
+scheme file contains two lisp expression setting the the variables 
+<varname>MODELNAME::phone_durs</varname> and <varname>MODELNAME::zdurtree</varname>. To 
+uses these in a voice you must load this file, typically by 
+adding 
+<blockquote><literallayout>
+(require 'MODELNAME_dur)
+</literallayout></blockquote>
+to the diphone voice definition file 
+(<filename>festvox/MODELNAME_diphone.scm</filename>). And then get the voice 
+defintion to use these new variables. This is done by the 
+commands in the voice definition function 
+<blockquote><literallayout>
+  ;; Duration prediction
+  (set! duration_cart_tree MODELNAME::zdurtree)
+  (set! duration_ph_info MODELNAME::phone_durs)
+  (Parameter.set 'Duration_Method 'Tree_ZScores)
+</literallayout></blockquote>
+</para>
+</sect2>
+
+<sect2><title>F0 contour models</title>
+
+<para>
+(what about accents ?) 
+</para>
+<para>
+extract features for prediction 
+build feature description files 
+Build regression model to preict F0 at start, mid and end of syllable 
+construct scheme file with F0 model 
+</para>
+
+</sect2></sect1>
+
+
+</chapter>

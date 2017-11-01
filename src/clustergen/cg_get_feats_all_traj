@@ -1,0 +1,70 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                     Carnegie Mellon University                        ##
+##                         Copyright (c) 2005                            ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Fix features for trajectors, creating unitindexs                     ##
+##                                                                       ##
+###########################################################################
+
+LANG=C; export LANG
+
+DATAFILE=$1
+
+if [ $# != 1 ]
+then
+   echo usage: cg_get_feats_all_traj etc/txt.done.data
+   exit -1
+fi
+
+awk '{print $2}' $DATAFILE |
+while read i
+do
+   awk '{print $1}' festival/coeffs/$i.feats
+   rm -f festival/coeffs/$i.feats
+done | 
+sort -u |
+while read x
+do
+   mv festival/feats/$x.feats festival/feats/$x.feats-old 
+   cat festival/feats/$x.feats-old |
+   awk '{printf("%d ",NR-1);
+         for (i=2; i<=NF; i++)
+            printf("%s ",$i);
+         printf("\n");}' >festival/feats/$x.feats
+   awk '{print $1,$2}' festival/feats/$x.feats-old |
+   $ESTDIR/bin/ch_track -itype ascii -otype est_binary -s 0.005 -o festival/disttabs/$x.idx
+   rm festival/feats/$x.feats-old 
+
+done
+
+
+

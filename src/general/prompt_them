@@ -1,0 +1,151 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                   Carnegie Mellon University and                      ##
+##                   Alan W Black and Kevin A. Lenzo                     ##
+##                      Copyright (c) 1998-2000                          ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Prompt and record a prompt file                                      ##
+##     when this works its an easy way to collect data, but it requires  ##
+##     a working play/record program and na_play na_record doesn't work  ##
+##     everywhere.  This can also work with sox's play/rec programs      ##
+###########################################################################
+
+LANG=C; export LANG
+
+if [ $# = 0 ]
+then
+   echo "prompt and record diphone nonsense words"
+   echo "Usage: prompt_them DATALIST [POSITION] "
+   echo "   DATALIST list of utterance prompts e.g. etc/MUMBLE.data"
+   echo "   POSITION which utterance to start/restart at, default is 1"
+   exit 1
+fi
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ ! -d prompt-wav ]
+then
+   echo "can't find prompt-wav/ directory."
+   echo "are you in the right directory?"
+   exit 1
+fi
+
+POSITION=1
+if [ $# = 2 ]
+then
+   POSITION=$2
+fi
+
+# If na_play/na_record doesn't work on your machine, but the play/rec
+# programs from the sox package do, uncomment the following line
+#USE_SOX=1
+
+cat $1 | 
+tr -d "" |
+grep "^ *(.*) *$" |
+awk '{if (NR >= '$POSITION') print $0}' |
+while read lll
+do
+   echo 24 | awk '{for(i=1; i<=$1; i++)
+                   printf("\n");}'
+   echo "--------------------------------------------------------------"
+   echo -n $POSITION " "
+   echo $lll | awk '{print $2}' 
+   echo
+   echo $lll | tr -d '"' | 
+   awk '{ l=0;
+         printf("   ");
+         for(i=3; i<NF; i++)
+         {
+            if (l > 64)
+            {
+               printf("\n   "); 
+               l = 0;
+            }
+            printf("%s ",$i);
+            l += length($i)+1;
+         }
+         printf("\n")}' 
+   echo
+   f=`echo $lll | awk '{print $2}'`
+
+   # Take duration from the prompt-wav if it exists
+   if [ -f prompt-wav/$f.wav ]
+   then 
+      duration=`$ESTDIR/bin/ch_wave -info prompt-wav/$f.wav | awk '{if ($1 == "Duration:") printf("%d\n",$2+1.5)}'`
+   else
+      # Take duration from number of words (when no prompt-wavs are available
+      duration=`echo $lll | awk '{printf("%d\n",2.5+(NF/2.5))}'`
+    fi
+
+   if [ -f prompt-wav/$f.wav ]
+   then 
+      # If you don't want to hear the prompt comment out the following line
+      if [ "$USE_SOX" = 1 ]
+      then
+         play -q prompt-wav/$f.wav
+      else
+         $ESTDIR/bin/na_play prompt-wav/$f.wav
+      fi
+   fi
+
+#   echo press retrun to start recording
+#   read x </dev/tty
+
+   echo start recording for $duration seconds ...
+#   arecord -t wav -r 16000 -d $duration wav/$f.wav
+   if [ "$USE_SOX" = 1 ]
+   then
+      # This isn't going to record properly for times longer than 60secs
+      d2=`echo $duration | awk '{printf("%0d\n",$1)}'`
+      rec -q -c 1 -r 16000 -b 16 wav/$f.wav trim 0 00:$d2
+   else
+      $ESTDIR/bin/na_record -f 16000 -time $duration -o wav/$f.wav
+   fi
+   echo ... end recording
+
+   POSITION=`echo $POSITION | awk '{printf("%d",$1+1)}'`
+
+   # If you don't want to hear the review comment out the following lines
+#   echo Review $f
+#   $ESTDIR/bin/na_play prompt-wav/$f.wav
+#   $ESTDIR/bin/na_play wav/$f.wav
+
+done
+

@@ -1,0 +1,107 @@
+A quick HOWTO for a clustergen voice (August 2008)
+
+Basic directory set up
+  mkdir cmu_us_awb_arctic_cg
+  cd cmu_us_awb_arctic_cg
+  $FESTVOXDIR/src/clustergen/setup_cg cmu us awb_arctic
+
+Get your txt.done.data and waveform files (by recording or copying)
+for example
+
+  cp -p /home/awb/data/arctic/cmu_us_awb_arctic/wav/*.wav wav/
+  cp -p /home/awb/data/arctic/cmu_us_awb_arctic/etc/txt.done.data etc/
+
+The EHMM labeling 
+
+  ./bin/do_build build_prompts
+  ./bin/do_build label
+  ./bin/do_build build_utts
+
+Now the specific clustergen stuff.  First build the coefficients
+that will be clustered (uses the mcep code in Tomoki's vc code in FestVox,
+not the EST sig2fv mcep stuff).
+
+  ./bin/do_clustergen f0
+  ./bin/do_clustergen mcep
+  ./bin/do_clustergen voicing
+  ./bin/do_clustergen combine_coeffs_v
+
+Now do the clustering itself
+
+  ./bin/do_clustergen generate_statenames
+  ./bin/do_clustergen cluster
+  ./bin/do_clustergen dur
+
+festival festvox/cmu_us_awb_arctic_cg.scm
+...
+festival> (voice_cmu_us_awb_arctic_cg)
+cmu_us_awb_arctic_cg
+festival> (SayText "This is an example.")
+
+If you want to distribution your new voice for installation on other
+festival installations
+
+  ./bin/do_clustergen festvox_dist
+
+will generate festvox_cmu_us_awb_arctic_cg.tar.gz
+
+You can improve labeling, if you already have a complete voice built.
+This method moves the segment and state boundaries so you get better
+prediction.
+
+Set up the training and test set (90% train/10% test)
+
+  ./bin/traintest etc/txt.done.data
+
+Do the label moving.  By default this does 10 passes, for full arctic
+voice (1100 utterances) thats about 2 hours per pass.  The
+main improvements are typically in the first 4 or 5 passes.
+
+  $FESTVOXDIR/src/clustergen/do_move_labels
+
+At each pass a summary is printed (you can look at it in ml/summary)
+which shows the improvement.  The default setup optimizes on MCD
+(spectral measure) though this seem to not be very detrimental to F0.
+Once complete you can select the best model, but naming it or letting
+it automatically select the lowest MCD pass
+
+  $FESTVOXDIR/src/clustergen/do_move_labels select
+
+You can then rebuild you selected model with the full data
+
+  ./bin/do_clustergen cluster
+  ./bin/do_clustergen dur
+
+-------------
+FLITE Support
+-------------
+
+If you want to build Flite voice from such a build please do the following
+
+You need to rebuild the duration model with features that are fully
+supported in flite
+
+  cp -p $FESTVOX/src/clustergen/statedur.feats_flite festival/dur/etc/statedur.feats
+  ./bin/do_clustergen dur
+
+Then setup the flite build code
+
+   $FLITEDIR/tools/setup_flite
+
+Then convert the models to C
+
+   ./bin/build_flite cg
+
+Then compile the generated code
+
+   cd flite
+   make
+
+A binary should be generated
+
+   ./flite_cmu_us_awb_arctic -t "Hello world"
+
+
+
+
+   

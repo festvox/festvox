@@ -1,0 +1,1253 @@
+<chapter id="bsv-diphone-ch">
+<title>Diphone databases</title>
+
+<para>
+This chapter describes the processes involved in designing, listing 
+recording, and using a diphone database for a language. 
+</para>
+<sect1><title>Diphone introduction </title>
+
+<para>
+<indexterm><primary> diphones </primary></indexterm>
+The basic idea behind building diphone databases is to explicitly list 
+all possible phone-phone transitions in a language. This makes the 
+incorrect but practical and simplifying assumption that co-articulatory 
+effects never go over more than two phones. The exact definition of 
+<emphasis>phone</emphasis> here is in general nontrivial, and what a "standard" phone 
+set should be is not uncontroversial -- various allophonic variations, 
+such as light and dark /l/, may also be included. Unlike generalized 
+unit selection where multiple occurrences of phones may exists with 
+various distinguishing features, in a diphone database only one 
+occurrence of each diphone is recorded. This makes selection much 
+easier but also makes for a large laborious collection task. 
+</para>
+<para>
+<indexterm><primary> diphone database size </primary></indexterm>
+<indexterm><primary> illegal diphones </primary></indexterm>
+In general, the number of diphones in a language is the square of the 
+number of phones. However, in natural human languages, there are 
+phonotactic constraints -- some phone-phone pairs, even whole classes of 
+phones-phone combinations, may not occur at all. These gaps are common 
+in the world's languages. The exact definition of <emphasis>never exist</emphasis> is 
+also problematic. Humans can often generate those so-called 
+non-existent diphones if they try, and one must always think about phone 
+pairs that cross over word boundaries as well, but even then, certain 
+combinations cannot exist; for example, /hh/ /ng/ in English is probably 
+impossible (we would probably insert a schwa). /ng/ may really only 
+appears after the vowel in a syllable (in coda position); however, in 
+other languages it can appear in syllable-initial position. /hh/ cannot 
+appear at the end of a syllable, though sometimes it may be pronounced 
+when trying to add aspiration to open vowels. 
+</para>
+<para>
+Diphone synthesis, and more generally any concatenative synthesis 
+method, makes an absolutely fixed choice about which units exist, and in 
+circumstances where something else is required, a mapping is necessary. 
+When humans are given a context where an unusual phone is desired, for 
+example in a foreign word, they will (often) attempt to produce it even 
+though it falls outside their basic phonetic vocabulary. The 
+articulatory system is flexible enough to produce (or attempt to 
+produce) unfamiliar phones, as we all share the same underlying physical 
+structures. Concatenative synthesizers, however, have a fixed 
+inventory, and cannot reasonably be made to produce anything outside 
+their pre-defined vocabulary. Formant and articulatory synthesizers 
+have the advantage here. This is a basic trade off, concatenative 
+synthesizers typically produce much more natural synthesis than formants 
+synthesizer but at the cost of being only able to produce those phones 
+defined within their inventory. 
+</para>
+<para>
+<indexterm><primary> mapping unknown phones </primary></indexterm>
+Since we wish to build voices for arbitrary text-to-speech systems which 
+may include unusual phones, some mapping, typically at the lexical 
+level, can be used to ensure all the required diphones lie within the 
+recorded inventory. The resulting voice will therefore be limited, and 
+unusual phones will lie outside its range. This in many cases is 
+acceptable though if the voice is specifically to be used for 
+pronouncing Scottish place names it would be advisable to include the 
+/X/ phone as in "loch". 
+</para>
+<para>
+<indexterm><primary> consonant clusters </primary></indexterm>
+In addition to the base phones, various allophonic variations may also 
+be considered. Flapping, as when the /t/ becoming a /dx/ in the word 
+"butter" is an example of an allophonic variation reduction which 
+occurs naturally in American English, and including flaps in the phone 
+set makes the synthetic speech more natural. Stressed and unstressed 
+vowels in Spanish, consonant cluster /r/ verses lone /r/ in English, 
+inter-syllabic diphones verses intra-syllabic ones -- variations like 
+these are well worth considering. Ideally, all such possible variations 
+should be included in a diphone list, but the more variations you 
+include, the larger the diphone set will be -- remember the general rule 
+that the number of diphones is nearly the square of the number of 
+phones. This affects recording time, labeling time and ultimately the 
+database size. Duplicating all the vowels (e.g. stressed/unstressed 
+versions) will significantly increase the database size. 
+</para>
+<para>
+<indexterm><primary> non-diphone fixed inventories </primary></indexterm>
+<indexterm><primary> beyond diphones </primary></indexterm>
+<indexterm><primary> Hadifix </primary></indexterm>
+<indexterm><primary> Whistler </primary></indexterm>
+<indexterm><primary> CHATR </primary></indexterm>
+<indexterm><primary> demi-syllables </primary></indexterm>
+These inventory questions are open, and depending on the resources you 
+are willing or able to devote, can be extended considerably. It should 
+be clear, however, that such a list is simply a basic set. Alternative 
+synthesis methods and inventories of different unit sizes may produce 
+better results for the amount of work (or data collected). 
+Demi-syllable databases and mixed inventory methods such as Hadifix 
+<citation>portele96</citation> may give better results under some conditions. Still, 
+controlling the inventory and using acoustic measures rather than 
+linguistic knowledge to define the space of possible units in your 
+inventory has also been attempted as in work like Whistler 
+<citation>huang97</citation>. The most extreme view where the unit inventory is not 
+predefined at all but based solely on what is available in general 
+speech databases is CHATR <citation>campbell96</citation>. 
+</para>
+<para>
+<indexterm><primary> unit selection </primary></indexterm>
+Although generalized unit selection can produce <emphasis>much</emphasis> better 
+synthesis than diphone techniques, using more units makes selecting 
+appropriate ones more difficult. In the basic strategy presented in 
+this section, selection of the appropriate unit from the diphone 
+inventory is trivial, while in a system like CHATR, selection of the 
+appropriate unit is a significantly difficult problem. (See <xref 
+linkend="bsv-unitsel-ch"> on unit 
+selection for more discussion of such techniques). With a 
+harder selection task, it is more likely that mistakes will be made, 
+which in unit selection can give some selections which are much worse 
+worse that diphones, even though other examples may be better. 
+</para>
+</sect1>
+
+<sect1><title>Defining a diphone list</title>
+
+<para>
+<indexterm><primary> nonsense words for diphones </primary></indexterm>
+Since diphones need to be cleanly articulated, various techniques have 
+been proposed to elicit them from subjects. One technique is to use 
+target words embedded carrier sentences to ensure that the diphones are 
+pronounced with acceptable duration and prosody (i.e. consistently). We 
+have typically used nonsense words that iterate through all possible 
+combinations; the advantage of this is that you don't need to search for 
+natural examples that have the desired diphone, the list can be more 
+easily checked and the presentation is less prone to pronunciation 
+errors than if real words were presented. The words look unnatural but 
+collecting all diphones in not a particularly natural thing to do. See 
+<citation>isard86</citation> or <citation>stella83</citation> for some more discussion on the use of 
+nonsense words for collecting diphones. 
+</para>
+<para>
+For best results, we believe the words should be pronounced with consistent 
+vocal effort, with as little prosodic variation as possible. In fact 
+pronouncing them in a monotone is ideal. Our nonsense words consist of 
+a simple carrier form with the diphones (where appropriate) being taken 
+from a middle syllable. Except where schwa and syllabic consonants are 
+involved that syllable should normally be a full stressed one. 
+</para>
+<para>
+Some example code is given in <filename>src/diphone/darpaschema.scm</filename>. The 
+basic idea is to define classes of diphones, for example: vowel consonant, 
+consonant vowel, vowel vowel and consonant consonant. Then define 
+carrier contexts for these and list the cases. Here we use Festival's 
+Scheme interpreter to generate the list though any scripting language is 
+suitable. Our intention is that the diphone will come from a middle 
+syllable of the nonsense word so it is fully articulated and minimize 
+the articulatory effects at the start and end of the word. 
+</para>
+<para>
+For example to generate all vowel vowel diphone we define 
+a carrier 
+<blockquote><literallayout>
+(set! vv-carrier '((pau t aa t) (t aa pau)))
+</literallayout></blockquote>
+And we define a simple function that will enumerate all 
+vowel vowel transitions 
+<blockquote><literallayout>
+(define (list-vvs)
+  (apply
+   append
+   (mapcar
+    (lambda (v1)
+      (mapcar 
+       (lambda (v2) 
+         (list
+          (string-append v1 "-" v2)
+          (append (car vv-carrier) (list v1 v2) (car (cdr vv-carrier)))))
+       vowels))
+    vowels)))
+</literallayout></blockquote>
+For those of you who aren't used to reading Lisp this simple 
+lists all possible combinations or in some potentially more 
+readable format (in an imaginary language) 
+<blockquote><literallayout>
+for v1 in vowels
+   for v2 in vowels
+     print pau t aa t $v1 $v2 t aa pau
+</literallayout></blockquote>
+The actual Lisp code returns a list of diphone names and phone string. 
+To be more efficient, the DARPAbet example produces consonant-vowel and 
+vowel-consonant diphones in the same nonsense word, which reduces the 
+number of words to be spoken quite significantly. Your voice talent 
+will appreciate this. 
+</para>
+<para>
+Although the idea seems simple to begin with, simply listing all 
+contexts and pairs, there are other constraints. Some consonants can 
+only appear in the onset of a syllable (before the vowel), and others 
+are restricted to the coda. 
+</para>
+<para>
+<indexterm><primary> consonant clusters </primary></indexterm>
+While one can collect all the diphones without considering where they 
+fall in a syllable, it often makes sense to collect diphones in 
+different syllabic contexts. Consonant clusters are the obvious next 
+set to consider; thus the example DARPAbet schema includes simple 
+consonant clusters with explicit syllable boundaries. We also include 
+syllabic consonants though these may be harder to pronounce in all 
+contexts. You can add other phenomena too, but this is at the cost of 
+not only making the list longer (and making it take longer to record), 
+but making it harder to produce. You must consider how easy it is for 
+your voice talent to pronounce them, and how consistent they can be 
+about it. For example, not all American speakers produce flaps (/dx/) 
+in all of the same contexts (and some may produce them even when you ask 
+them not to), and its quite difficult for some to pronounce them, which 
+can lead to production/transcription mismatches. 
+</para>
+<para>
+<indexterm><primary> foreign phones </primary></indexterm>
+<indexterm><primary> lone phones </primary></indexterm>
+A second and related problem is language interference, which can cause 
+phoneme crossover. Because of the prevalence of English, especially in 
+electronic text, how many "foreign" phone should be considered for 
+addition? For example, should /w/ be include for German speakers, 
+(maybe), /t-i/ for Japanese (probably) or both /b/ and /v/ for Spanish 
+speakers ("B de burro / V de vaca"). This problem is made difficult by 
+the fact that the people you are recording will often be fluent or 
+nearly fluent in English, and hence already have reasonably ability in 
+phones that are not in their native language. If you are unfamiliar 
+with the phone set and constraints on a language, it pays off 
+considerably to either ask someone (like a linguist!) who knows the 
+language analytically (not just by intuition), to check the literature, 
+or to do some research. 
+</para>
+<para>
+To the degree that they are expected to appear, regardless of their 
+status in the target language per se, foreign phones should be 
+considered for the inventory. Remember that in most languages, nowadays, 
+making no attempt to accommodate foreign phones is considered ignorant 
+at least and possibly even arrogant. 
+</para>
+<para>
+Ultimately, when more complex forms are needed, extending the "diphone" 
+set becomes prohibitive and has diminishing returns. Obviously there 
+are phonetic differences between onset and coda positions, 
+co-articulatory effects which go over more then one phone, stress 
+differences, intonational accent differences, and phrase-positional 
+difference to name but a few. Explicitly enumerating all of these, or 
+even deciding the relative importance of each, is a difficult research 
+question, and arguably shouldn't be done in an abstract, linguistically 
+generated fashion from a strict interpretation of the language. 
+Identifying these potential differences and finding an inventory which 
+takes into account the actual distinctions a speaker makes is far more 
+productive and is the fundamental part of many new research directions 
+in concatenative speech synthesis. (See the discussion in the 
+introduction above). 
+</para>
+<para>
+<indexterm><primary> diphone list format </primary></indexterm>
+However you choose to construct the diphone list, and whatever examples 
+you choose to include, the the tools and scripts included with this 
+document require that it be in a particular format. 
+</para>
+<para>
+Each line should contain a file id, a prompt, and a diphone name (or 
+list of names if more than one diphone is being extracted from that 
+file). The file id is used to in the filename for the waveform, label 
+file, and any other parameters files associated with the nonsense word. 
+We usually make this distinct for the particular speaker we are going to 
+record, e.g. their initials and possibly the language they are speaking. 
+</para>
+<para>
+The prompt is presented to the speaker at recording time, and here it 
+contains a string of the phones in the nonsense word from which the 
+diphones will be extracted. For example the following is taken from the 
+DARPAbet-generated list 
+<blockquote><literallayout>
+( uk_0001 "pau t aa b aa b aa pau" ("b-aa" "aa-b") )
+( uk_0002 "pau t aa p aa p aa pau" ("p-aa" "aa-p") )
+( uk_0003 "pau t aa d aa d aa pau" ("d-aa" "aa-d") )
+( uk_0004 "pau t aa t aa t aa pau" ("t-aa" "aa-t") )
+( uk_0005 "pau t aa g aa g aa pau" ("g-aa" "aa-g") )
+( uk_0006 "pau t aa k aa k aa pau" ("k-aa" "aa-k") )
+...
+( uk_0601 "pau t aa t ey aa t aa pau" ("ey-aa") )
+( uk_0602 "pau t aa t ey ae t aa pau" ("ey-ae") )
+( uk_0603 "pau t aa t ey ah t aa pau" ("ey-ah") )
+( uk_0604 "pau t aa t ey ao t aa pau" ("ey-ao") )
+...
+( uk_0748 "pau t aa p - r aa t aa pau" ("p-r") )
+( uk_0749 "pau t aa p - w aa t aa pau" ("p-w") )
+( uk_0750 "pau t aa p - y aa t aa pau" ("p-y") )
+( uk_0751 "pau t aa p - m aa t aa pau" ("p-m") )
+...
+</literallayout></blockquote>
+Note the explicit syllable boundary marking <varname>-</varname> for the 
+consonant-consonant diphones is used to distinguish them from the 
+consonant cluster examples that appear later. 
+</para>
+<sect2><title>Synthesizing prompts</title>
+
+<para>
+<indexterm><primary> synthesizing diphone prompts </primary></indexterm>
+To help keep pronunciation consistent we suggest synthesizing prompts 
+and playing them to your voice talent at collection time. This helps 
+the speaker in two ways -- if they mimic the prompt they are more likely 
+to keep a fixed prosodic style; it also reduces the number of errors 
+where the speaker vocalizes the wrong diphone. Of course for new 
+languages where a set of diphones doesn't already exist, producing 
+prompts is not easy, however giving approximations with diphone sets 
+from other languages may work. The problem then is that in producing 
+prompts from a different phone set, the speaker is likely to mimic the 
+prompts hence the diphone set will probably seem to have a foreign 
+pronunciation, especially for vowels.
+Furthermore, mimicing the synthesizer too closely can remove some of the 
+speaker's natural voice quality, which is under their (possibly 
+subconscious) control to some degree. 
+</para>
+<para>
+Even when synthesizing prompts from an existing diphone set, you must be 
+aware that that diphone set may contain errors or that certain examples 
+will not be synthesized appropriately (e.g. consonant clusters). 
+Because of this, it is still worthwhile monitoring the speaker to ensure 
+they say things correctly. 
+</para>
+<para>
+The basic code for generating the prompts is in 
+<filename>src/diphone/diphlist.scm</filename>, and a specific example for DARPA phone 
+set for American English in <filename>src/diphone/us_schema.scm</filename>. The 
+prompts can be generated from the diphone list as described above (or at 
+the same time). The example code produces the prompts and phone labels 
+files which can be used by the aligning tool described below. 
+</para>
+<para>
+<indexterm><primary> <varname>Diphone_Prompt_Setup</varname> </primary></indexterm>
+<indexterm><primary> varying fixed prosody </primary></indexterm>
+<indexterm><primary> fixed prosody </primary></indexterm>
+Before synthesizing, the function <varname>Diphone_Prompt_Setup</varname> is called, 
+if it has been defined. You should define this to set up the 
+appropriate voices in Festival, as well as any other initialization you 
+might need -- for example, setting the fundamental frequency (F0) for 
+the prompts that are to be delivered in a monotone (disregarding 
+so-called microprosody, which is another matter). This value is set 
+through the variable <varname>FP_F0</varname> and should be near the middle of the 
+range for the speaker, or at least somewhere comfortable to deliver. 
+For the DARPAbet diphone list for KAL, we have: 
+<blockquote><literallayout>
+(define (Diphone_Prompt_Setup)
+ "(Diphone_Prompt_Setup)
+Called before synthesizing the prompt waveforms.  Uses the kal_dphone
+voice for prompting and sets F0."
+ (voice_kal_diphone)  ;; US male voice
+ (set! FP_F0 90)      ;; lower F0 than ked
+ )
+</literallayout></blockquote>
+<indexterm><primary> Diphone_Prompt_Word </primary></indexterm>
+If the function <varname>Diphone_Prompt_Word</varname> is defined, it will be called 
+after the basic prompt-word utterance has been created, and before the 
+actual waveform synthesis. This may be used to map phones to other 
+phones, set durations or whatever you feel appropriate for your 
+speaker/diphone set. For the KAL set, we redefined the syllabic 
+consonants to their full consonant forms in the prompts, since the ked 
+diphone database doesn't actually include syllabics. Also, in the 
+example below, instead of using fixed (100ms) durations we make the 
+diphones use a constant scaling factor (here, 1.2) times the average 
+duration of the phones. 
+<blockquote><literallayout>
+(define (Diphone_Prompt_Word utt)
+  "(Diphone_Prompt_Word utt)
+Specify specific modifications of the utterance before synthesis
+specific to this particular phone set."
+  ;; No syllabics in kal so flip them to non-syllabic form
+  (mapcar
+   (lambda (s)
+     (let ((n (item.name s)))
+       (cond
+        ((string-equal n "el")
+         (item.set_name s "l"))
+        ((string-equal n "em")
+         (item.set_name s "m"))
+        ((string-equal n "en")
+         (item.set_name s "n")))))
+   (utt.relation.items utt 'Segment))
+  (set! phoneme_durations kd_durs)
+  (Parameter.set 'Duration_Stretch '1.2)
+  (Duration_Averages utt))
+</literallayout></blockquote>
+</para>
+<para>
+<indexterm><primary> generating diphone prompts </primary></indexterm>
+By convention, the prompt waveforms are saved in 
+<filename>prompt-wav/</filename>, and their labels in <filename>prompt-lab/</filename>. 
+The prompts may be generated after the diphone list is given 
+using the following command: 
+<blockquote><literallayout>
+festival festvox/us_schema.scm festvox/diphlist.scm
+festival> (diphone-gen-schema "us" "etc/usdiph.list")
+</literallayout></blockquote>
+</para>
+<para>
+If you already have a diphone list schema generated in the file 
+<filename>etc/usdiphlist</filename>, you can do the following 
+<blockquote><literallayout>
+festival festvox/us_schema.scm festvox/diphlist.scm
+festival> (diphone-gen-waves "prompt-wav" "prompt-lab" "etc/usdiph.list")
+</literallayout></blockquote>
+</para>
+<para>
+<indexterm><primary> cross language prompting </primary></indexterm>
+Another useful example of the setup functions is to generate prompts for 
+a language for which no synthesizer exists yet -- to "bootstrap" from 
+one language to another. A simple mapping can be given between the 
+target phoneset and an existing synthesizer's phone set. We don't know 
+if this will be sufficient to actually use as prompts, but we have found 
+that it is suitable to use these prompts for automatic alignment. 
+</para>
+<para>
+The example here is using the <varname>voice_kal_diphone</varname> speaker, 
+a US English speaker, to produce prompts for japanese phone set, 
+this code is in <filename>src/diphones/ja_schema.scm</filename> 
+</para>
+<para>
+The function <varname>Diphone_Prompt_Setup</varname> calls the kal (US) voice, sets 
+a suitable F0 value, and sets the option <varname>diph_do_db_boundaries</varname> to 
+<varname>nil</varname>. This option allows the diphone boundaries to be dumped into 
+the prompt label files, but this doesn't work when cross-language 
+prompting is done, as the actual phones don't match the desired ones. 
+<blockquote><literallayout>
+(define (Diphone_Prompt_Setup)
+ "(Diphone_Prompt_Setup)
+Called before synthesizing the prompt waveforms.  Cross language prompts
+from US male (for gaijin male)."
+ (voice_kal_diphone)  ;; US male voice
+ (set! FP_F0 90)
+ (set! diph_do_db_boundaries nil) ;; cross-lang confuses this
+ )
+</literallayout></blockquote>
+At synthesis time, each Japanese phone must be mapped to an equivalent 
+(one or more) US phone. This is done though a simple table. set in 
+<varname>nhg2radio_map</varname> which gives the closest phone or phones for 
+the Japanese phone (those unlisted remain the same). 
+</para>
+<para>
+Our mapping table looks like this 
+<blockquote><literallayout>
+(set! nhg2radio_map
+      '((a aa)
+	(i iy)
+	(o ow)
+	(u uw)
+	(e eh)
+	(ts t s)
+	(N n)
+	(h hh)
+	(Qk k)
+	(Qg g)
+	(Qd d)
+	(Qt t)
+	(Qts t s)
+	(Qch t ch)
+	(Qj jh)
+	(j jh)
+	(Qs s)
+	(Qsh sh)
+	(Qz z)
+	(Qp p)
+	(Qb b)
+	(Qky k y)
+	(Qshy sh y)
+	(Qchy ch y)
+	(Qpy p y ))
+	(ky k y)
+	(gy g y)
+	(jy jh y)
+	(chy ch y)
+	(shy sh y)
+	(hy hh y)
+	(py p y)
+	(by b y)
+	(my m y)
+	(ny n y)
+	(ry r y)))
+</literallayout></blockquote>
+Phones that are not explicitly mentioned map to themselves (e.g. most of 
+the consonants). 
+</para>
+<para>
+Finally we define <varname>Diphone_Prompt_Word</varname> to actually do the mapping. 
+Where the mapping involves more than one US phone we add an extra 
+segment to the Segment (defined in the Festival manual) relation and 
+split the duration equally between them. The basic function looks like 
+<blockquote><literallayout>
+(define (Diphone_Prompt_Word utt)
+  "(Diphone_Prompt_Word utt)
+Specify specific modifications of the utterance before synthesis
+specific to this particular phone set."
+  (mapcar
+   (lambda (s)
+     (let ((n (item.name s))
+	   (newn (cdr (assoc_string (item.name s) nhg2radio_map))))
+       (cond
+	((cdr newn)  ;; its a dual one
+	 (let ((newi (item.insert s (list (car (cdr newn))) 'after)))
+	   (item.set_feat newi "end" (item.feat s "end"))
+	   (item.set_feat s "end"
+			  (/ (+ (item.feat s "segment_start")
+				(item.feat s "end"))
+			     2))
+	   (item.set_name s (car newn))))
+	(newn
+	 (item.set_name s (car newn)))
+	(t
+	 ;; as is
+	 ))))
+   (utt.relation.items utt 'Segment))
+  utt)
+</literallayout></blockquote>
+The label file produced from this will have the original desired 
+language phones, while the acoustic waveform will actually consist of 
+phones in the target language. Although this may seem like cheating, we 
+have found this to work for Korean and Japanese from English, and is 
+likely to work over many other language combination pairs. For 
+autolabeling as the nonse word phone names are pre-defined alignment 
+just needs to be the best matching path and as long as the phones are 
+distinctive from the ones around them this alignment method is likely to 
+work. 
+</para>
+</sect2></sect1>
+
+<sect1><title>Recording the diphones</title>
+
+<para>
+<indexterm><primary> recording the diphones </primary></indexterm>
+The object of recording diphones is to get as uniform a set of 
+pronunciations as possible. Your speaker should be relaxed, not be 
+suffering for a cold, or cough, or a hangover. If something goes wrong 
+with the recording and some of the examples need to be re-recorded it is 
+important that the speaker has as similar a voice as with the original 
+recording, waiting for another cold to come along is not reasonable, 
+(though some may argue that the same hangover can easily be induced). 
+Also to try to keep the voice potentially repeatable it is wise to 
+record at the same time of day, morning is a good idea. The points 
+on speaker selection and recording in the previous section should also 
+be borne in mind. 
+</para>
+<para>
+The recording environment should be reconstructable, so that the 
+conditions can be set up again if needed. Everything should be as 
+well-defined as possible, as far as gain settings, microphone distances, 
+and so on. Anechoic chambers are best, but general recording studios 
+will do. We've even done recording in an open room, with care this 
+works (make sure there's little background noise from computers, air 
+conditioning, outside traffic etc). Of course open rooms aren't ideal 
+but they are better than open noisey rooms. 
+</para>
+<para>
+The distance between the speaker and the microphone is crucial. A head 
+mounted mike helps keep this constant; the Shure SM-2 headset, for 
+instance, works well with the mic positioned at 8mm from the lips or so. 
+This can be checked with a ruler. Considering the cost and availability 
+of headmounted microphones and rulers, you should really consider using 
+them. While even fixed microphones like the Shure SM-57 can be used 
+well by professional voice talent, we strongly recommend a good headset 
+mic. 
+</para>
+<para>
+Ultimately, you need to split the recordings into individual files, one 
+for each prompt. Ideally this can be done while recording on a 
+file-by-file basis, but as that may not be practical and some other 
+technique can be used, such as recording onto DAT and transferring the 
+data to disk (and downsampling) later. Files might contain 50-100 
+nonsense words each. In this case we hand label the words, taking into 
+account any duplicates caused be errors in the recording. The program 
+<filename>ch_wave</filename> in the Edinburgh Speech Tools (EST) offers a function to 
+split a large file into individual files based on a label file. We can 
+use this to get our individual files. You may also add an identifiable 
+noise during recording and automatically detect that as a split point, 
+as is often done at the Oregon Graduate Instititute.. They typically 
+use two different noises that can easily be distinguished and use one 
+for <quote><emphasis>OK</emphasis></quote> and <quote><emphasis>BAD</emphasis></quote> this can make the splitting of the files 
+into the individual nonsense words easier. Note you will also need 
+to split the electroglottograph (EGG) signal exactly the same way, if 
+you are using one. 
+</para>
+<para>
+No matter how you split these, you should be aware that there will still 
+often be mistakes, and checking by listening will help. 
+</para>
+<para>
+We now almost always record directly to disk on a computer using a
+sound card; see <xref linkend="bsv-recording-sect"> for recording
+setup details. There can be a reduction in the quality of the
+recording due to poor quality audio hardware in computers (and often
+too much noise), though at least the hardware issue is getting to be
+less of a problem these days. There are lots of advantages to
+recording directly to disk, as the stage of digitising, transfering
+and spliting the offline records is laborious and prone to error.
+</para>
+</sect1>
+
+<sect1><title>Labeling the diphones</title>
+
+<para>
+<indexterm><primary> labeling diphones </primary></indexterm>
+<indexterm><primary> diphone labeling </primary></indexterm>
+Labeling nonsense words is <emphasis>much</emphasis> easier than labeling continuous 
+speech, whether it is by hand or automatically. With nonsense words, it 
+is completely defined which phones are there and they are (hopefully) 
+clearly articulated. 
+</para>
+<para>
+<indexterm><primary> hand labeling diphones </primary></indexterm>
+We have had significant experience in hand labeling diphones, and with 
+the right tools it can be done fairly quickly (e.g. 20 hours for 2500 
+nonsense words) even if it is a mind-numbing exercise which your voice 
+talent may offer you little sympathy for after you've made them babble 
+for hours in a box with electrodes on their throat (optional). But 
+labeling can't realistically be done for more than an hour or two at 
+any one time. As a minimum, the start of the preceding phone to the 
+first phone in the diphone, the changeover, and the end of the second 
+phone in the diphone should be labeled. Note we recommend phone 
+boundary labeling as that is much better defined than phone middle 
+marking. The diphone will, by default be extracted from the middle of 
+phone one to the middle of phone two. 
+</para>
+<para>
+<indexterm><primary> closures </primary></indexterm>
+<indexterm><primary> stops </primary></indexterm>
+Your data set conventions may include the labeling of closures within 
+stops explicitly. Thus you would expect the label <varname>tcl</varname> at the end 
+of the silence part of a /t/ and a label <varname>t</varname> after the burst. This 
+way the diphone boundary can automatically be placed within the silence 
+part of the stop. The label <varname>DB</varname> can be used when explicit diphone 
+boundaries are desireable; this is useful within phones such as 
+diphthongs where the temporal middle need not be the most stable part. 
+</para>
+<para>
+<indexterm><primary> explicit diphone boundaries </primary></indexterm>
+Another place when specific diphone boundaries are recommended is in the 
+phone-to-silence diphones. The phones at the end of words are typically 
+longer than word internal phones, and tend to trail off in energy. Thus 
+the midpoint of a phone immediately before a silence typically has much 
+less energy than the midpoint of a word internal phone. Thus, when a 
+diphone is to be concatenated to a phone-silence diphone, there would be 
+a big jump in energy (as well as other related spectral characteristics). 
+Our solution to this is explicitly label a diphone boundary near the 
+beginning of the phone before the silence (about 20% in) where the 
+energy is much closer to what it will be in the diphone that will 
+precede it. 
+</para>
+<para>
+If you are using explicit closures, it is worth noting that stops at the 
+start of words don't seem to have a closure part; however it is a good 
+idea to actually label one anyway, if you are doing this by hand. Just 
+"steal" a suitable short piece of silence from the preceding part of the 
+waveform. 
+</para>
+<para>
+<indexterm><primary> labeling silence </primary></indexterm>
+Because the words will often have very varying amounts of silence around 
+them, it is a good idea to label multiple silences around the word, so 
+that the silence immediately before the first phone is about 200-300 ms, 
+and labeling the silence before that as another phone; likewise with 
+the final silence. Also, as the final phone before the end silence may 
+trail off, we recommend that the end of the last phone come at the very 
+end of any signal thus appear to include silence within it. Then label 
+the real silence (200-300 ms) after it. The reason for this is if the 
+end silence happens to include some part of the spoken signal, and if 
+this is duplicated, as is the case when duration is elongated, an 
+audible buzz can be introduced. 
+</para>
+<para>
+<indexterm><primary> autolabeling </primary></indexterm>
+<indexterm><primary> aligning </primary></indexterm>
+Because labeling of diphone nonsense words is such a constrained task 
+we have included a program for automatically providing a labeling for 
+the spoken prompts. This requires that prompts be generated for the 
+diphone database. The aligner uses those prompts to do the aligning. 
+Though its not actually necessary that the prompts were used as prompts 
+they do need to be generated for this alignment process. This is not the 
+only means for alignment; you may also, for instance, use a speech 
+recognizer, such as CMU Sphinx, to segment (align) the data. 
+</para>
+<para>
+The idea behind the aligner is to take the prompt and the spoken form 
+and derive mel-scale cepstral parameterizations (and their deltas) of 
+the files. Then a DTW (dynamic time warping) algorithm is used to find 
+the best alignment between these two sets of features. Then the prompt 
+label file is used to index through the alignment to give a label file 
+for the spoken nonsense word. This is largely based on the techniques 
+described in <citation>malfrere97</citation>, though this general technique has been 
+used for many years. 
+</para>
+<para>
+We have tested this aligner on a number of existing hand-labeled 
+databases to compare the quality of the alignments with respect to 
+the hand labeling. We have also tested aligning prompts generated 
+from a language different from that being recorded. To do this there 
+needs to be reasonable mapping between the language phonesets. 
+</para>
+<para>
+Here are results for automatically finding labels for 
+the ked (US English) by aligning them against prompts generated by 
+three different voices 
+<variablelist>
+<varlistentry>
+<term><emphasis>ked itself</emphasis></term>
+<listitem><para>
+mean error 14.77ms stddev 17.08 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>mwm (US English)</emphasis></term>
+<listitem><para>
+mean error 27.23ms stddev 28.95 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>gsw (UK English)</emphasis></term>
+<listitem><para>
+mean error 25.25ms stddev 23.923 
+</para></listitem></varlistentry>
+</variablelist>
+Note that gsw actually gives better results than mwm, even though it is 
+a different dialect of English. We built three diphone index files from 
+each of the label sets generated from there alignment processes. 
+ked-to-ked was the best, and only marginally worse that the database 
+made from the manually produced labels. The database from mwm and gsw 
+produced labels were a little worse but not unacceptably so. 
+Considering a significant amount of careful corrections were made to the 
+manually produced labels, these automatically produced labels are still 
+significantly better than the first pass of hand labels. 
+</para>
+<para>
+A further experiment was made across languages; the ked diphones were 
+used as prompts to align a set of Korean diphones. Even though there 
+are a number of phones in Korean not present in English (various forms 
+of aspirated consonants), the results are quite usable. 
+</para>
+<para>
+Whether you use hand labeling or automatic alignment, it is always 
+worthwhile doing some hand-correction after the basic database is built. 
+Mistakes (sometimes systematic) always occur and listening to 
+substantial subset of the diphones (or them all if you resynthesize the 
+nonsense words) is definitely worth the time in finding bad diphones. 
+The diva is in the details. 
+</para>
+<para>
+<indexterm><primary> aligning </primary></indexterm>
+<indexterm><primary> automatically labeling diphones </primary></indexterm>
+The script <filename>festvox/src/diphones/make_labs</filename> will process a set of 
+prompts and their spoken (recorded) form generating a set of label 
+files, to the best of its ability. The script expects the following to 
+already exist 
+<variablelist>
+<varlistentry>
+<term><filename>prompt-wav/</filename></term>
+<listitem><para>
+The waveforms as synthesized by Festival 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><filename>prompt-lab/</filename></term>
+<listitem><para>
+The label files corresponding to the synthesized prompts in 
+<filename>prompt-wav</filename>. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><filename>prompt-cep/</filename></term>
+<listitem><para>
+The directory where the cepstral feature streams for each prompt 
+will be saved. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><filename>wav/</filename></term>
+<listitem><para>
+The directory holding the nonsense words spoken by your voice talent. 
+The should have the same file id as the waveforms in <filename>prompt-wav/</filename>. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><filename>cep/</filename></term>
+<listitem><para>
+The directory where the cepstral feature streams for the recorded 
+material will be saved. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><filename>lab/</filename></term>
+<listitem><para>
+The directory where the generated label files for the spoke 
+words in <filename>wav/</filename> will be saved. 
+</para></listitem></varlistentry>
+</variablelist>
+To run the script over the prompt waveforms 
+<blockquote><literallayout>
+bin/make_labs prompt-wav/*.wav
+</literallayout></blockquote>
+The script is written so it may be use used in parallel on multiple 
+machines if you want to distribute the process. On a Pentium Pro 
+200MHz, which you probably won't be able to find any more, a 2000 word 
+diphone databases can be labeled in about 30 minutes. Most of that 
+time is in generating the cepstrum coefficients. This is down to a 
+few minutes at most on a dual Pentium III 550. 
+</para>
+<para>
+<indexterm><primary> diphone index </primary></indexterm>
+Once the nonsense words have been labeled, you need to build a diphone 
+index. The index identifies which diphone comes from which files, and 
+from where. This can be automatically built from the label files 
+(mostly). The Festival script 
+<filename>festvox/src/diphones/make_diph_index</filename> will take the diphone list 
+(as used above), find the occurrence of each diphone in the label files, 
+and build an index. The index consists of a simple header, followed by 
+a single line for each diphone: the diphone name, the fileid, start time, 
+mid-point (i.e. the phone boundary) and end time. The times are given 
+in <emphasis>seconds</emphasis> (note that early versions of Festival, using a different 
+diphone synthesizer module, used milliseconds for this. If you have 
+such an old version of Festival, it's time to update it). 
+</para>
+<para>
+An example from the start of a diphone index file is 
+<blockquote><literallayout>
+EST_File index
+DataType ascii
+NumEntries  1610
+IndexName ked2_diphone
+EST_Header_End
+y-aw kd1_002 0.435 0.500 0.560
+y-ao kd1_003 0.400 0.450 0.510
+y-uw kd1_004 0.345 0.400 0.435
+y-aa kd1_005 0.255 0.310 0.365
+y-ey kd1_006 0.245 0.310 0.370
+y-ay kd1_008 0.250 0.320 0.380
+y-oy kd1_009 0.260 0.310 0.370
+y-ow kd1_010 0.245 0.300 0.345
+y-uh kd1_011 0.240 0.300 0.330
+y-ih kd1_012 0.240 0.290 0.320
+y-eh kd1_013 0.245 0.310 0.345
+y-ah kd1_014 0.305 0.350 0.395
+...
+</literallayout></blockquote>
+Note the number of entries field must be correct; if it is too small it 
+will (often confusingly) ignore the entries after that point. 
+</para>
+<para>
+This file can be created with a diphone list file and the lab 
+files in by the command 
+<blockquote><literallayout>
+$FESTVOXDIR/src/diphones/make_diph_index etc/usdiph.list dic/kaldiph.est
+</literallayout></blockquote>
+You should check that this has successfully found all the named 
+diphones. When an diphone is not found in a label file, an entry with 
+zeroes for the start, middle, and end is generated, which will produce a 
+warning when being used in Festival, but it is worth checking in 
+advance. 
+</para>
+<para>
+The <filename>make_diph_index</filename> program will take the midpoint between phone 
+boundaries for the diphone boundary, unless otherwise specified with the 
+label <varname>DB</varname>. It will also automatically remove underscores and 
+dollar symbols from the diphone names before searching for the diphone 
+in the label file, and it will only find the first occurrence of the 
+diphone. 
+</para>
+</sect1>
+
+<sect1><title>Extracting the pitchmarks</title>
+
+<para>
+<indexterm><primary> pitchmarks </primary></indexterm>
+<indexterm><primary> EGG </primary></indexterm>
+<indexterm><primary> larynograph </primary></indexterm>
+Festival, in its publically distributed form, currently only supports 
+residual excited Linear-Predictive Coding (LPC) resynthesis 
+<citation>hunt89</citation>. It does support PSOLA <citation>moulines90</citation>, though this is 
+not distributed in the public version. Both of these techniques are 
+<emphasis>pitch synchronous</emphasis>, that is there require information about where 
+pitch periods occur in the acoustic signal. Where possible, it is 
+better to record with an electroglottograph (EGG, also known as a 
+laryngograph) at the same time as the voice signal. The EGG records 
+electrical activity in the glottis during speech, which makes it easier 
+to get the pitch moments, and so they can be more precisely found. 
+</para>
+<para>
+Although extracting pitch periods from the EGG signal is not trivial, it 
+is fairly straightforward in practice, as The Edinburgh Speech Tools 
+include a program <filename>pitchmark</filename> which will process the EGG signal 
+giving a set of pitchmarks. However it is not fully automatic and 
+requires someone to look at the result and make some decisions to change 
+parameters that may improve the result. 
+</para>
+<para>
+The first major issue in processing the signal is deciding which way is 
+up. From our experience, we have seen the signal inverted in some cases 
+and it is necessary to identify the direction in order for the rest of 
+the processing to work properly. In general we've found the CSTR's LAR 
+output is upside down while OGI's and CMU's output is the right way up, 
+though this can even flip from file to file. If you find inverted 
+signals, you should add <varname>-inv</varname> to the arguments to 
+<filename>pitchmark</filename>. 
+</para>
+<para>
+The object is to produce a single mark at the peak of each pitch period and 
+"fake" or "phantom" periods during unvoiced regions. The basic command 
+we have found that works for us is 
+<blockquote><literallayout>
+pitchmark lar/file001.lar -o pm/file001.pm -otype est \
+     -min 0.005 -max 0.012 -fill -def 0.01 -wave_end
+</literallayout></blockquote>
+It is worth doing one or two by hand and confirming that a reasonable 
+pitch periods are found. Note that the <varname>-min</varname> and <varname>-max</varname> 
+arguments are speaker-dependent. This can be moved towards the fixed F0 
+point used in the prompts, though remember the speaker will not have 
+been exactly constant. The script <filename>festvox/src/general/make_pm</filename> 
+can be copied and modified (for the particular pitch range) and run to 
+generate the pitchmarks 
+<blockquote><literallayout>
+bin/make_pm lar/*.lar
+</literallayout></blockquote>
+</para>
+<para>
+<indexterm><primary> pitchmarks without EGG </primary></indexterm>
+<indexterm><primary> pitchmarks from waveforms </primary></indexterm>
+If you don't have an EGG signal for your diphones, the alternative is to 
+extract the pitch periods using some other signal processing function. 
+Finding the pitch periods is similar to finding the F0 contour and, 
+although harder than finding it from the EGG signal, with clean 
+laboratory-recorded speech, such as diphones, it is possible. The 
+following script is a modification of the <filename>make_pm</filename> script above 
+for extracting pitchmarks from a raw waveform signal. It is not as good 
+as extracting from the EGG file, but it works. It is more 
+computationally intensive, as it requires rather high order filters. 
+The value should change depending on the speaker's pitch range. 
+<blockquote><literallayout>
+for i in $*
+do
+   fname=`basename $i .wav`
+   echo $i
+   $ESTDIR/bin/ch_wave -scaleN 0.9 $i -F 16000 -o /tmp/tmp$$.wav
+   $ESTDIR/bin/pitchmark /tmp/tmp$$.wav -o pm/$fname.pm \
+             -otype est -min 0.005 -max 0.012 -fill -def 0.01 \
+             -wave_end -lx_lf 200 -lx_lo 71 -lx_hf 80 -lx_ho 71 -med_o 0
+done
+</literallayout></blockquote>
+If you are extracting pitch periods automatically, it is worth taking 
+more care to check the signal. We have found that recording consistency 
+and bad pitch extraction the two most common causes of poor quality 
+synthesis. 
+</para>
+<para>
+See <xref linkend="bsv-pitchmarks-sect"> for a more detailed 
+discussion on how to do this. 
+</para>
+</sect1>
+
+<sect1><title>Building LPC parameters</title>
+
+<para>
+<indexterm><primary> LPC parameters </primary></indexterm>
+<indexterm><primary> make_lpc </primary></indexterm> 
+
+Currently the only publically distributed signal processing method in
+Festival is residual excited LPC.  To use this, you must extract LPC
+parameters and LPC residual files for each file in the diphone
+database. Ideally, the LPC analysis should be done
+pitch-synchronously, thus requiring that pitch marks are created
+before the LPC analysis takes place.
+
+</para>
+<para>
+A script suitable for generating the LPC coefficients and residuals 
+is given in <filename>festvox/src/general/make_lpc</filename> and is repeated 
+here. 
+<blockquote><literallayout>
+for i in $*
+do
+   fname=`basename $i .wav`
+   echo $i
+
+   # Potential normalise the power
+   #$ESTDIR/bin/ch_wave -scaleN 0.5 $i -o /tmp/tmp$$.wav
+   # resampling can be done now too
+   #$ESTDIR/bin/ch_wave -F 11025 $i -o /tmp/tmp$$.wav
+   # Or use as is
+   cp -p $i /tmp/tmp$$.wav
+   $ESTDIR/bin/sig2fv /tmp/tmp$$.wav -o lpc/$fname.lpc \
+             -otype est -lpc_order 16 -coefs "lpc" \ 
+             -pm pm/$fname.pm -preemph 0.95 -factor 3 \
+             -window_type hamming
+   $ESTDIR/bin/sigfilter /tmp/tmp$$.wav -o lpc/$fname.res \
+              -otype nist -lpcfilter lpc/$fname.lpc -inv_filter
+   rm /tmp/tmp$$.wav
+done
+</literallayout></blockquote>
+<indexterm><primary> power normalization </primary></indexterm>
+<indexterm><primary> energy normalization </primary></indexterm>
+Note the (optional) use of <filename>ch_wave</filename> to attempt to normalize the 
+power in the wave to a percentage of its maximum. This is a very crude 
+method for making the waveforms have a reasonably equivalent power. 
+Wildly different power fluctuations in power between segments is likely 
+to be noticed when they are joined. Differing power in the nonsense 
+words may occur if not enough care has been taking in the recording. 
+Either the settings on the recording equipment have been changed (bad) 
+or the speaker has changed their vocal effort (worse). It is important 
+that this should be avoided as the above normalization does not make the 
+problem of different power go away it only makes the problem slightly 
+less bad. 
+</para>
+<para>
+A more elaborate power normaliziation has been successful, but it is a 
+little harder, though it was definitely successful for the KED US 
+American voice that had major power fluctuations over different 
+recording sesssions. The idea is to find the power during vowels in 
+each nonsense word, then find the mean power for each vowel overall 
+files. Then, for each file, find the average factor difference for each 
+actual vowel with the mean for that vowel and scale the waveform 
+according to that value. We now provided a basic script which does this 
+<blockquote><literallayout>
+bin/find_powerfacts lab/*.lab
+</literallayout></blockquote>
+This script creates (among others) <filename>etc/powfacts</filename> which if it 
+exists, is used to normalize the power of each waveform file during 
+the making of the LPC coefficients. 
+</para>
+<para>
+We generate a set of <filename>ch_wave</filename> commands that extract the parts of 
+the wave from that are vowels (using <filename>-start</filename> and <filename>-end</filename> 
+options, make the output be in ascii <filename>-otype raw</filename> <filename>-ostype 
+ascii</filename> and use a simple script to calculate the RMS power. We then 
+calculate the mean power for each vowel with another awk script using 
+the result as a table, then finally we process the fileid, actual vowel 
+power information to generate a power factor to by averaging the ration 
+of each vowel's actual power to the mean power for that vowel. You may 
+wish to still modify the power further after this if it is too low or 
+high. 
+</para>
+<para>
+Note that power normalization is intended to remove artifacts caused by 
+different recording environment, i.e. the person moved from the 
+microphone, the levels were changed etc. they should not modify the 
+intrinsic power differences in the phones themselves. The above 
+techniques try to preserve the intrinsic power, which is why we take the 
+average over all vowels in a nonsense word, though you should listen to 
+the results and make the ultimate decision yourself. 
+</para>
+<para>
+If all has been recorded properly, of course, individual power 
+modification should be unnecessary. Once again, we can't stress 
+enough how important it is to have good and consistent recording 
+conditions, so as to avoid steps like this. 
+</para>
+<para>
+<indexterm><primary> resampling data </primary></indexterm>
+If you want to generate a database using a different sampling rate than 
+the recordings were made with, this is the time to resample. For 
+example an 8KHz or 11.025KHz will be smaller than a 16KHz database. If 
+the eventual voice is to be played over the telephone, for example, 
+there is little point in generating anything but 8Khz. Also it will be 
+faster to synthesize 8Khz utterances than 16Khz ones. 
+</para>
+<para>
+<indexterm><primary> LPC coefficient order </primary></indexterm>
+The number of LPC coefficients used to represent each pitch period can 
+be changed depending on sample rate you choose. Hearsay, reasonable 
+experience, and perhaps some theoretical underpining, suggests the 
+following formula for calculating the order 
+<blockquote><literallayout>
+(sample_rate/1000)+2
+</literallayout></blockquote>
+But that should only be taken as a rough guide though a larger sample 
+rate deserves a greater number of coeeficients. 
+</para>
+</sect1>
+
+<sect1><title>Defining a diphone voice</title>
+
+<para>
+The easiest way to define a voice is to start from the skeleton scheme
+files distributed. For English voices see <xref
+linkend="bsv-usukdiphone-ch">, and for non-English voices see
+<xref linkend="bsv-jpdiphone-ch"> for detailed walkthroughs.
+</para>
+<para>
+Although in many cases you'll want to modify these files (sometimes quite 
+substantially), the basic skeleton files will give you a good grounding, 
+and they follow some basic conventions of voice files that will make it 
+easier to integrate your voice into the Festival system. 
+</para>
+</sect1>
+
+<sect1><title>Checking and correcting diphones</title>
+
+<para>
+This probably sounds like we're repeating ourselves here, and we are, 
+because it's quite important for the overall quality of the voice: once 
+you have the basic diphone database working it is worthwhile 
+systematically testing it as it is common to have mistakes. These may 
+be mislabeling, and mispronunciation for the phones themselves. Two 
+possible strategies are possible for testing both of which have their 
+advantages. This first is a simple exhaustive synthesis of all 
+diphones. Ideally, the diphone prompts are exactly the set of 
+utterances that test each and every diphone. using the <varname>SayPhones</varname> 
+function you can synthesize and listen to each prompt. Actually, for a 
+first pass, it may even be useful to synthesize each nonsense word 
+without listening as some of the problems missing files, missing 
+diphones, badly extracted pitchmarks will show up without you having to 
+listen to at all. 
+</para>
+<para>
+When a problem occurs, trace back why, check the entry in the diphone 
+index, then check the label for the nonsense word, then check how that 
+label matches the actually waveform file itself (display the waveform 
+with the label file and spectrogram to see if the label is correct). 
+</para>
+<para>
+Listing all the problems that could occur is impossible. What you need 
+to do is break down the problem and find out where it might be occurring. 
+If you just get apparent garbage being synthesized, take a look at the 
+synthesized waveform 
+<blockquote><literallayout>
+(set! utt1 (SayPhones '(pau hh ah l ow pau)))
+(utt.save.wave utt1 "hello.wav")
+</literallayout></blockquote>
+Is it <emphasis>garbage</emphasis>, can you recognized any part of it? It 
+could be a byte swap problem or a format problem for your files. 
+Can your nonsense word file be played and displayed as is? Can 
+your LPC residual files be played and displayed. Residual files should 
+look like very low powered waveform files and sound very buzzy when 
+played but almost recognizable if you know what is being said 
+(sort of like Kenny from South Park). 
+</para>
+<para>
+If you can recognize some of what is being said but it is fairly 
+uniformly garbled it is possible your pitchmarks are not being aligned 
+properly. Use some display mechanism to see where the pitchmarks 
+are. These should be aligned (during voiced speech) with the peaks 
+in the signal. 
+</para>
+<para>
+If all is well except for some parts of the signal are bad or 
+overflowed, then check the diphone where the errors occur. 
+</para>
+<para>
+<indexterm><primary> cheating </primary></indexterm>
+There are a number of solutions to problems that may save you some time, 
+for the most part they should be considered cheating, but they may save 
+having to re-record, which is something that you will probably want to 
+avoid if at all possible. 
+</para>
+<para>
+Note that some phones are very similar, particular the left half 
+side of most stops are indistinguishable, as the consist of mostly 
+silence. Thus if you find you didn't get a good <varname>SOMETHING-p</varname> 
+diphone you can easily make it use the <varname>SOMETHING-b</varname> diphone 
+instead. You can do this by hand editing the diphone index 
+file accordingly. 
+</para>
+<para>
+The linguists among you may not find that acceptable, but you can go 
+further, the burst part of /p/ and /b/ isn't that different when it 
+comes down to it and if is it just one or two diphones you can simply 
+map those too. Considering problems are often in one or two badly 
+articulated phones replace a /p/ with a /b/ (or similar) in one or two 
+diphones may not be that bad. 
+</para>
+<para>
+Once, however, the problems become systematic over a number of phones 
+re-recording them should be considered. Though remember if you do have 
+to re-record you want to have as similar an environment as possible 
+which is not always easy. Eventually you may need to re-record the 
+whole database again. 
+</para>
+<para>
+Recording diphone databases is not an exact science, although we have a 
+fair amount of experience in recording these databases, they never 
+completely go as planned. Some apparently minor problem often occurs, 
+noise on the channel, slightly different power over two sessions. Even 
+when everything seems the same and we can't identify any difference 
+between two recording environments we have found that some voices are 
+better than others for building diphone databases. We can't immediately 
+say why, we discussed some of these issues above in selecting a speaker 
+but there is still some other parameters which we can't identify so 
+don't be disheartened when you database isn't as good as you hoped, ours 
+sometimes fail too. 
+</para>
+</sect1>
+
+<sect1><title>Diphone check list</title>
+
+<para>
+The section contains a quick check list of the processes required to 
+constructing a working diphone database. Each part is discussed in 
+detail above. 
+<itemizedlist mark=bullet>
+<listitem><para>
+Choose phoneset:
+Find an appropriate phoneset for the language, if possible using an 
+existing standard. If you already have a good lexicon in the desired 
+language, we recommend that you use that phone set. 
+</para></listitem>
+<listitem><para>
+Construct diphone list:
+Construct the diphone list with appropriate carrier words. Either 
+using an existing list or generating one from the examples. Consider 
+what allophones, consonant clusters, etc., you also wish to record. 
+</para></listitem>
+<listitem><para>
+Synthesize prompts:
+Synthesize prompts from an existing voice, if possible. Even when a few 
+phones are missing from that voice it can still be useful to 
+have the speaker listen to prompts as it keeps then focussed on 
+minimal prosody and normalized vocal effort as well as reminding them 
+what they need to say. 
+</para></listitem>
+<listitem><para>
+Record words:
+Record the words in the best possible conditions you can. Bad 
+recordings can never be corrected later. Ideally, you would use an 
+anechoic chamber with voice from close talking mike and larynograph 
+channels. 
+</para></listitem>
+<listitem><para>
+Hand label/align phones:
+If you used prompts you can probably use the provided aligner to 
+get a reasonable first pass at the phone labels. Alternatively, 
+find a different aligner, or do it by hand. 
+</para></listitem>
+<listitem><para>
+Extract pitchmarks:
+Extract the pitchmarks from the recorded signal, either from 
+the EGG signal, or by the more complicated approach of extracting 
+them from the speech signal itself. 
+</para></listitem>
+<listitem><para>
+Build parameter files:
+If you don't have PSOLA, extract the LPC parameters and residuals 
+from the speech signal, with power normalization if you feel its 
+necessary. 
+</para></listitem>
+<listitem><para>
+Build database itself:
+Build the diphone index, correcting any obvious labeling errors 
+then test the database itself. Running significant tests to 
+correct any further labeling errors. 
+</para></listitem>
+<listitem><para>
+Test and check database:
+Systematically check the database by synthesizing the prompts 
+again and synthesizing general text. 
+</para></listitem>
+</itemizedlist>
+</para>
+</sect1>
+
+
+
+</chapter>

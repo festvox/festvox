@@ -1,0 +1,60 @@
+#!/bin/sh
+#
+#  Gives rmse and corr between $1 and $2 list numbers
+#
+awk '{
+        x=$1
+        y=$2
+        xcount += 1
+	xsum += x
+	xsumsq += x*x
+        ycount += 1
+	ysum += y
+	ysumsq += y*y
+	se += (x-y)*(x-y)
+        xxcount += 1
+	xxsum += x*x
+	xxsumsq += (x*x)*(x*x)
+        yycount += 1
+	yysum += y*y
+	yysumsq += (y*y)*(y*y)
+        xycount += 1
+	xysum += x*y
+	xysumsq += (x*y)*(x*y)
+	}
+     function std (sum, sumx, n)
+     {
+	if (n==1)
+            n=2;
+        return safe_sqrt(((n*sumx)-(sum*sum)) / (n*(n-1)))
+     }
+     function safe_sqrt(x)
+     {
+           if (x < 0.0) 
+              return 0.0
+           else
+              return sqrt(x)
+     }
+     function mean (sum,n)
+     {
+           return sum/n;
+     }
+     function correlation()
+     {
+	v1 = mean(xysum,xycount)-(mean(xsum,xcount)*mean(ysum,ycount));
+	v2 = mean(xxsum,xxcount)-(mean(xsum,xcount)*mean(xsum,xcount));
+	v3 = mean(yysum,yycount)-(mean(ysum,ycount)*mean(ysum,ycount));
+#	printf("vs %f %f %f\n",v1,v2,v3);
+        sss = safe_sqrt(v2*v3);
+        if (sss == 0.0)
+           return 0.0;
+        else
+  	   return  v1/(safe_sqrt(v2*v3));
+     }
+     END {
+        printf("RMSE %3.3f Cor %3.3f 1mean %3.3f 1std %3.3f 2mean %3.3f 2std %3.3f n %d\n",
+               safe_sqrt(se/xcount),correlation(),
+                    mean(xsum,xcount),std(xsum,xsumsq,xcount),
+                    mean(ysum,xcount),std(ysum,ysumsq,ycount),
+                    xcount);
+     }'

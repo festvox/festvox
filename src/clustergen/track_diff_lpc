@@ -1,0 +1,155 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                     Carnegie Mellon University                        ##
+##                         Copyright (c) 2005                            ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Author: Alan W Black (awb@cs.cmu.edu) Aug 2010                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  LPC distortion                                                       ##
+###########################################################################
+
+LANG=C; export LANG
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ ! "$FESTVOXDIR" ]
+then
+   echo "environment variable FESTVOXDIR is unset"
+   echo "set it to your local festvox directory e.g."
+   echo '   bash$ export FESTVOXDIR=/home/awb/projects/festvox/'
+   echo or
+   echo '   csh% setenv FESTVOXDIR /home/awb/projects/festvox/'
+   exit 1
+fi
+
+if [ $# = 0 ]
+then
+   echo "Distance between two tracks (actual, synthesized"
+   echo "   track_diff track1 track2"
+   exit 0
+fi
+
+CH_TRACK=$ESTDIR/bin/ch_track
+PHONEALIGN=$FESTVOXDIR/src/general/phonealign
+
+ORDER=16
+ORDERD=2
+if [ $# = 4 ]
+then
+   ORDER=$3
+   ORDERD=$4
+fi
+
+TRACK1=$1
+TRACK1_CHANNELS=`$ESTDIR/bin/ch_track -info $1 | grep "Number of channels" | awk '{print $NF/'$ORDERD'}'`
+TRACK1_FRAMES=`$ESTDIR/bin/ch_track -info $1 | grep "Number of frames" | awk '{print $NF}'`
+TRACK2=$2
+TRACK2_CHANNELS=`$ESTDIR/bin/ch_track -info $2 | grep "Number of channels" | awk '{print $NF}'`
+TRACK2_FRAMES=`$ESTDIR/bin/ch_track -info $2 | grep "Number of frames" | awk '{print $NF}'`
+
+if [ $TRACK1_CHANNELS != $TRACK2_CHANNELS ]
+then
+   echo "Tracks have different number of channels $TRACK1_CHANNELS $TRACK2_CHANNELS"
+   exit 1
+fi
+
+if [ $TRACK1_FRAMES != $TRACK2_FRAMES ]
+then
+  echo Aligning $TRACK1 to $TRACK2
+  TRACK2DIR=`dirname $TRACK2`
+  fname=`basename $TRACK2 .mcep`
+
+  $CH_TRACK -otype est_ascii ccoefs/$fname.mcep |
+  sed '1,/EST_Header_End/d' |
+  awk 'BEGIN {printf("#\n")}
+       { printf("%f 125 %d\n",$1,NR-1) }' >$TRACK2DIR/$fname.actual.lab
+  $PHONEALIGN -otrack $TRACK2 -itrack $TRACK1 -ilabel $TRACK2DIR/$fname.actual.lab -olabel $TRACK2DIR/$fname.lab -verbose -withcosts
+
+  exit
+  TRACK2=something.align
+fi
+
+## Calculates differences
+$ESTDIR/bin/ch_track -otype ascii $TRACK1 |
+awk '{for (i=1; i<= '$ORDER'; i++)
+         printf("%s ",$i);
+      printf("\n");}' >actual.mcep
+$ESTDIR/bin/ch_track -otype ascii $TRACK2 >test.mcep
+paste actual.mcep test.mcep |
+awk '{t=0;
+      if (channels == 0)
+         channels = NF;
+      if (channels == NF)
+      {
+         ss = 0;
+         for (i=2; i<NF/2; i++)
+         {
+            d = ($i-$(i+NF/2));
+            ss += d*d;
+         }
+      }
+      printf("%f\n",sqrt(ss));
+      }' |
+   awk '{ num_channels = NF;
+          for (i=1; i<=NF; i++)
+          {
+             countall += 1; 
+             sumall += $i; 
+             sumsqall += $i*$i
+             count[i] += 1;
+             sum[i] += $i;
+             sumsq[i] += $i*$i;
+          } 
+        }
+     function std (sum, sumx, n)
+     {
+	if (n==1) n=2;
+        return sqrt(((n*sumx)-(sum*sum)) / (n*(n-1)))
+     }
+     function mean (sum,n) { return sum/n; }
+     END {
+        printf "LPDmean %3.3f std %3.3f var %3.3f rms %3.3f n %d\n",mean(sumall,countall),std(sumall,sumsqall,countall),std(sumall,sumsqall,countall)*std(sumall,sumsqall,countall),sqrt(sumsqall/countall),countall
+     }'
+
+rm -f mcep.diff actual.mcep test.mcep
+
+exit 0
+

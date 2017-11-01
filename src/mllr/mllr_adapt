@@ -1,0 +1,174 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                     Carnegie Mellon University                        ##
+##                        Copyright (c) 2009                             ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+#
+# Expects wav_adapt/ lab_adapt/ and bin/mllr
+#./bin/mllr_adapt etc/txt.transform.data newmodel.params
+# Ensure the phone coverage is good in txt.transform.data 
+# (atleast 3 instances of the phoneme)
+###########################################################################
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ ! "$FESTVOXDIR" ]
+then
+   echo "environment variable FESTVOXDIR is unset"
+   echo "set it to your local festvox directory e.g."
+   echo '   bash$ export FESTVOXDIR=/home/awb/projects/festvox/'
+   echo or
+   echo '   csh% setenv FESTVOXDIR /home/awb/projects/festvox/'
+   exit 1
+fi
+
+LANG=C; export LANG
+
+. etc/voice.defs
+
+if [ $# = 0 ]
+then
+   echo " Output new params given adaptation data via mllr"
+   echo " Expects wav_adapt/ lab_adapt/ and bin/mllr"
+   echo "Usage: ./bin/mllr_adapt etc/txt.transform.data adapted.params"
+   exit 1
+fi
+
+
+PROMPTFILE=$1
+OUTFILE=$2
+CG_RAW=cg_raw$$
+
+echo "$FV_VOICENAME"
+   echo "Build Prompts" 
+   $ESTDIR/../festival/bin/festival --heap 10000000 -b festvox/build_clunits.scm '(build_prompts "'$PROMPTFILE'")'
+mv lab lab_tmpmllr
+ln -s lab_adapt lab
+mv ccoefs ccoefs_tmpmllr
+#ln -s ccoefs_adapt ccoefs
+mkdir ccoefs
+mv wav wav_tmpmllr
+ln -s wav_adapt wav
+mkdir -p adapt
+
+./bin/do_clustergen mcep $PROMPTFILE
+./bin/do_clustergen f0 $PROMPTFILE
+./bin/do_clustergen voicing $PROMPTFILE
+./bin/do_clustergen combine_coeffs_v $PROMPTFILE
+mv f0 f0_tmpmllr
+#Build Utts
+$ESTDIR/../festival/bin/festival --heap 10000000 -b festvox/build_clunits.scm '(build_utts "'$PROMPTFILE'")'
+mv f0_tmpmllr f0
+#Frame-Codebook alignments
+$ESTDIR/../festival/bin/festival --heap 2000000 -b festvox/${FV_VOICENAME}_cg.scm "(voice_${FV_VOICENAME}_cg)" $FESTVOXDIR/src/clustergen/clustergen_build.scm "(ClusterGen_adapt '$PROMPTFILE 'adapt)"
+
+#Codebook instance frames in each file
+for i in `awk '{print $2}' $PROMPTFILE`
+do
+${ESTDIR}/bin/ch_track -otype ascii adapt/$i.tgt | 
+sed 's/\..*//g' | 
+awk '{arr[$1]=arr[$1]NR";";}
+END{for (i in arr){print i,arr[i];}}'|sort -n > adapt/$i.frm
+done
+
+
+# Adapting and computing new models
+start=0
+for i in `awk '{if ($1 ~ /^\("/){print $1;}}' festival/trees/${FV_VOICENAME}_mcep.tree|sed 's/["\(]//g'`
+do
+end=`awk '{if ($0 ~ /\(\(\(/) {print $1}}' festival/trees/${i}_mcep.tree |sed 's/^\s*//'|wc -l`
+if [ `echo $i | grep 'pau'` ]
+then
+echo "Skipping $i"
+cbl=`expr $start + $end`
+ncb=`expr $cbl - $start`
+head -n $cbl festival/trees/${FV_VOICENAME}_mcep.rawparams| tail "-n" $ncb >> $CG_RAW
+start=`expr $start + $end`
+
+else 
+echo "Doing $i"
+CG_TMP=cg_tmp_$$"$i.mcep"
+cbl=`expr $start + $end`
+ncb=`expr $cbl - $start`
+# Collect features corresponding to a state
+for pn in `awk '{print $2}' $PROMPTFILE`
+do
+${ESTDIR}/bin/ch_track -otype ascii ccoefs/$pn.mcep -o $CG_TMP
+awk -v pn=$pn -v cgtmp=$CG_TMP -v start=$start -v end=$cbl  'BEGIN{itr=1;while(getline < cgtmp){cep[itr++]=$0;}}{
+if ($1 >= start && $1 < end){
+split($2,farr,";");
+for(p=1;farr[p]>0;p++){
+printf("%s\n",cep[farr[p]])>> cgtmp"f.txt";
+printf("%d\n",$1-start) >> cgtmp"c.txt";
+}
+}
+}' adapt/$pn.frm
+
+done
+start=`expr $start + $end`
+
+head -n $cbl $PWD/festival/trees/${FV_VOICENAME}_mcep.rawparams| tail "-n" $ncb > $CG_TMP".cborig"
+echo $ncb 48 > $CG_TMP.cb
+#echo $ncb 98 > $CG_TMP.cb
+head -n $cbl $PWD/festival/trees/${FV_VOICENAME}_mcep.rawparams| tail "-n" $ncb | awk '{for(n=5;n<=52;n++){printf("%f ",$n);}printf("\n");}' >> $CG_TMP.cb
+#head -n $cbl $PWD/festival/trees/${FV_VOICENAME}_mcep.rawparams| tail "-n" $ncb | awk '{for(n=5;n<=102;n++){printf("%f ",$n);}printf("\n");}' >> $CG_TMP.cb
+nof=`wc -l ${CG_TMP}"f.txt" | awk '{print $1}'`
+echo $nof 24 > $CG_TMP.obs
+#echo $nof 49 > $CG_TMP.obs
+awk '{for(k=3;k<=26;k++){printf("%f ",$k);}printf("\n");}' $CG_TMP"f.txt" >> $CG_TMP.obs
+#awk '{for(k=3;k<=51;k++){printf("%f ",$k);}printf("\n");}' $CG_TMP"f.txt" >> $CG_TMP.obs
+# Compute the transform
+./bin/mllr $CG_TMP.cb $CG_TMP.obs $CG_TMP"c.txt" $CG_TMP.cb > $CG_TMP".cbconv"
+
+awk -v cbf=$CG_TMP".cbconv" 'BEGIN{start=1;while (getline < cbf){arr[start]=$0;start++;}} {printf("%f %f %f %f %s",$1,$2,$3,$4,arr[NR]);for (n=53;n<=104;n++){printf(" %f",$n);}printf("\n");}' $CG_TMP".cborig" >> $CG_RAW
+#awk -v cbf=$CG_TMP".cbconv" 'BEGIN{start=1;while (getline < cbf){arr[start]=$0;start++;}} {printf("%f %f %f %f %s",$1,$2,$3,$4,arr[NR]);for (n=103;n<=104;n++){printf(" %f",$n);}printf("\n");}' $CG_TMP".cborig" >> $CG_RAW
+
+rm -f $CG_TMP*
+fi
+done
+
+${ESTDIR}/bin/ch_track -otype est_binary -s 0.005 -o $OUTFILE -itype ascii $CG_RAW
+
+rm $CG_RAW
+rm lab
+mv lab_tmpmllr lab
+rm -rf ccoefs
+rm wav
+mv wav_tmpmllr wav
+mv ccoefs_tmpmllr ccoefs
+

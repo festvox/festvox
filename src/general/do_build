@@ -1,0 +1,247 @@
+#!/bin/sh
+###########################################################################
+##                                                                       ##
+##                  Language Technologies Institute                      ##
+##                    Carnegie Mellon University                         ##
+##                         Copyright (c) 2002                            ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Do full build                                                        ##
+##  this is really for regression testing and to remind you want to do   ##
+##                                                                       ##
+###########################################################################
+
+LANG=C; export LANG
+
+if [ ! "$FESTVOXDIR" ]
+then
+   echo "environment variable FESTVOXDIR is unset"
+   echo "set it to your local festvox directory e.g."
+   echo '   bash$ export FESTVOXDIR=/home/awb/projects/festvox/'
+   echo or
+   echo '   csh% setenv FESTVOXDIR /home/awb/projects/festvox/'
+   exit 1
+fi
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local Edinburgh Speech Tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ "$SIODHEAPSIZE" = "" ]
+then
+   SIODHEAPSIZE=20000000
+   export SIODHEAPSIZE
+fi
+HEAPSIZE=$SIODHEAPSIZE
+
+if [ $# = 0 ]
+then
+#   $0 setup $*
+   # import prompt list
+   $0 build_prompts
+   # import/record waveform files
+   $0 label
+   $0 build_utts
+   $0 do_pm
+   $0 do_mcep
+   $0 build_clunits
+   exit 0
+fi
+
+if [ "$1" = "parallel" ]
+then
+    ACTION="$2"
+    PROMPTFILE="$3"
+    if [ "$PROMPTFILE" = "" ]
+    then
+	PROMPTFILE=etc/txt.done.data
+    fi
+    # We use xargs to parallelize our work. We split our promptfile in 16
+    # parts. Then run those in parallel with xargs
+
+    num_cpus=$(./bin/find_num_available_cpu)
+
+    if [ ! -d tmpdir ]
+    then
+       # for the split promptfile
+       mkdir tmpdir
+    fi
+
+    seq 0 15 | xargs -n 1 -P $num_cpus $0 _parallelworker $ACTION $PROMPTFILE
+    exit 0
+fi
+
+if [ "$1" = "_parallelworker" ]
+then
+    ACTION="$2"
+    PROMPTFILE="$3"
+    INDEX="$4"
+
+    # Get our partition of PROMPTFILE
+    SPLITPROMPTFILE=tmpdir/dobuild_parallelworker.$$.$INDEX
+    cat $PROMPTFILE | awk "NR%16==$INDEX {print \$0}" > $SPLITPROMPTFILE
+    
+    # Run our task
+    $0 $ACTION $SPLITPROMPTFILE
+    rm $SPLITPROMPTFILE
+    exit 0
+fi    
+
+if [ "$PROMPTFILE" = "" ]
+then
+   if [ $# = 2 ]
+   then
+      export PROMPTFILE=$2
+   else
+      export PROMPTFILE=etc/txt.done.data
+   fi
+fi
+
+if [ "$1" = "setup" ]
+then
+   shift
+   mkdir $1"_"$2"_"$3
+   cd $1"_"$2"_"$3
+   $FESTVOXDIR/src/unitsel/setup_clunits $1 $2 $3
+   $FESTVOXDIR/src/prosody/setup_prosody $1 $2 $3
+   exit 0
+fi
+
+# we've already got a set up voice
+. ./etc/voice.defs
+
+if [ "$1" = "build_prompts" ]
+then
+   $ESTDIR/../festival/bin/festival --heap $HEAPSIZE -b festvox/build_clunits.scm '(build_prompts "'$PROMPTFILE'")'
+
+   exit 0
+fi
+
+if [ "$1" = "build_prompts_waves" ]
+then
+  $ESTDIR/../festival/bin/festival --heap $HEAPSIZE -b festvox/build_clunits.scm '(build_prompts_waves "'$PROMPTFILE'")'
+
+   exit 0
+fi
+
+if [ "$1" = "record" ]
+then
+   # I doubt anyone will run this from here
+   ./bin/prompt_them $PROMPTFILE
+   exit 0
+fi
+
+if [ "$1" = "label" ]
+then
+   $FESTVOXDIR/src/ehmm/bin/do_ehmm
+   exit 0
+fi
+
+if [ "$1" = "label_dtw" ]
+then
+   ./bin/make_labs prompt-wav/*.wav
+   exit 0
+fi
+
+if [ "$1" = "label_sphinx" ]
+then
+    ./bin/sphinxtrain
+   exit 0
+fi
+
+if [ "$1" = "build_utts" ]
+then
+    $ESTDIR/../festival/bin/festival --heap $HEAPSIZE -b festvox/build_clunits.scm '(build_utts "'$PROMPTFILE'")'
+   exit 0
+fi
+
+if [ "$1" = "do_pm" ]
+then
+    ./bin/make_pm_wave $PROMPTFILE
+   exit 0
+fi
+
+if [ "$1" = "do_mcep" ]
+then
+    ./bin/make_mcep $PROMPTFILE
+   exit 0
+fi
+
+if [ "$1" = "do_lpc" ]
+then
+    ./bin/make_lpc $PROMPTFILE
+   exit 0
+fi
+
+if [ "$1" = "build_clunits" ]
+then
+    $ESTDIR/../festival/bin/festival --heap $HEAPSIZE -b festvox/build_clunits.scm '(build_clunits "'$PROMPTFILE'")'
+   exit 0
+fi
+
+if [ "$1" = "do_dur" ]
+then
+   . etc/voice.defs
+   ./bin/make_dur_model $PROMPTFILE &&
+   cp -p festvox/$FV_VOICENAME"_dur.scm" festvox/$FV_VOICENAME"_durdata.scm"
+   exit 0
+fi
+
+if [ "$1" = "test" ]
+then
+   TEXT2WAVE=$ESTDIR/../festival/bin/text2wave
+   TEXT2UTTS=$FESTVOXDIR/src/promptselect/text2utts
+   . etc/voice.defs
+
+   if [ ! -d test/$3 ]
+   then
+      mkdir -p test/$3
+   fi
+
+   if [ "$2" = "tts" ]
+   then
+    $ESTDIR/../festival/bin/festival --heap $HEAPSIZE -b festvox/${FV_VOICENAME}_clunits.scm "(voice_"$FV_VOICENAME"_clunits)" festvox/build_clunits.scm '(tts_test "'$4'" "'test/$3'")'
+   fi
+   if [ "$2" = "usm" ]
+   then
+    $ESTDIR/../festival/bin/festival --heap $HEAPSIZE -b festvox/${FV_VOICENAME}_clunits.scm "(voice_"$FV_VOICENAME"_clunits)" festvox/build_clunits.scm '(usm_file "'$4'" "'test/$3'")'
+   fi
+
+
+   exit 0
+fi
+
+echo $0 unknown option $1
+exit 1

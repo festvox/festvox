@@ -1,0 +1,204 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                   Carnegie Mellon University and                      ##
+##                   Alan W Black and Kevin A. Lenzo                     ##
+##                      Copyright (c) 1998-2000                          ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Generate skeletal scm files for an mbrola voice                      ##
+##                                                                       ##
+###########################################################################
+
+LANG=C; export LANG
+
+if [ ! "$FESTVOXDIR" ]
+then
+   echo "environment variable FESTVOXDIR is unset"
+   echo "set it to your local festvox directory e.g."
+   echo '   bash$ export FESTVOXDIR=/home/awb/DOCS/reports/festvox/'
+   echo or
+   echo '   csh% setenv FESTVOXDIR /home/awb/DOCS/reports/festvox/'
+   exit 1
+fi
+
+if [ $# != 3 ]
+then
+    echo "Build dirs, and setup scripts and scm files for a new diphone voice "
+    echo "Usage: setup_diphone INST LANG VOX"
+    echo "INST is the insstitute building the language, e.g. cmu, cstr, ogi"
+    echo "     if there isn't an appropriate institute use, net."
+    echo "LANG is language identifier, e.g. japan, scotsgaelic"
+    echo "VOX is speaker identifier e.g kal, awb"
+    exit 1
+fi
+
+FV_INST=$1
+FV_LANG=$2
+FV_VOX=$3
+SKELFESTVOXDIR=$FESTVOXDIR/src/vox_diphone/festvox
+
+if [ "0" != `ls | wc -l` ]
+then
+   echo "I'm going to make a whole bunch of new directories in"
+   echo "    "`pwd`
+   echo "This directory is currently non-empty, are you sure this is "
+   echo "the directory you want these new directories built in?"
+   echo -n "Answer y/n? "
+   read answer
+   if [ "$answer" != "y" ]
+   then
+       echo "setup aborted"
+       exit -1
+   fi
+fi
+
+# Build the directory structure
+$FESTVOXDIR/src/general/make_dirs
+
+cp -p $FESTVOXDIR/src/general/make_dist bin
+
+if [ -d $FESTVOXDIR/src/vox_files/$FV_LANG ]
+then
+   FV_LANG_SKELS=$FV_LANG
+else
+   FV_LANG_SKELS=general
+fi
+
+echo "FV_INST=$FV_INST" >etc/voice.defs
+echo "FV_LANG=$FV_LANG" >>etc/voice.defs
+echo "FV_NAME=$FV_VOX" >>etc/voice.defs
+echo "FV_TYPE=diphone" >>etc/voice.defs
+echo "FV_VOICENAME=\$FV_INST\"_\"\$FV_LANG\"_\"\$FV_NAME" >>etc/voice.defs
+echo "FV_FULLVOICENAME=\$FV_VOICENAME\"_\"\$FV_TYPE" >>etc/voice.defs
+
+# Language/Vox scheme files
+echo Generating language/voice specific scheme files
+for i in $FESTVOXDIR/src/vox_files/$FV_LANG_SKELS/INST_*_VOX_*.scm
+do
+   fname=`basename $i | sed 's/INST/'$FV_INST'/g' | sed 's/LANG/'$FV_LANG'/g' | sed 's/VOX/'$FV_VOX'/g'`
+   cat $i |
+   sed 's%INST%'$FV_INST'%g' |
+   sed 's%LANG%'$FV_LANG'%g' |
+   sed 's%VOX%'$FV_VOX'%g' |
+   sed 's%ESTDIR%'$ESTDIR'%g' |
+   sed 's%CURRENTDIR%'$CURRENTDIR'%g' >festvox/$fname
+done
+
+# Diphone specific files
+if [ -f $FESTVOXDIR/src/vox_files/$FV_LANG_SKELS/$FV_LANG"_schema.scm" ]
+then
+   cp -p $FESTVOXDIR/src/vox_files/$FV_LANG_SKELS/$FV_LANG"_schema.scm" festvox/$FV_LANG"_schema.scm"
+fi
+
+if [ -f $FESTVOXDIR/src/vox_files/$FV_LANG_SKELS/INST_*_VOX_diphone.scm-diphone ]
+then
+   cat $FESTVOXDIR/src/vox_files/$FV_LANG_SKELS/INST_*_VOX_diphone.scm-diphone |
+   sed 's%INST%'$FV_INST'%g' |
+   sed 's%LANG%'$FV_LANG'%g' |
+   sed 's%VOX%'$FV_VOX'%g' |
+   sed 's%ESTDIR%'$ESTDIR'%g' |
+   sed 's%CURRENTDIR%'$CURRENTDIR'%g' >festvox/$FV_INST"_"$FV_LANG"_"$FV_VOX"_diphone.scm"
+fi
+
+case $FV_LAG in
+   us)
+      cp -p $FESTVOXDIR/src/diphones/us_schema.scm festvox/us_schema.scm
+      ;;
+   uss2)
+      cp -p $FESTVOXDIR/src/vox_diphone/festvox/cmusphinx2_phones.scm festvox/
+      ;;
+   uk)
+      cp -p $FESTVOXDIR/src/diphones/uk_schema.scm festvox/uk_schema.scm
+      ;;
+   *)
+      if [ -f $FESTVOXDIR/src/diphones/$FV_LANG"_schema.scm" ]
+      then
+         cp -p $FESTVOXDIR/src/diphones/$FV_LANG"_schema.scm" festvox
+      fi
+      ;;
+esac
+
+echo "Set up for "$FV_INST"_"$FV_LANG"_"$FV_VOX" diphone complete"
+
+
+exit
+
+# Language/Vox scheme files
+case $FV_LANG in
+   us)
+      echo "copying skeleton files for US English"
+      for i in $SKELFESTVOXDIR/INST_us_VOX_*.scm
+      do
+         fname=`basename $i`
+         newname=`echo $fname | sed 's/INST/'$FV_INST'/g' | sed 's/VOX/'$FV_VOX'/g'`
+         cat $i | sed 's/INST/'$FV_INST'/g' | sed 's/VOX/'$FV_VOX'/g' >festvox/$newname
+      done
+      cp -p $FESTVOXDIR/src/diphones/us_schema.scm festvox/us_schema.scm
+      ;;
+   uss2)
+      echo "copying skeleton files for US English (Sphinx2 phoneset)"
+      for i in $SKELFESTVOXDIR/INST_uss2_VOX_*.scm
+      do
+         fname=`basename $i`
+         newname=`echo $fname | sed 's/INST/'$FV_INST'/g' | sed 's/uss2/us/g' | sed 's/VOX/'$FV_VOX'/g'`
+         cat $i | sed 's/INST/'$FV_INST'/g' | sed 's/VOX/'$FV_VOX'/g' >festvox/$newname
+      done
+      cp -p $FESTVOXDIR/src/diphones/cmusphinx2_schema.scm festvox/cmusphinx2_schema.scm
+      cp -p $FESTVOXDIR/src/vox_diphone/festvox/cmusphinx2_phones.scm festvox/
+      ;;
+   uk)
+      echo "copying skeleton files for UK English"
+      for i in $SKELFESTVOXDIR/INST_uk_VOX_*.scm
+      do
+         fname=`basename $i`
+         newname=`echo $fname | sed 's/INST/'$FV_INST'/g' | sed 's/VOX/'$FV_VOX'/g'`
+         cat $i | sed 's/INST/'$FV_INST'/g' | sed 's/VOX/'$FV_VOX'/g' >festvox/$newname
+      done
+      cp -p $FESTVOXDIR/src/diphones/uk_schema.scm festvox/uk_schema.scm
+      ;;
+   *)
+      echo "copying skeleton files for new language: "$FV_LANG
+      for i in $SKELFESTVOXDIR/INST_LANG_*.scm
+      do
+         fname=`basename $i`
+         newname=`echo $fname | sed 's/INST/'$FV_INST'/g' | sed 's/LANG/'$FV_LANG'/g' | sed 's/VOX/'$FV_VOX'/g'`
+         cat $i | sed 's/INST/'$FV_INST'/g' | sed 's/LANG/'$FV_LANG'/g' | sed 's/VOX/'$FV_VOX'/g' >festvox/$newname
+      done
+      if [ -f $FESTVOXDIR/src/diphones/$FV_LANG"_schema.scm" ]
+      then
+         cp -p $FESTVOXDIR/src/diphones/$FV_LANG"_schema.scm" festvox
+      fi
+      ;;
+esac
+
+
+
+
+

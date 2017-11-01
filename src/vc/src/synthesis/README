@@ -1,0 +1,97 @@
+Program for Speech Synthesis
+* FOR LITTLE ENDIAN
+
+usage: synthesis [options...] [inf0file] [inmcepfile] [outputfile]
+options:
+        -f samp_freq[16000.0]           : sampling frequency [Hz]
+        -frame frame[5.0]               : frame length [ms]
+        -order order[24]                : cepstrum order
+        -rmcepfile rmcepfile            : reference mel-cep file
+        -raw                            : input raw file (16bit short)
+        -float                          : input float
+        -nmsg                           : no message
+        -help                           : display this message
+
+Two Input files are an F0 [Hz] text file and a binary file of a
+mel-cepstral sequence including the 0th coefficients. The output file
+is a wav file (RIFF WAVE). If -raw is used, the output is a raw file
+(little endian short-type format).
+
+A sampling frequency is changed by -f. A frame length is changed by
+-frame. A mel-cepstral order is changed by -order.
+* Note that a coefficient for mel-frequency warping is set to 0.42 for
+16 kHz sampling in analysis_sub.h, Line 48.
+
+Power can be controlled so that the output waveform has the same power
+as a waveform synthesized by a specific mel-cepstral sequence has. A
+binary file of the specific mel-cep is used by -rmcepfile.
+* Note that the size of the reference mel-cep should be equal to that
+of the input mel-cepstral sequence.
+
+Binary data has double-type format. If -float is used, data has
+float-type format.
+
+Some messages are printed while executing this program. If you
+don't need those messages, use -nmsg.
+
+
+<EXAMPLE>
+% synthesis \
+	-frame 10.0 \
+	-order 29 \
+	-rmcepfile input.rmcep \
+	-nmsg \
+	input.f0 \
+	input.mcep \
+	output.wav
+
+
+Tomoki Toda (tomoki@ics.nitech.ac.jp)
+
+
+==================================================
+The current copyright is
+
+/*********************************************************************/
+/*                                                                   */
+/*            Nagoya Institute of Technology, Aichi, Japan,          */
+/*       Nara Institute of Science and Technology, Nara, Japan       */
+/*                                and                                */
+/*             Carnegie Mellon University, Pittsburgh, PA            */
+/*                      Copyright (c) 2003-2004                      */
+/*                        All Rights Reserved.                       */
+/*                                                                   */
+/*  Permission is hereby granted, free of charge, to use and         */
+/*  distribute this software and its documentation without           */
+/*  restriction, including without limitation the rights to use,     */
+/*  copy, modify, merge, publish, distribute, sublicense, and/or     */
+/*  sell copies of this work, and to permit persons to whom this     */
+/*  work is furnished to do so, subject to the following conditions: */
+/*                                                                   */
+/*    1. The code must retain the above copyright notice, this list  */
+/*       of conditions and the following disclaimer.                 */
+/*    2. Any modifications must be clearly marked as such.           */
+/*    3. Original authors' names are not deleted.                    */
+/*                                                                   */    
+/*  NAGOYA INSTITUTE OF TECHNOLOGY, NARA INSTITUTE OF SCIENCE AND    */
+/*  TECHNOLOGY, CARNEGIE MELLON UNIVERSITY, AND THE CONTRIBUTORS TO  */
+/*  THIS WORK DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,  */
+/*  INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, */
+/*  IN NO EVENT SHALL NAGOYA INSTITUTE OF TECHNOLOGY, NARA           */
+/*  INSTITUTE OF SCIENCE AND TECHNOLOGY, CARNEGIE MELLON UNIVERSITY, */
+/*  NOR THE CONTRIBUTORS BE LIABLE FOR ANY SPECIAL, INDIRECT OR      */
+/*  CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM   */
+/*  LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,  */
+/*  NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN        */
+/*  CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.         */
+/*                                                                   */
+/*********************************************************************/
+/*                                                                   */
+/*          Author :  Tomoki Toda (tomoki@ics.nitech.ac.jp)          */
+/*          Date   :  June 2004                                      */
+/*                                                                   */
+/*-------------------------------------------------------------------*/
+/*                                                                   */
+/*  Speech Synthesis                                                 */
+/*                                                                   */
+/*-------------------------------------------------------------------*/

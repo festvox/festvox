@@ -1,0 +1,459 @@
+<chapter id="bsv-label-ch">
+<title>Labeling Speech</title>
+
+<para>
+In the early days of concatenative speech synthesis every recorded
+prompt had to be hand labeled.  Although a significant task, very
+skilled and mind bogglingly tedious it was a feasible task to attempt
+when databases were relatively and the time to build a voice was
+measure in years.  With the increase in size of database and the
+demand for much faster turnaround we have moved away from hand
+labeling to automatic labeling.
+</para>
+<para>
+In this section we will only touch the the aspects of
+<emphasis>what</emphasis> we need labeled in recorded data but discuss what
+techniques are available for <emphasis>how</emphasis> to label it.  As
+discussed before phonemes are a useful but incomplete inventory of
+units that should be identified but other aspects of lexical stress,
+prosody, allophonic variations etc are certainly worthy of
+consideration.
+</para>
+<para>
+In labeling recorded prompts for synthesis we rely heavily on the work
+that has been done in the speech recognition community.  For synthesis
+we do, however, have different goals. In ASR (automatic speech
+recognition) we are trying to find the most likely set of phones that
+are in a given acoustic observation.  In synthesis labeling, however
+we know the sequence of phones spoken, assuming the voice talent spoke
+the prompt properly, and wish to find out where those phones are in
+the signal.  We care, very deeply, about the boundaries of segments,
+while ASR can be achieve adequately performance by only concerning
+itself with the centers, and hence has rightly been optimized for
+that. <comment>AWB: that point deserves more discussion, though maybe not
+here</comment>.
+</para>
+<para>
+There are other distinctions from the ASR task, in synthesis labeled
+we are concerned with a singled speaker, that is, if the synthesizer
+is going to work well, very carefully performed and consistently
+recorded.  This does make things easier for the labeling task.
+However in synthesize labeling we are also concerned about prosody,
+and spectral variation, much more than in ASR.
+</para>
+<para>
+We discuss two specific techniques for labeling record prompts here,
+which each have their advantages and limitations.  Procedures running
+these are discussed at the end of each section.
+</para>
+<para>
+The first technique uses <firstterm>dynamic time warping</firstterm>
+alignment techniques to find the phone boundaries in a recorded prompt
+by align it against a synthesized utterance where the phone boundary
+are know.  This is computationally easier than second technique and
+works well for small databases which do not have full phonetic
+coverage.
+</para>
+<para>
+The second technique uses <firstterm>Baum-Welch training</firstterm>
+to build complete ASR acoustic models from the the database.  This
+takes sometime, but if the database is phonetically balanced, as
+should be the case in databases designed for speech synthesis voices,
+can work well.  Also this technique can work well on databases in
+languages that do not yet have a synthesizer, hence making the dynamic
+time warping technique hard without cross-language phone mapping
+techniques.
+</para>
+
+<sect1><title>Labeling with Dynamic Time Warping</title>
+
+<para>
+DTW (dynamic time warping) is a technique for aligning some new
+recording with some known one.  This technique was used in early
+speech recognition systems which had limit vocabularies as it requires
+a acoustic signal for each word/phrase to be recognized.  This
+technique is sometime still used in matching two audio signal in
+command and control situations, for example in some cell-phone for
+voice dialing.
+</para>
+<para>
+What is important in DTW alignment is that it can deal with signals
+that have varying durations.  The idea has been around for many
+years, though its application to labeling in synthesis is relative
+new.  The work here is based on the detail published in
+<citation>malfrere</citation>.
+</para>
+<para>
+Comparing raw acoustic score is unlikely to given god results so
+comparisons are done in then spectral domain.  Following ASR
+techniques we will use Mel Frequency Cepstral Coefficients to
+represent the signal, and also following ASR we will include delta
+MFCCs (the different between the current MFCC vector and the previous
+MFCC vector).  However for the DTW algorithm the content of the
+vectors is somewhat irrelevant, and are merely treated as vectors.
+</para>
+<para>
+The next stage is define a distance function between two vectors,
+conventionally we use Euclidean Distance defined as
+<blockquote><literallayout>
+  root (sumof(i-n) (v0i - v1i)^2
+</literallayout></blockquote>
+Weights could be considered too.
+</para>
+<para>
+The search itself is best picture as a large matrix.  The algorithm
+then searches for the best path through the matrix.  At each node it
+finds the distance between the two current vectors and sums it with the
+smallest of three potential previous states.  That is one of i-1,j,
+i,j-1, or i-1,j-1.  If two signals were identical the best path would
+be the diagonal through the matrix, if one part of the signal is
+shorter or longer than the corresponding one horizontal or vertical
+parts will have less cost. 
+<blockquote><literallayout>
+  matrix diagram (more than one)
+</literallayout></blockquote>
+
+<comment>AWB: describe the make_labs stuff and cross-language
+phone mapping</comment>
+</para>
+
+</sect1>
+<sect1 id="bsv-sphinx-sect">
+<title>Labeling with Full Acoustic Models</title>
+
+<para>
+This is old -- we recommend using the builtin HMM
+labeller <filename>ehmm</filename> as it is more targeting towards
+festvox voice builds, and doesn't require other code to be installed.
+</para>
+<para>
+A second method for labeling is also available.  Here we train full
+acoustic HMM models on the recorded data.  We build a database
+specific speech recognition engine and use that engine to label the
+data.  As this method can work from recorded prompts plus orthography
+(and a method to produce phone strings from that orthography), this
+works well when you have no synthesizer to bootstrap from.  However
+such training requires that the database has a suitable number of
+examples of triphones in it.  Here we have an advantage.  As the
+requirements for a speech synthesis data, that it is has a good
+distribution of phonemes, is the same as that require for acoustic
+modeling, a good speech synthesis databases should produce a good
+acoustic model for labeling.  Although there is no neatly defined
+definition of what "good" is, we can say that you probably need at
+least 400 utterances, and at least 15,000 segments.  400 sentences all
+starting with "The time is now, ..." probably wont do.
+</para>
+<para>
+Other large database synthesis techniques use the same basic
+techniques to not just label the database but define the units to be
+selected.  <citation>Donovan95</citation> and others label there data with an
+acoustic model build (with Baum-Welch training) and use the defined
+HMM states (typically 3-5 per phoneme) as the units for selecting.
+<citation>Tokuda9?</citation> actually use the state models themselves to
+generate the units, but again use the same basic techniques for
+labeling.
+</para>
+<para>
+For training we use Carnegie Mellon University's SphinxTrain and
+Sphinx speech recognition system.  There are other accessible training
+systems out there, HTK being the most famous, but SphinxTrain is the
+one we are most familiar with, and we have some control over its
+updates so can better ensure it remains appropriate for our synthesis
+labeling task.  As voice building is complex, acoustic model building
+is similarly so.  SphinxTrain has been reliably used to labeling
+hundreds of databases in many different languages but making it
+utterly robust against unseen data is very hard so although we have
+tried to minimize the chance of things going wrong (in non-obvious
+ways), we will not be surprised that when you try this processing on
+some new database there may be some problems.
+</para>
+<para>
+SphinxTrain (and sphinx) have a number of restrictions which we need
+to keep in mind when labeling a set of prompts.  These a re code
+limitations, and may be fixed in future versions of
+SphinxTrain/Sphinx.  For the most part the are not actually serious
+restrictions, just minor prompts that the setup scripts need to work
+around.  The scripts cater for these limitations, and mostly will
+all go unseen by the user, unless of course something goes wrong.
+</para>
+<para>
+Specifically, sphinx folds case on all phoneme names, so the scripts
+ensure that phone names are distinct irrespective of upper and lower
+case.  This is done by prepending "CAP" in front of upper case phone
+names.  Secondly there can only be up to 255 phones.  This is likely
+only to be problem when SphinxTrain phones are made more elaborate
+than simple phones, so mostly wont be a problem.  The third noted
+problem is limitation on the length and complexity of utterances.  The
+transcript files has a line length limit as does the lexicon.  For
+"nice" utterances this is never a problem but for some of our
+databases especially those with paragraph length utterances, the
+training and/or the labeling itself fails.
+</para>
+<para>
+Sphinx2 is a real-time speech recognition system made available under
+a free software license.  It is available from <ulink
+url="http://cmusphinx.org">http://cmusphinx.org</ulink>.  The source
+is available from
+<ulink url="http://sourceforge.net/projects/cmusphinx/">
+http://sourceforge.net/projects/cmusphinx/</ulink>.  For these
+tests we used version <filename>sphinx2-0.4.tar.gz</filename>.
+SphinxTrain is a set of programs and scripts that allow the building
+of acoustic models for Sphinx2 (and Sphinx3).  You can download
+SphinxTrain from <ulink url="http://www.speech.cs.cmu.edu/SphinxTrain/">
+http://sourceforge.net/projects/cmusphinx/</ulink>.
+Note that Sphinx2 must be compiled and installed while SphinxTrain can
+run in place.  On many systems steps like these should give you
+working versions.  
+
+<blockquote><literallayout> 
+   tar zxvf sphinx2-0.4.tar.gz 
+   mkdir sphinx2-runtime 
+   export SPHINX2DIR=`pwd`/sphinx2-runtime
+   cd sphinx2 ./configure --prefix=$SPHINX2DIR 
+   make 
+   make install 
+   cd ..  
+   tar zxvf SphinxTrain-0.9.1-beta.tar.gz 
+   cd SphinxTrain 
+   ./configure 
+   make 
+  export SPHINXTRAINDIR=`pwd`/SphinxTrain 
+</literallayout></blockquote>
+
+</para>
+<para>
+Now that we have sphinx2 and SphinxTrain installed we can prepare our
+FestVox voice for training.  Before starting the training process you
+must create utterance files for each of the prompts.  This can be done
+with the conventional festival script.
+
+<blockquote><literallayout>
+  festival -b festvox/build_clunits.scm '(build_prompts "etc/txt.done.data")'
+</literallayout></blockquote>
+
+This generates label files in <filename>prompt-lab/</filename> and waveform
+files in <filename>prompt-wav/</filename> which technically are not
+needed for this labeling process.  Utterances are saved in
+<filename>prompt-utt/</filename>.  At first it was thought that the prompt
+file <filename>etc/txt.done.data</filename> would be sufficient but the 
+synthesis process is likely to resolve pronunciations in context,
+though post-lexical rules etc, that would make naive conversion
+of the words in the prompt list to phone lists wrong in general so
+the transcription for SphinxTrain is generated from the utterances
+themselves which ensures that they resulting labels can be trivially
+mapped back after labeling.  Thus the word names generate by
+in this process are somewhat arbitrary though often human readable.
+The word names are the word themselves plus a number (to ensure
+uniqueness in pronunciations).  Only "nice" words are printed as
+is, i.e. those containing only alphabetic characters, others
+are mapped to the word "w" with an appropriate number following.
+Thus hyphenated, quoted, etc words will not cause a problem for
+the SphinxTrain code.
+</para>
+<para>
+After the prompt utterances are generated we can setup the SphinxTrain
+directory <filename>st/</filename>.  All processing and output files
+are done within that directory until the file conversion of labels
+back into the voice's own phone set and put in
+<filename>lab/</filename>.  Note this process takes a long time, at
+least several hours and possible several days if you have a
+particularly slow machine or particularly large database.  Also this
+may require around a half a gigabyte of space.
+</para>
+<para>
+The script <filename>./bin/sphinxtrain</filename> does the work of converting
+the FestVox database into a form suitable for SphinxTrain.  In all
+there are 6 steps: setup, building files, converting waveforms,
+the training itself, alignment and conversion of label files back into
+FestVox format.  The training stage itself consist of 11
+parts and by far takes the most time.
+</para>
+<para>
+This script requires the environment variables
+<filename>SPHINXTRAINDIR</filename> and
+<filename>SPHINX2DIR</filename> to be set point to compiled versions
+of SphinxTrain and Sphinx2 respectively, as shown above.
+</para>
+<para>
+The first step is to set up the sub-directory <filename>st/</filename>
+where the training will take place.
+
+<blockquote><literallayout>
+  ./bin/sphinxtrain setup
+</literallayout></blockquote>
+
+The training database name will be taken from your 
+<filename>etc/voice.defs</filename>, if you don't have one of those
+use 
+
+<blockquote><literallayout>
+  $FESTVOXDIR/src/general/guess_voice_defs
+</literallayout></blockquote>
+
+</para>
+<para>
+The next stage is to convert the database prompt list into a
+transcription file suitable for SphinxTrain,; construct a lexicon, and
+phone file etc.  All of the generate files will be put in
+<filename>st/etc/</filename>.  Note because of various limitations in
+Sphinx2 and SphinxTrain, the lexicon (<filename>.dic</filename>), and
+transcription (<filename>.transcription</filename>) will not have what
+you might thing are sensible values.  The word names are take from the
+utts if they consist of only upper and lower case characters.  A
+number is added to make them unique. Also if another work exists with
+the same pronunciation but different word it may be assigned a differ
+name from what you expect.  The word names in the SphinxTrain files
+are only there to help debugging and are really referring to specific
+instances of words in the utterance (to ensure the pronunciations are
+preserved with respect to homograph disambiguation and post lexical
+rules. If people complain about these being confusing I
+will make all words simple "w" followed by a number.
+
+<blockquote><literallayout>
+  ./bin/sphinxtrain files
+</literallayout></blockquote>
+
+</para>
+<para>
+The next stage is to generate the mfcc's for SphinxTrain unfortunately
+these must be in a different format from the mfcc's used in FestVox,
+also SphinxTrain only supports raw headered files, and NIST header
+files, so we copy the waveform files in <filename>wav/</filename> into
+the <filename>st/wav/</filename> directory converting them to NIST
+headers
+
+<blockquote><literallayout>
+  ./bin/sphinxtrain feats
+</literallayout></blockquote>
+
+</para>
+<para>
+
+Now we can start the training itself.  This consists of eleven stages
+each which will be run automatically.
+
+<itemizedlist mark=bullet spacing=compact>
+<listitem><para>
+
+Module 0 checks the basic files for training.  There should be no errors
+at this stage
+
+</para></listitem>
+<listitem><para>
+
+Module 1 builds the vector quantization parameters.
+
+</para></listitem>
+<listitem><para>
+
+Module 2 builds context-independent phone models.  This runs Baum-Welch over
+the data building context-independent HMM phone models.  This runs
+for several passes until convergences (somewhere between 4 and 15 
+passes).  There may be some errors on some files (especially long,
+or badly transcribed ones), but a small number of errors here (with 
+the identified file being "ignored" should be ok.
+
+</para></listitem>
+<listitem><para>
+
+Module 3 makes the untied model definition.
+
+</para></listitem>
+<listitem><para>
+
+Module 4 builds context dependent models.
+
+</para></listitem>
+<listitem><para>
+
+Module 5a builds trees for asking questions for tied-states.
+
+</para></listitem>
+<listitem><para>
+
+Module 5b builds trees.  One for each state in each HMM.  This part
+takes the longest time.
+
+</para></listitem>
+<listitem><para>
+
+Module 6 prunes trees.
+
+</para></listitem>
+<listitem><para>
+
+Module 7 retrain context dependent models with tied states.
+
+</para></listitem>
+<listitem><para>
+
+Module 8 deleted interpolation
+
+</para></listitem>
+<listitem><para>
+
+Module 9 convert the generated models to Sphinx2 format
+
+</para></listitem>
+</itemizedlist>
+
+</para>
+<para>
+All of the above stages should be run together with the command
+as 
+
+<blockquote><literallayout>
+  ./bin/sphinxtrain train
+</literallayout></blockquote>
+
+</para>
+<para>
+Once trained we can use these models to align the labels against the
+recorded prompts.  
+
+<blockquote><literallayout>
+  ./bin/sphinxtrain align
+</literallayout></blockquote>
+
+Some utterances may fail to be labeled at this point, either because
+they are too long, or their orthography does not match the acoustics.
+There is not simple solution for this at present.  For some you wimple
+not get a label file, and you can either label the utterance by hand,
+exclude if from the data, or split it into a smaller file.  Other
+times Sphinx2 will crash and you'll need to remove the 
+utterances from the <filename>st/etc/*.align</filename> and
+<filename>st/etc/*.ctl</filename> and run the script
+<filename>./bin/sphinx_lab</filename> by hand.
+
+</para>
+<para>
+The final stage is to take the output from the alignment and convert
+the labels back into their FestVox format.  If everything worked
+to this stage, this final stage should be uneventful.
+
+<blockquote><literallayout>
+  ./bin/sphinxtrain labs
+</literallayout></blockquote>
+</para>
+<para>
+
+There should be a set of reasonable phone labels in
+<filename>prompt-lab/</filename>.  These can the be
+merged into the original utterances with the command
+
+<blockquote><literallayout>
+  festival -b festvox/build_clunits.scm '(build_utts "etc/txt.done.data")'
+</literallayout></blockquote>
+
+</para>
+</sect1>
+
+<sect1><title>Prosodic Labeling</title>
+
+<para>
+FO, Accents, Phrases etc.
+</para>
+
+</sect1>
+
+</chapter>

@@ -1,0 +1,119 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                   Carnegie Mellon University and                      ##
+##                   Alan W Black and Kevin A. Lenzo                     ##
+##                      Copyright (c) 1998-2000                          ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Normalize cepstrum parameters                                        ##
+##   note this is zscoring, not just mean normalization                  ##
+###########################################################################
+
+LANG=C; export LANG
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ $# = 0 ]
+then
+   echo "Normalize cepstral coefficients"
+   echo "Usage:  bin/make_cmn mcep/*.mcep"
+   echo "Note this creates the stats file in etc/cep.meanstddev and "
+   echo "overwrites the mcep files with their normalized versions "
+   exit 1
+fi
+
+echo "Building meanstddev file"
+
+for i in $*
+do
+   $ESTDIR/bin/ch_track -otype ascii $i
+done |
+awk '{
+        for (i=1; i<=NF; i++)
+        {
+          count[i] += 1
+   	  sum[i] += $i
+	  sumsq[i] += $i*$i
+        } 
+        numchannels=NF;
+     }
+     function std (sum, sumx, n)
+     {
+	if (n==1)
+            n=2;
+        return sqrt(((n*sumx)-(sum*sum)) / (n*(n-1)))
+     }
+     function mean (sum,n)
+     {
+           return sum/n;
+     }
+     END {
+        for (i=1; i<=NF; i++)
+           printf("%3.3f %3.3f\n",mean(sum[i],count[i]),std(sum[i],sumsq[i],count[i]));
+     }' >etc/cep.meanstddev
+
+cat etc/cep.meanstddev |
+awk 'BEGIN {printf("BEGIN {\n")}
+     {printf("mean[%d]=%s; stddev[%d]=%s;\n",NR,$1,NR,$2);}
+     END {printf("}\n")}' >etc/norm.awk
+echo '{if (header==0)
+       {
+          print $0;
+          if ($1 == "EST_Header_End")
+             header=1;
+       }
+       else
+       {
+          printf("%s %s ",$1,$2)  
+          for (i=1; i<=(NF-2); i++)
+              printf("%f ",($(i+2)-mean[i])/stddev[i]);
+          printf("\n");
+       }}' >>etc/norm.awk
+
+exit   
+
+$CMN -findmsd -omsd etc/cep.meanstddev $*
+
+for i in $*
+do
+  fname=`basename $i .wav`
+  echo $fname
+  $CMN -applymsd -imsd etc/cep.meanstddev $i
+done
+
+

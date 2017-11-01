@@ -1,0 +1,341 @@
+(
+( occurid vector )
+( R:mcep_link.parent.name 
+state names
+"0"
+)
+( R:mcep_link.parent.R:HMMstate.p.name
+state names
+"0"
+)
+( R:mcep_link.parent.R:HMMstate.n.name
+state names
+"0"
+)
+( R:mcep_link.parent.R:segstate.parent.p.name
+phone names
+"0"
+)
+( R:mcep_link.parent.R:segstate.parent.p.ph_clst
++
+-
+0
+)
+( R:mcep_link.parent.R:segstate.parent.p.ph_vc
++
+-
+0
+)
+( R:mcep_link.parent.R:segstate.parent.p.ph_ctype
+0
+a
+f
+l
+n
+r
+s
+-
+)
+( R:mcep_link.parent.R:segstate.parent.p.ph_vheight
+0
+1
+2
+3
+-
+)
+( R:mcep_link.parent.R:segstate.parent.p.ph_vlng
+0
+a
+d
+l
+s
+-
+)
+( R:mcep_link.parent.R:segstate.parent.p.ph_vfront
+0
+1
+2
+3
+-
+)
+( R:mcep_link.parent.R:segstate.parent.p.ph_vrnd
++
+-
+0
+)
+( R:mcep_link.parent.R:segstate.parent.p.ph_cplace
+0
+a
+b
+d
+l
+p
+v
+g
+-
+)
+( R:mcep_link.parent.R:segstate.parent.p.ph_cvox
++
+-
+0
+)
+( R:mcep_link.parent.R:segstate.parent.p.ph_asp
++
+-
+0
+)
+( R:mcep_link.parent.R:segstate.parent.p.ph_nuk
++
+-
+0
+)
+( R:mcep_link.parent.R:segstate.parent.n.name ignore
+phone names
+"0"
+)
+( R:mcep_link.parent.R:segstate.parent.p.ph_clst
++
+-
+0
+)
+( R:mcep_link.parent.R:segstate.parent.n.ph_vc
++
+-
+0
+)
+( R:mcep_link.parent.R:segstate.parent.n.ph_ctype
+0
+a
+f
+l
+n
+r
+s
+-
+)
+( R:mcep_link.parent.R:segstate.parent.n.ph_vheight
+0
+1
+2
+3
+-
+)
+( R:mcep_link.parent.R:segstate.parent.n.ph_vlng
+0
+a
+d
+l
+s
+-
+)
+( R:mcep_link.parent.R:segstate.parent.n.ph_vfront
+0
+1
+2
+3
+-
+)
+( R:mcep_link.parent.R:segstate.parent.n.ph_vrnd
++
+-
+0
+)
+( R:mcep_link.parent.R:segstate.parent.n.ph_cplace
+0
+a
+b
+d
+l
+p
+v
+g
+-
+)
+( R:mcep_link.parent.R:segstate.parent.n.ph_cvox
++
+-
+0
+)
+( R:mcep_link.parent.R:segstate.parent.n.ph_asp
++
+-
+0
+)
+( R:mcep_link.parent.R:segstate.parent.n.ph_nuk
++
+-
+0
+)
+( R:mcep_link.parent.R:segstate.parent.segment_duration ignore float)
+( R:mcep_link.parent.lisp_cg_duration float)
+( R:mcep_link.parent.R:segstate.n.lisp_cg_duration float)
+( R:mcep_link.parent.R:segstate.p.lisp_cg_duration float)
+( lisp_cg_state_pos b m e)
+( lisp_cg_state_place float)
+( lisp_cg_state_index float)
+( lisp_cg_state_rindex float)
+( lisp_cg_phone_place float)
+( lisp_cg_phone_index float)
+( lisp_cg_phone_rindex float)
+( lisp_cg_position_in_sentence ignore float)
+( R:mcep_link.parent.R:segstate.parent.R:SylStructure.parent.parent.R:Phrase.parent.lisp_cg_find_phrase_number float)
+( lisp_cg_position_in_phrasep float)
+( lisp_cg_position_in_phrase float)
+( R:mcep_link.parent.R:segstate.parent.R:SylStructure.parent.stress float)
+( R:mcep_link.parent.R:segstate.parent.R:SylStructure.parent.R:Syllable.p.stress
+float
+)
+( R:mcep_link.parent.R:segstate.parent.R:SylStructure.parent.R:Syllable.n.stress
+float
+)
+( R:mcep_link.parent.R:segstate.parent.seg_onsetcoda
+0
+coda
+onset
+)
+( R:mcep_link.parent.R:segstate.parent.n.seg_onsetcoda 
+0
+coda
+onset
+)
+( R:mcep_link.parent.R:segstate.parent.p.seg_onsetcoda
+0
+coda
+onset
+)
+( R:mcep_link.parent.R:segstate.parent.R:SylStructure.parent.accented
+0
+1
+)
+( R:mcep_link.parent.R:segstate.parent.pos_in_syl float)
+( R:mcep_link.parent.R:segstate.parent.syl_initial 
+0
+1
+)
+( R:mcep_link.parent.R:segstate.parent.syl_final
+0
+1
+)
+( R:mcep_link.parent.R:segstate.parent.R:SylStructure.parent.lisp_cg_break
+0
+1
+3
+4
+)
+( R:mcep_link.parent.R:segstate.parent.R:SylStructure.parent.R:Syllable.p.lisp_cg_break
+0
+1
+3
+4
+)
+( R:mcep_link.parent.R:segstate.parent.R:SylStructure.parent.position_type
+0
+initial
+single
+final
+mid
+)
+( R:mcep_link.parent.R:segstate.parent.pp.name ignore
+phone names
+"0"
+)
+( R:mcep_link.parent.R:segstate.parent.pp.ph_vc ignore
++
+-
+0
+)
+( R:mcep_link.parent.R:segstate.parent.pp.ph_ctype ignore
+0
+a
+f
+l
+n
+r
+s
+-
+)
+( R:mcep_link.parent.R:segstate.parent.pp.ph_vheight ignore
+0
+1
+2
+3
+-
+)
+( R:mcep_link.parent.R:segstate.parent.pp.ph_vlng ignore
+0
+a
+d
+l
+s
+-
+)
+( R:mcep_link.parent.R:segstate.parent.pp.ph_vfront ignore
+0
+1
+2
+3
+-
+)
+( R:mcep_link.parent.R:segstate.parent.pp.ph_vrnd ignore
++
+-
+0
+)
+( R:mcep_link.parent.R:segstate.parent.pp.ph_cplace ignore
+0
+a
+b
+d
+g
+l
+p
+v
+-
+)
+( R:mcep_link.parent.R:segstate.parent.pp.ph_cvox ignore
++
+-
+0
+)
+( R:mcep_link.parent.R:segstate.parent.n.lisp_is_pau 0 1)
+( R:mcep_link.parent.R:segstate.parent.p.lisp_is_pau 0 1)
+( R:mcep_link.parent.R:segstate.parent.R:SylStructure.parent.parent.gpos
+0
+aux
+cc
+content
+det
+in
+md
+pps
+to
+wp
+punc
+)
+( R:mcep_link.parent.R:segstate.parent.R:SylStructure.parent.parent.R:Word.p.gpos
+0
+aux
+cc
+content
+det
+in
+md
+pps
+to
+wp
+punc
+)
+( R:mcep_link.parent.R:segstate.parent.R:SylStructure.parent.parent.R:Word.n.gpos
+0
+aux
+cc
+content
+det
+in
+md
+pps
+to
+wp
+punc
+)
+)

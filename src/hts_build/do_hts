@@ -1,0 +1,204 @@
+#!/bin/sh
+###########################################################################
+##                                                                       ##
+##                  Language Technologies Institute                      ##
+##                     Carnegie Mellon University                        ##
+##                        Copyright (c) 2007                             ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##             Author:  Alan W Black (awb@cs.cmu.edu)                    ##
+##               Date:  December 2007                                    ##
+###########################################################################
+## make an HTS (2.0) voice from a FestVox voice                          ##
+## (currently only tested for English)                                   ##
+###########################################################################
+
+LANG=C; export LANG
+
+if [ ! -d hts_build ]
+then
+    mkdir hts_build
+fi
+
+if [ ! -d hts ]
+then
+    mkdir hts
+fi
+
+if [ ! "$FESTVOXDIR" ]
+then
+   echo "environment variable FESTVOXDIR is unset"
+   echo "set it to your local festvox directory e.g."
+   echo '   bash$ export FESTVOXDIR=/home/awb/projects/festvox/'
+   echo or
+   echo '   csh% setenv FESTVOXDIR /home/awb/projects/festvox/'
+   exit 1
+fi
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local Edinburgh Speech Tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ ! "$SPTKBINDIR" ]
+then
+   echo "environment variable SPTKBINDIR is unset"
+   echo "set it to your local Nagoya Institute of Technology Speech Toolkit e.g."
+   echo '   bash$ export SPTKBINDIR=/home/awb/projects/SPTK/bin'
+   echo or
+   echo '   csh% setenv SPTKBINDIR /home/awb/projects/SPTK/bin'
+   exit 1
+fi
+
+if [ ! "$HTSBINDIR" ]
+then
+   echo "environment variable HTSBINDIR is unset"
+   echo "set it to your local Cambridge University HTK bin directorylogy e.g."
+   echo '   bash$ export HTSBINDIR=/home/awb/projects/HTK/bin.i386'
+   echo or
+   echo '   csh% setenv HTSBINDIR /home/awb/projects/HTK/bin.i386'
+   exit 1
+fi
+
+export FESTIVALDIR=`dirname $ESTDIR`/festival
+export HTSDIR=$FESTVOXDIR/src/hts_build/
+
+export ACTIVETCLBIN=/opt/ActiveTcl-8.4/bin
+export SPTKBIN=/usr/lti/SPTK/bin
+export HTSBIN=/home/awb/projects/hts/2.0/HTS/htk/build/bin.linux
+
+export HTS_BUILD_DIR=hts_build/HTS-demo_CMU-ARCTIC-SLT
+
+# To keep our assumptions about perl compatible
+LANG=C
+export LANG
+
+if [ "$PROMPTFILE" = "" ]
+then
+   PROMPTFILE=etc/txt.done.data
+fi
+
+source etc/voice.defs
+
+if [ $# = 0 ]
+then
+   $0 setup
+   $0 files
+   $0 train
+   $0 festvox
+   $0 festvox_dist
+   exit
+fi
+
+
+if [ "$1" = "setup" ]
+then
+    echo "HTS 2.0 Setup subdirectories"
+    cd hts_build
+    tar jxvf $HTS_SLT_DEMO
+    cd $HTS_BUILD_DIR
+
+    mv configure.ac configure.ac.orig 
+    cat configure.ac.orig |
+    sed 's/SPEAKER=slt/SPEAKER=spk/' |
+    sed 's/DATASET=cmu_us_arctic/DATASET='${FV_VOICENAME}'/' >configure.ac
+
+    ./configure \
+      --with-tcl-search-path=$ACTIVETCLBIN \
+      --with-fest-search-path=$ESTDIR/../festival/examples \
+      --with-sptk-search-path=$SPTKBIN \
+      --with-hts-search-path=$HTSBIN    
+
+    cp -pr $HTSDIR/do_hts bin/do_hts
+
+    exit 0
+fi
+
+if [ "$1" = "files" ]
+then
+    echo HTS "copy in files (utts,wavs)"
+
+    rm -rf $HTS_BUILD_DIR/data/raw $HTS_BUILD_DIR/data/utts
+    mkdir $HTS_BUILD_DIR/data/raw $HTS_BUILD_DIR/data/utts
+
+    for i in `cat $PROMPTFILE | awk '{print $2}'`
+    do
+      echo wave and utt for $i
+      $ESTDIR/bin/ch_wave -otype raw -F 16000 wav/$i.wav -o $HTS_BUILD_DIR/data/raw/${FV_VOICENAME}_spk_${i}.raw
+      cp -p festival/utts/$i.utt hts_build/data/utts/${FV_VOICENAME}_spk_${i}.utt
+    done
+    exit 0
+fi
+
+if [ "$1" = "train" ]
+then
+    echo "HTS train"
+    ( cd $HTS_BUILD_DIR && make)
+    exit 0
+fi
+
+if [ "$1" = "festvox" ]
+then
+    echo HTS "Make festvox voice"
+    # Built models
+    cp -p $HTS_BUILD_DIR/voices/qst001/ver1/* hts/
+
+    # Festvox stuff
+    cat $HTSDIR/VOICE_2.0_hts.scm |
+    sed 's/VOICENAME/'${FV_VOICENAME}'/g' |
+    cat > festvox/${FV_VOICENAME}_hts.scm
+
+    exit 0
+fi
+
+if [ "$1" = "festvox_dist" ]
+then
+    echo HTS "Make festvox voice distribution"
+    mkdir -p festival/lib/voices/
+    mkdir -p festival/lib/voices/${FV_LANG}
+    ln -s ../../../.. festival/lib/voices/${FV_LANG}/${FV_VOICENAME}_hts
+
+    tar zcvf festvox_${FV_VOICENAME}_hts.tar.gz \
+         festival/lib/voices/$FV_LANG/${FV_VOICENAME}_hts/hts \
+         festival/lib/voices/$FV_LANG/${FV_VOICENAME}_hts/festvox/${FV_VOICENAME}*.scm \
+         festival/lib/voices/$FV_LANG/${FV_VOICENAME}_hts/README \
+         festival/lib/voices/$FV_LANG/${FV_VOICENAME}_hts/COPYING
+    rm -rf festival/lib
+
+    exit 0
+fi
+
+echo HTS unknown options: $*
+exit 1
+
+

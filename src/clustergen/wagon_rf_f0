@@ -1,0 +1,176 @@
+#!/bin/sh
+###########################################################################
+##                                                                       ##
+##                   Language Technologies Institute                     ##
+##                     Carnegie Mellon University                        ##
+##                         Copyright (c) 2014                            ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##
+##  Replacement wagon call that also does random forests  F0##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+## Example
+##
+## -ignore '(R:mcep_link.parent.lisp_duration)' -desc festival/clunits/f0.desc -data 'festival/feats/aa_1_f0.feats' -test 'festival/feats/aa_1_f0.feats' -balance 0 -stop 200 -output 'festival/trees/aa_1_f0.tree' 
+##
+##                                                                       ##
+## EXPERIMENTAL                                                          ##
+##                                                                       ##
+###########################################################################
+
+WAGON=$ESTDIR/bin/wagon
+#
+#
+WGN_IG=${1}
+WGN_IGV=${2}
+WGN_desc=${3}
+WGN_descv=${4}
+WGN_data=${5}
+WGN_datav=${6}
+WGN_test=${7}
+WGN_testv=${8}
+WGN_bal=${9}
+WGN_balv=${10}
+WGN_stop=${11}
+WGN_stopv=${12}
+WGN_tree=${13}
+WGN_treev=${14}
+
+echo $*
+
+# Stuff
+WD=wagon_rf_f0_$$
+
+mkdir $WD
+
+if [ ! -d all_rf ]
+then
+   mkdir all_rf
+fi
+
+#  Copy in description file and datafile
+cat $WGN_descv >$WD/desc.base
+cat $WGN_datav >$WD/data
+
+# Get some randomness
+SEED=`echo $$ | awk '{ print $1%10000 }'`
+echo $SEED >$WD/seed
+
+#  Build models N times
+Ntimes=20
+echo 1 $Ntimes |
+awk '{for (i=$1; i<=$2; i++)
+         printf("%02d\n",i)}' |
+while read i
+do
+   echo Iteration $i $WGN_treev
+   SSEED=`cat $WD/seed`
+   RRR=40
+   if [ -f rrr ]
+   then
+      RRR=`cat rrr`
+   fi
+   RRF=40
+   if [ -f rrf ]
+   then
+      RRF=`cat rrf`
+   fi
+   # make random description file
+   # Keep first two features always
+   cat $WD/desc.base |
+   awk 'BEGIN {for (i=1;i<'$SSEED'; i++)
+                      randint(10)}
+        function randint(n) { return int(n * rand()) }
+        {if (NR < 2)
+         {
+            print $0
+         }
+         else if (substr($0,2,1) == "(")
+         {
+            p = randint(100);
+            if (p < '$RRR')
+            {
+               printf("%s ignore ",$1);
+               for (i=2; i<=NF; i++)
+                  printf("%s ",$i);
+               printf("\n");
+            }
+            else
+               print $0
+         }
+         else
+            print $0
+        }' >$WD/desc.$i
+
+   echo $SSEED |
+   awk 'function randint(n) { return int(n * rand()) }
+        {for (i=1;i<$1; i++)
+                 n=randint(10000);
+         print n}' >$WD/seed
+
+    # Build a tree (note we don't use our $WD/data.test.$i here yet)
+    $WAGON $WGN_IG $WGN_IGV $WGN_desc $WD/desc.$i $WGN_data $WD/data $WGN_test $WD/data $WGN_bal $WGN_balv $WGN_track $WGN_trackv $WGN_stop $WGN_stopv $WGN_tree $WD/tree.$i
+
+    if [ ! -d rf_models/trees_$i ]
+    then
+       mkdir -p rf_models/trees_$i
+    fi
+
+    cp -pr $WD/tree.$i $WGN_treev
+    cp -pr $WGN_treev rf_models/trees_$i
+
+done
+
+# Collect them together per unittype, rather than per pass 
+# (not used yet)
+N0times=`echo $Ntimes | awk '{printf("%02d\n",$1)}'`
+
+cp -pr $WD/tree.$N0times $WGN_treev
+UNITNAME=`basename $WGN_treev | sed 's/_f0.tree//'`
+
+if [ -d all_rf/${UNITNAME}_f0 ]
+then
+   rm -rf all_rf/${UNITNAME}_f0
+fi
+
+mv $WD all_rf/${UNITNAME}_f0
+
+exit
+
+##
+##  Debuging info .... what a call looks like
+##
+
+# Original call
+#$WAGON $WGN_TF $WGN_TFV $WGN_VO $WGN_VOV $WGN_desc $WGN_descv $WGN_data $WGN_datav $WGN_test $WGN_testv $WGN_bal $WGN_balv $WGN_track $WGN_trackv $WGN_stop $WGN_stopv $WGN_tree $WGN_treev 
+
+$ESTDIR/bin/wagon -ignore '(R:mcep_link.parent.lisp_duration)' -desc festival/clunits/f0.desc -data 'festival/feats/aa_1_f0.feats' -test 'festival/feats/aa_1_f0.feats' -balance 0 -stop 200 -output 'festival/trees/aa_1_f0.tree'
+
+

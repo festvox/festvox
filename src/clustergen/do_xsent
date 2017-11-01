@@ -1,0 +1,200 @@
+#!/bin/sh
+###########################################################################
+##                                                                       ##
+##                   Language Technologies Institute                     ##
+##                     Carnegie Mellon University                        ##
+##                         Copyright (c) 2013                            ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Synthesis of multi-sentence text making cross sentences features     ##
+##  available                                                            ##
+##
+##  Assumes there is parainfo in the txt.done.data (text2utts -parainfo) ##
+##
+##  In a voice
+##
+##   ./bin/do_xsent dump etc/txt.done.data.train
+##   ./bin/do_xsent train etc/txt.done.data.train
+##   ./bin/do_xsent make_scm_file etc/txt.done.data.train
+##       will make festvox/xsent_f0_model.scm
+##   Add to festvox/clustergen.scm
+##   (set! cg:prev_utt_f0 t)
+##   ...
+##   (if cg:prev_utt_f0
+##    (begin
+##      (defvar testset_utts nil)
+##      (load "festvox/xsent_f0_models.scm")
+##      (require 'xsent)))
+##   ... in (defSynthType ClusterGen
+##       after cg:spamf0
+##    (if cg:prev_utt_f0
+##        ;; Global variance modification
+##        (if (utt.relation.first utt 'Word)
+##            (cg:xsent_f0_conversion utt))
+##        )
+##
+##   To get parainfo in a txt.done.data file use
+##   $FESTVOXDIR/src/promptselect/text2utts -all -itype raw -parainfo X.txt -o X.data
+##
+##   For synthesis
+##   ./bin/do_xsent synth_ttd /etc/txt.done.data odir
+##       for sunthesis of ttd with sentences per line with parainfo
+##   ./bin/do_xsent synth_para_ttd /etc/txt.done.data odir
+##       for sunthesis of ttd with full paragraphs per line
+##   ./bin/do_xsent synth_file file.txt file.wav
+##       for synthesis of arbitary text files
+##   
+LANG=C; export LANG
+
+if [ $# = 0 ]
+then
+   echo "Synthesis given textfile to given waveform file with current voice"
+   echo "Usage:  do_xsent COMMAND ARGS"
+   exit 1
+fi
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+. etc/voice.defs
+
+PROMPTFILE=$2
+
+FESTIVAL=$ESTDIR/../festival/bin/festival
+
+if [ $1 = "setup" ]
+then
+   mkdir -p festival/xsent
+   cp -pr $FESTVOXDIR/src/clustergen/xsent.desc festival/xsent
+   cp -pr $FESTVOXDIR/src/clustergen/xsent.scm festvox/
+
+   exit
+fi
+
+#########################################################################
+##   For TRAINING models
+#########################################################################
+if [ $1 = "dump" ]
+then
+
+    if [ ! -d festival/xsent ]
+    then
+       echo first run: $0 setup
+       exit
+    fi
+
+    $FESTIVAL -b --heap 10000000 festvox/$FV_FULLVOICENAME.scm festvox/build_clunits.scm festvox/clustergen.scm festvox/clustergen_build.scm festvox/xsent.scm '(xsent_dumpfeats "'$PROMPTFILE'" "'festival/xsent/xsent.data'")'
+
+   ./bin/traintest festival/xsent/xsent.data
+   ./bin/traintest festival/xsent/xsent.data.train
+
+   exit
+fi
+
+
+if [ $1 = "train" ]
+then
+   $ESTDIR/bin/wagon -desc festival/xsent/xsent.desc -stepwise -data festival/xsent/xsent.data.train.train -test festival/xsent/xsent.data.train.test -stop 25 -predictee lisp_utt_f0_mean -ignore '(lisp_utt_f0_stddev lisp_utt_f0_high lisp_utt_f0_low)' -o festival/xsent/f0_mean.tree
+
+   $ESTDIR/bin/wagon -desc festival/xsent/xsent.desc -stepwise -data festival/xsent/xsent.data.train.train -test festival/xsent/xsent.data.train.test -stop 25 -predictee lisp_utt_f0_stddev -ignore '(lisp_utt_f0_mean lisp_utt_f0_high lisp_utt_f0_low)' -o festival/xsent/f0_stddev.tree
+
+   $ESTDIR/bin/wagon -desc festival/xsent/xsent.desc -stepwise -data festival/xsent/xsent.data.train.train -test festival/xsent/xsent.data.train.test -stop 25 -predictee lisp_utt_f0_high -ignore '(lisp_utt_f0_mean lisp_utt_f0_stddev lisp_utt_f0_low)' -o festival/xsent/f0_high.tree
+
+   $ESTDIR/bin/wagon -desc festival/xsent/xsent.desc -stepwise -data festival/xsent/xsent.data.train.train -test festival/xsent/xsent.data.train.test -stop 25 -predictee lisp_utt_f0_low -ignore '(lisp_utt_f0_mean lisp_utt_f0_stddev lisp_utt_f0_high)' -o festival/xsent/f0_low.tree
+
+   exit
+fi
+
+if [ $1 = "make_scm_file" ]
+then
+   echo >festvox/xsent_f0_models.scm
+
+   echo "(set! xsent_f0_model_f0_mean '" >>festvox/xsent_f0_models.scm
+   cat festival/xsent/f0_mean.tree >>festvox/xsent_f0_models.scm
+   echo ")" >>festvox/xsent_f0_models.scm
+
+   echo "(set! xsent_f0_model_f0_stddev '" >>festvox/xsent_f0_models.scm
+   cat festival/xsent/f0_stddev.tree >>festvox/xsent_f0_models.scm
+   echo ")" >>festvox/xsent_f0_models.scm
+
+   echo "(set! xsent_f0_model_f0_high '" >>festvox/xsent_f0_models.scm
+   cat festival/xsent/f0_high.tree >>festvox/xsent_f0_models.scm
+   echo ")" >>festvox/xsent_f0_models.scm
+
+   echo "(set! xsent_f0_model_f0_low '" >>festvox/xsent_f0_models.scm
+   cat festival/xsent/f0_low.tree >>festvox/xsent_f0_models.scm
+   echo ")" >>festvox/xsent_f0_models.scm
+
+fi
+
+if [ $1 = "synth_ttd" ]
+then
+   if [ ! -d test/$3 ]
+   then
+      mkdir -p test/$3
+   fi
+
+   #  utterances in ttd are sentences with parainfo
+
+   $FESTIVAL -b --heap 10000000 festvox/$FV_FULLVOICENAME.scm "(voice_$FV_FULLVOICENAME)" festvox/xsent.scm '(xsent_synth_ttd "'$PROMPTFILE'" "'test/$3'")'
+
+   exit
+fi
+
+if [ $1 = "synth_para_ttd" ]
+then
+   if [ ! -d test/$3 ]
+   then
+      mkdir -p test/$3
+   fi
+
+   #  utterances in ttd are paragraphs
+
+   $FESTIVAL -b --heap 10000000 festvox/$FV_FULLVOICENAME.scm "(voice_$FV_FULLVOICENAME)" festvox/xsent.scm '(xsent_synth_para_ttd "'$PROMPTFILE'" "'test/$3'")'
+
+   exit
+fi
+
+if [ $1 = "synth_file" ]
+then
+   #  file is text
+
+   $FESTIVAL -b --heap 10000000 festvox/$FV_FULLVOICENAME.scm "(voice_$FV_FULLVOICENAME)" festvox/xsent.scm '(xsent_synth_file "'$2'" "'$3'")'
+
+
+   exit
+fi
+

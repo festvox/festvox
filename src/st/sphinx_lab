@@ -1,0 +1,74 @@
+#!/bin/sh
+####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                  Language Technologies Institute                      ##
+##                     Carnegie Mellon University                        ##
+##                      Copyright (c) 2000-2002                          ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Label spoken utterances with Sphinx2 aligner                         ##
+##                                                                       ##
+###########################################################################
+
+if [ ! "$SPHINX2DIR" ]
+then
+   echo "environment variable SPHINX2DIR is unset"
+   echo "set it to your local Sphinx2 is installed e.g."
+   echo '   bash$ export SPHINX2DIR=/home/awb/projects/sphinx2/'
+   echo or
+   echo '   csh% setenv SPHINX2DIR /home/awb/projects/sphinx2/'
+   echo 'such that $SPHINX2DIR/bin/sphinx2-batch exists'
+   exit 1
+fi
+
+LANG=C; export LANG
+
+. ./etc/voice.defs
+
+S2BATCH=$SPHINX2DIR/bin/sphinx2-batch
+
+# the HMM directory 
+HMM=st/model_parameters/$FV_VOICENAME.s2models/
+
+# the 'task'; files for this db
+TASK=st/wav
+DICFILE=st/etc/$FV_VOICENAME.dic
+NDICFILE=st/etc/$FV_VOICENAME.sil
+
+# the control file, which lists the utterance names, one per line
+CTLFILE=st/etc/$FV_VOICENAME.fileids
+
+# the transcripts, one per line, to be used for the alignment
+TACTLFN=st/etc/$FV_VOICENAME.align
+
+#$S2BATCH -adcin TRUE -adcext wav -ctlfn ${CTLFILE} -tactlfn ${TACTLFN} -ctloffset 0 -ctlcount 100000000 -datadir wav -agcmax FALSE -langwt 6.5 -fwdflatlw 8.5 -rescorelw 9.5 -ugwt 0.5 -fillpen 1e-10 -silpen 1e-10 -inspen 0.65 -top 1 -topsenfrm 3 -topsenthresh -70000 -beam 2e-06 -npbeam 2e-06 -lpbeam 2e-05 -lponlybeam 0.0005 -nwbeam 0.0005 -fwdflat FALSE -fwdflatbeam 1e-08 -fwdflatnwbeam 0.0003 -bestpath TRUE -kbdumpdir ${TASK} -dictfn ${DICFILE} -ndictfn ${NDICFILE} -phnfn ${HMM}/phone -mapfn ${HMM}/map -hmmdir ${HMM} -hmmdirlist ${HMM} -8bsen TRUE -sendumpfn ${HMM}/sendump -cbdir ${HMM} -phonelabdir st/lab
+
+#$S2BATCH -adcin TRUE -adcext wav -ctlfn ${CTLFILE} -tactlfn ${TACTLFN} -ctloffset 0 -ctlcount 100000000 -datadir wav -agcmax FALSE -langwt 6.5 -fwdflatlw 8.5 -rescorelw 9.5 -ugwt 0.5 -fillpen 1e-10 -silpen 1e-10 -inspen 0.65 -topn 4 -topsenfrm 3 -topsenthresh -70000 -beam 2e-90 -npbeam 2e-06 -lpbeam 2e-05 -lponlybeam 0.0005 -nwbeam 0.0005 -fwdflat FALSE -fwdflatbeam 1e-08 -fwdflatnwbeam 0.0003 -bestpath TRUE -kbdumpdir ${TASK} -dictfn ${DICFILE} -fdictfn ${NDICFILE} -phnfn ${HMM}/phone -mapfn ${HMM}/map -hmmdir ${HMM} -hmmdirlist ${HMM} -8bsen TRUE -sendumpfn ${HMM}/sendump -cbdir ${HMM} -phonelabdir st/lab
+
+$S2BATCH -adcin TRUE -adcext wav -ctlfn ${CTLFILE} -tactlfn ${TACTLFN} -ctloffset 0 -ctlcount 100000000 -datadir wav -agcmax FALSE -langwt 6.5 -fwdflatlw 8.5 -rescorelw 9.5 -ugwt 0.5 -fillpen 1e-10 -silpen 1e-10 -inspen 0.65 -topn 5 -topsenfrm 3 -topsenthresh -70000 -beam 2e-90 -npbeam 2e-90 -lpbeam 2e-90 -lponlybeam 0.0005 -nwbeam 0.0005 -fwdflat FALSE -fwdflatbeam 1e-08 -fwdflatnwbeam 0.0003 -bestpath TRUE -kbdumpdir ${TASK} -dictfn ${DICFILE} -fdictfn ${NDICFILE} -phnfn ${HMM}/phone -mapfn ${HMM}/map -hmmdir ${HMM} -hmmdirlist ${HMM} -8bsen TRUE -sendumpfn ${HMM}/sendump -cbdir ${HMM} -phonelabdir st/lab

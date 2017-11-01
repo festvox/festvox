@@ -1,0 +1,226 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                                                                       ##
+##                  Language Technologies Institute                      ##
+##                     Carnegie Mellon University                        ##
+##                      Copyright (c) 1998-2004                          ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+
+LANG=C; export LANG
+
+if [ "$FESTIVALDIR" = "" ]
+then
+   FESTIVALDIR=$ESTDIR/../festival
+fi
+FESTIVAL=$FESTIVALDIR/bin/festival
+
+if [ "$SIODHEAPSIZE" = "" ]
+then
+   SIODHEAPSIZE=20000000
+   export SIODHEAPSIZE
+fi
+HEAPSIZE=$SIODHEAPSIZE
+
+if [ $# = 0 ]
+then
+   $0 cummulate
+   $0 align
+   $0 traintest
+   $0 build
+   $0 merge
+   $0 test
+   exit 0
+fi
+
+if [ "$1" = "setup" ]
+then
+
+   cp -p $FESTVOXDIR/src/lts/build_lts_rules .
+   cp -p $FESTVOXDIR/src/lts/build_lts .
+   mkdir lts_scratch
+
+   LTYPE=nil
+   if [ $# = 3 ]
+   then
+      # asis or utf8
+      LTYPE=$3
+   fi
+
+   $FESTIVAL -b "(require 'lts_build)" '(dump-flat-entries "'$2'" "lts_scratch/lex_entries.out" "'$LTYPE'")'
+   exit 0
+fi
+
+if [ "$1" = "make_allowables" ]
+then
+   # Automatic build of allowables
+   if [ -f allowables.scm ]
+   then
+      cp -p allowables.scm allowables.scm-old
+   fi
+
+   $FESTIVAL --heap $SIODHEAPSIZE -b "(require 'lts_build)" '(dump-lets-phones "lts_scratch/lex_entries.out")'
+
+   $FESTVOXDIR/src/lts/make_allows >allowables.scm
+
+   exit 0
+fi
+
+if [ "$1" = "make_allowables_smt" ]
+then
+   # Automatic build of allowables
+   if [ -f allowables.scm ]
+   then
+      cp -p allowables.scm allowables.scm-old
+   fi
+
+   $FESTIVAL --heap $SIODHEAPSIZE -b "(require 'lts_build)" '(dump-lets-phones "lts_scratch/lex_entries.out")'
+
+   $FESTVOXDIR/src/lts/make_allows-smt >allowables.scm
+
+   exit 0
+fi
+
+if [ "$1" = "cummulate" ]
+then
+
+   if [ ! -f "lts_scratch/lex_entries.out" ]
+   then
+        echo "can't find lts_scratch/lex_entries.out"
+        exit
+   fi
+
+   echo Find probabilities of letter-phone pairs
+   $FESTIVAL -b --heap $SIODHEAPSIZE allowables.scm '(begin
+       (cummulate-pairs "lts_scratch/lex_entries.out")
+       (save-table "lts_scratch/lex-") )'
+   exit 0
+fi
+
+
+if [ "$1" = "align" ]
+then
+
+   echo Align letter-phone pairs with best path
+   $FESTIVAL -b --heap $SIODHEAPSIZE allowables.scm lts_scratch/lex-pl-tablesp.scm '(begin
+      (aligndata "lts_scratch/lex_entries.out" "lts_scratch/lex.align")
+      (build-feat-file "lts_scratch/lex.align" "lts_scratch/lex.feats"))' |
+      tee align.log
+   exit 0
+fi
+
+if [ "$1" = "align_p" ]
+then
+
+    echo Align letter-phone pairs with best path -- in parallel
+    numlines=`cat lts_scratch/lex_entries.out | awk 'END { printf("%d\n",(NR+6)/6)}'`
+    split --lines=$numlines lts_scratch/lex_entries.out lts_scratch/lex_entries.out.
+    for i in aa ab ac ad ae af 
+    do
+        echo lts_scratch/lex_entries.out.$i
+    done >all.cmd
+    cat all.cmd | xargs -n 1 -P 6 $0 align_part 1> align.log 2> align.log
+    cat lts_scratch/lex_entries.out.*.align >lts_scratch/lex.align
+
+    rm -f lts_scratch/lex.feats
+    for i in aa ab ac ad ae af 
+    do
+      $FESTIVAL -b --heap $SIODHEAPSIZE allowables.scm lts_scratch/lex-pl-tablesp.scm '(begin
+         (build-feat-file "lts_scratch/lex_entries.out.'$i'.align" "lts_scratch/lex.feats.part"))'
+      cat lts_scratch/lex.feats.part >>lts_scratch/lex.feats
+   done
+    exit 0
+fi
+
+if [ "$1" = "align_part" ]
+then
+    echo Align letter-phone pairs with best path -- part
+        
+   $FESTIVAL -b --heap $SIODHEAPSIZE allowables.scm lts_scratch/lex-pl-tablesp.scm '(begin
+      (aligndata "'$2'" "'$2.align'"))' |
+       tee align.log
+   exit 0
+fi
+
+if [ "$1" = "traintest" ]
+then
+   echo "Split into training and test sets"
+   $FESTVOXDIR/src/general/traintest lts_scratch/lex.align
+   $FESTIVAL -b --heap $SIODHEAPSIZE allowables.scm lts_scratch/lex-pl-tablesp.scm '(begin
+      (build-feat-file "lts_scratch/lex.align.train" "lts_scratch/lex.feats.train"))'
+   exit 0
+fi
+
+
+if [ "$1" = "build" ]
+then
+
+   echo Build letter to phone CART trees
+   if [ -f lts_scratch/lex.align.train ]
+   then
+        echo "With traintest split"
+   fi
+   (cd lts_scratch; ../build_lts_rules ) >lts_scratch/lts.build.out
+
+   exit 0
+fi
+
+if [ "$1" = "merge" ]
+then
+   echo Build complete model
+   (cd lts_scratch;
+       $FESTIVAL -b --heap $SIODHEAPSIZE ../allowables.scm '(begin
+         (merge_models "lex_lts_rules" "lex_lts_rules.scm" allowables))')
+   cp -p lts_scratch/lex_lts_rules.scm ./lex_lts_rules.scm
+   exit 0
+fi
+
+if [ "$1" = "test" ]
+then
+  echo Test model
+  if [ -f lts_scratch/lex.align.test ]
+  then
+     $FESTIVAL -b --heap $SIODHEAPSIZE allowables.scm lts_scratch/lex_lts_rules.scm '(lts_testset "lts_scratch/lex.align.test" lex_lts_rules)' | tee lts_test.log
+     echo "with TEST set"
+  else
+     $FESTIVAL -b --heap $SIODHEAPSIZE allowables.scm lts_scratch/lex_lts_rules.scm '(lts_testset "lts_scratch/lex.align" lex_lts_rules)' | tee lts_test.log
+     echo "with ALL data -- no held out test set"
+  fi
+  exit 0
+fi
+
+if [ "$1" = "tidyup" ]
+then
+   rm -rf lts_scratch
+   exit 0
+fi
+
+echo $0 unknown option $*
+exit 1
+

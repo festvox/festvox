@@ -1,0 +1,274 @@
+<chapter id="bsv-eval-ch">
+<title>Evaluation and Improvements</title>
+
+<para>
+This chapter discusses evaluation of speech synthesis voices and
+provides a detailed procedure to allow diagnostic testing of 
+new voices.
+</para>
+
+<sect1><title>Evaluation</title>
+
+<para>
+Now that you have built your voice, how can you tell if it works, and 
+how can you find out what you need to make it better. This chapter 
+deals with some issues of evaluating a voice in Festival. Some 
+of the points here also apply to testing and improving existing voices 
+too. 
+</para>
+
+<para>
+The evaluation of speech synthesis is notoriously hard. Evaluation in
+speech recognition was the major factor in making general speech
+recognition work. Rigourous tests on well defined data made the
+evaluation of different techniques possible. Though in spite of its
+success the strict evaluation criteria as used in speech recognition
+can cloud the ultimate goal. It is important always to remember that
+tests are there to evaluate a systems performance rather than become
+the task itself. Just as techniques can overtrain on data it is
+possible to over train on the test data and/or methodology too thus
+loosing the generality and purpose of the evaluation.
+</para>
+<para>
+In speech recognition a simple (though naive) measure of phones or words 
+correct gives a reasonable indicator of how well a speech recognition 
+system works. In synthesis this a lot harder. A word can have multiple 
+pronunciations, so it is much harder to automatically test if a 
+synthesizer's phoneme accuracy, besides much of the quality is not just 
+in if it is correct but if it "sounds good".  This is effectly the crux
+of the matter. The only real synthesis evaluation technique is having 
+a human listen to the result. Humans individually are not very reliably 
+testers of systems, but humans in general are. However it is usually 
+not feasible to have testers listen to large amounts of synthetic speech 
+and return a general goodness score. More specific tests are required. 
+</para>
+<para>
+Although listening tests are the ultimate, because they are expensive in 
+resources (undergraduates are not willing to listing to bad synthesis 
+all day for free), and the design of listening tests is a non-trivial 
+task, there are a number of more general tests which can be run at less 
+expenses and can help greatly. 
+</para>
+<para>
+It is common that a new voice in Festival (or any other speech synthesis 
+systems), has limitations and it is wise to test what the limitations 
+are and decide if such limitations are acceptable or not. This depends 
+a lot on what you wish to use your voice for. For example if the voice 
+a Scottish English voice to be primarily used as the output of a Chinese 
+speech tranlation system, the vocabulary is constained by the 
+translation system itself so a large lexicon is probably not much of an 
+issue, but the vocabulary will include many anglosized (calenodianized 
+?) versions of Chinese names, which are not common in standard English 
+so letter-to-sound rules should be made more sensitive for that input. 
+If the system is to be used to read address lists, it should be able to 
+tokenize names and address appropriately, and if it is to be used in a 
+dialogue system the intonation model should be able to deal with 
+questions and continuations properly. Optimizing your voices for the 
+most common task, and minimizing the errors is what evaluation is for. 
+</para>
+
+</sect1>
+
+<sect1><title>Does it work at all?</title>
+
+<para>
+
+It is very easy to build a voice and get it to say a few phrases and
+think that the job is done. As you build the voice it is worth testing
+each part as you built it to ensure it basically performs as expected.
+But once its all together more general tests are needed.  Before you
+submit it to any formal tests that you will use for benchmarking and
+grading progrees in the voice, more basic tests should
+be carried out.
+
+</para>
+<para>
+
+In fact it is stating such initial tests more concretely. <emphasis>
+Every</emphasis> we have ever built has always had a number mistakes
+in it that can be trivially fixed.  Such as the mfccs were not
+generated after fixing the pitchmarks.  Therefore you syould go
+through each stage of the build procedure and ensure it really did do
+what you though it should do, especially if you are totally convinced
+that section worked perfectly.
+
+</para>
+<para>
+
+Try to find around 100-500 sentences to play through it. It is amazing
+home many general problems are thrown up when you extend your test
+set.  The next stage is to play so <emphasis>real</emphasis>
+text. That may be news text from the web, output from your speech
+translation system, or some email.  Initially it is worth just
+synthesizing the whole set without even listening to it. Problems in
+analysis and missing diphones etc may be shown up just in the
+processing of the text. Then you want to listen to the output and
+identify problems. This make take some amount of investigation. What
+you want to do is identify <emphasis>where</emphasis> the problem is,
+is it bad tex analysis, bad lexical entry, a prosody problem, or a
+waveform synthesis problem. You may need to synthesizes parts of the
+text in isolation (e.g. using the Festival function
+<varname>SayText</varname> and look at the structure of the utterance
+generated, e.g. using the function
+<varname>utt.features</varname>. For example to see what words have
+been identified from the text analysis
+
+<blockquote><literallayout>
+(utt.features utt1 'Word '(name))
+</literallayout></blockquote>
+Or to see the phones generated 
+<blockquote><literallayout>
+(utt.features utt1 'Segment '(name))
+</literallayout></blockquote>
+Thus you can view selected parts of an utterance and find out 
+if it is being created as you intended. For some things 
+a graphical display of the utterance may help.
+
+</para>
+<para>
+
+Once you identify <emphasis>where</emphasis> the problem is you need
+to decide how to fix it (or if it is worth fixing).  The problem may
+be a number of different places:
+
+</para>
+
+<itemizedlist mark=bullet spacing=compact>
+
+<listitem><para>
+
+Phonetic error: the acoustics of a unit doesn't match the label.  This
+may be because the speaker said the wrong word/phoneme or the labeller
+had the wrong.  Or possible some other acoustic variant that has
+not been considered
+
+</para></listitem>
+<listitem><para>
+
+Lexical error: the word is pronounced with the wrong string of
+phonemes/stress/tone.  Either the lexical entry is wrong or the letter
+to sound rules are not doing ht right thing.  Or there are multiple
+valid pronunciations for that word (homographs) and the wrong
+one is selectec because the homograph disambiguation is wrong,
+or there is not a disambiguator.
+
+</para></listitem>
+
+<listitem><para>
+
+Text error: the text analysis doesn't deal properly with the word.
+It may be that a punctuation system is spoken (or not spoken) as
+expected, titles, symbols, compounds etc aren't dealt with properly
+
+</para></listitem>
+
+<listitem><para>
+
+Some other error: some error that is not one of the above.  As you
+progress in correction and tuningm errors in the category will grow
+and you must find some way to avoid such errors.
+
+</para></listitem>
+
+</itemizedlist>
+
+<para>
+
+Before rushing out and getting one hundred people to listen to your
+new synthetic voice, it is worth doing significant internal testing
+and evaluation, informally to find errors and test them.  Remember the
+purpose of evaluation in this case is to find errors and fix them.  We
+are not, at least not at this stage, evaluating the voices on an
+abstract scale, where unseen test data, and blind testing is
+important.
+
+</para>
+
+</sect1>
+
+<sect1><title>Formal Evaluation Tests</title>
+
+<para>
+
+Once you yourself and your immediate colleages have tests the voice
+you will want more formal evaluation metrics.  Again we are looking at
+diagnositic evluation, comparative eveluation between different
+commercial synthesizers is quite a different task.
+
+</para>
+
+<para>
+<indexterm><primary> lexical gaps </primary></indexterm>
+In our English checks we used Wall Street Journal and Time magazine 
+articles (around 10 millions words in total). Many unusual 
+words apear only in one article (e.g proper names) which are less 
+important to add to the lexicon, but unusual words that appear 
+across articales are more likely to appear again so should 
+be added. 
+
+</para>
+<para>
+
+Be aware that using data will cause your coverage to be biased towards 
+that type of data. Our databases are mostly collected in the early 90s 
+and hence have good coverage for the Gulf War, and the changes in 
+Eastern Europe but our ten million words have no occurences of the words 
+<quote><emphasis>Sojourner</emphasis></quote> or <quote><emphasis>Lewinski</emphasis></quote> whcih only appear in stories later 
+in the decade. 
+
+</para>
+<para>
+
+A script is provided in <filename>src/general/find_unknowns</filename> which will 
+analyze given text to find which words do not appear in the current 
+lexicon. You should use the <varname>-eval</varname> option to specify the 
+selection of your voice. Note this checks to see which words are not in 
+the lexicon itself, it replaces what ever letter-to-sound/ unknown word 
+function you specified and saves any words for which that function is 
+called in the given output file. For example 
+
+<blockquote><literallayout>
+find_unknowns -eval '(voice_ked_diphone)' -output cmudict.unknown \
+          wsj/wsj-raw/00/*
+</literallayout></blockquote>
+
+Normally you would run this over your database then cummulate the 
+unknown words, then rerun the unknown words synthesizing each and 
+listening to them to evaluate if your LTS system produces reasonable 
+results. Fur those words which do have acceptable pronunciations add 
+them to your lexicon. 
+
+</para>
+
+<sect2><title>Sematically unpredictable sentences</title>
+
+<para>
+<indexterm><primary> sematically unpredictable sentences </primary></indexterm>
+<indexterm><primary> SUS test </primary></indexterm>
+One technique that has been used to evaluation speech synthesis 
+quality is testing against semantically unpredictable sentences. 
+</para>
+<blockquote><literallayout>
+%%%%%%%%%%%%%%%%%%%%%%
+Discussion to be added 
+%%%%%%%%%%%%%%%%%%%%%%
+</literallayout></blockquote>
+
+<para>
+
+</para><para>
+
+</para>
+</sect2>
+</sect1>
+<sect1><title>Debugging voices</title>
+
+<para>
+
+</para>
+
+</sect1>
+
+
+
+</chapter>

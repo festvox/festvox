@@ -1,0 +1,130 @@
+#!/bin/bash
+###########################################################################
+##                                                                       ##
+##                  Language Technologies Institute                      ##
+##                    Carnegie Mellon University                         ##
+##                         Copyright (c) 2002                            ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Listen to sets of waveform files for A/B comparisons                 ##
+##                                                                       ##
+###########################################################################
+
+LANG=C; export LANG
+
+if [ $# = 0 ]
+then
+    echo "Compares two sets of waveform files, playing them in random"
+    echo "order to allow testing of comparative quality"
+    echo "   testab DIRA DIRB"
+    echo "It is assumed that all .wav files in DIRA are also in DIRB"
+    exit -1
+fi
+
+PLAY=$ESTDIR/bin/na_play
+PLAY="play -q"
+
+ls $1/*.wav | head -10 >/tmp/$$.aout
+ls $2/*.wav | head -10 >/tmp/$$.bout
+paste /tmp/$$.aout /tmp/$$.bout >/tmp/$$.about
+
+eee=`basename $1`
+fff=`basename $2`
+
+function print_results() {
+    echo
+    sed 's+/.*++' /tmp/$$.results |
+        awk '
+     # Print list of word frequencies
+     {
+         for (i = 1; i <= NF; i++)
+             freq[$i]++
+     }
+     
+     END {
+         for (word in freq)
+             printf "%s\t%d\n", word, freq[word]
+     }' | tee $eee.$fff.results | sort --key=1 -gr
+    }
+
+trap print_results INT
+
+awk 'BEGIN {iii='$$';
+           for (i=1; i < iii; i++)
+              rand();}
+    { print rand(),$0 }' /tmp/$$.about |
+head -10 |
+while read tt
+do
+   tt2=`echo $tt |
+   awk '{if ($1 < 0.5)
+            printf("%s %s\n",$2,$3);
+         else
+            printf("%s %s\n",$3,$2);
+        }'`
+   a=`echo $tt2 | awk '{print $1}'`
+   b=`echo $tt2 | awk '{print $2}'`
+   echo playing >/dev/tty
+   $PLAY $a
+   sleep 1
+   $PLAY $b
+   read x </dev/tty
+   if [ "$x" = "r" ];
+   then
+      $PLAY $a
+      sleep 1
+      $PLAY $b
+      read x </dev/tty
+   fi
+   if [ "$x" = "r" ];
+   then
+      $PLAY $a
+      sleep 1
+      $PLAY $b
+      read x </dev/tty
+   fi
+   if [ "$x" = "a" ];
+   then
+      echo $a;
+   else
+      if [ "$x" = "=" ]
+      then
+          echo =
+      else
+         echo $b
+      fi
+   fi
+#   echo $tt2 >/dev/tty
+done >/tmp/$$.results
+
+print_results
+
+rm -f /tmp/$$.*
+
+

@@ -1,0 +1,19 @@
+  )
+)
+
+ (PhoneSet.silences '(pau))
+ 
+ (define (INST_LANG_VOX::select_phoneset)
+   "(INST_LANG_VOX::select_phoneset)
+ Set up phone set for INST_LANG."
+   (Parameter.set 'PhoneSet 'INST_LANG)
+   (PhoneSet.select 'INST_LANG)
+ )
+ 
+ (define (INST_LANG_VOX::reset_phoneset)
+   "(INST_LANG_VOX::reset_phoneset)
+ Reset phone set for INST_LANG."
+   t
+ )
+ 
+ (provide 'INST_LANG_VOX_phoneset)

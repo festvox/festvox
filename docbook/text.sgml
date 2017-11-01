@@ -1,0 +1,474 @@
+<chapter id="bsv-text-ch">
+<title>Text analysis</title>
+
+<para>
+This chapter discusses some of the basic problems in analyzing text
+when trying to convert it to speech.  Although it is oftain considered
+a trival problem, not worthy of specnding time one, to anyone who has
+to actually listen to general text-to-speech systems quickly realises
+it is not as easy to pronounce text as it first appears.  Numbers,
+symbols, acronyms, abbreviations apear to various degrees in different
+types of text, even the most general types, like news stoires and
+novels still have tokens which do not have a simple pronunciaiton that
+can be found merely by looking up the token in a lexicon, or using
+letter to sound rules.
+</para>
+<para>
+In any new language, or any new domain that you wish to tranfer text
+to speech building an apporpriate text analysis module is necessary.
+As an attempt to define what we mean by text analysis more
+specifically we will consider this module as taking in strings of
+characters and producing strings of <firstterm>words</firstterm> where
+we defined words to be items for which a lexicon can provide
+pronucniations either by direct lookup or by some form of letter to
+sound rules.
+</para>
+<para>
+The degree of difficult of this convertion task depends on the text
+type and language.  For example in lanmguages like Chinese, Japanese
+etc., there is, conventionally, no use of whitespace characaters
+between words as found in most Western language, thus even identfying
+the token boundaries is an interesting task.  Even in English text the
+proportion of simple pronouncable words to what we will term
+<firstterm>non-standard words</firstterm> can vary greatly.  We define
+non-standard words (NSWs) to be those tokens which do not apear
+directly in the lexicon (at least as a first simplication).  Thus
+tokens contains digits, abbreviations, and out of vocabulary words are
+all considered to be NSWs that require some form of identification
+before their pronunciation can be specified.  Sometimes NSWs are
+ambiguous and some (often shallow) level of analysis is necessary
+to identfiy them.  For example in English the string of
+digits <computeroutput>1996</computeroutput> can have several
+different pronunciations depending on its use.  If it is used
+as a year it is pronunciation as <computeroutput>nineteen ninety-six
+</computeroutput>, if it is a quantity it is more likely pronuounced
+as <computeroutput>one thousand nine hundred (and) ninety-six
+</computeroutput> while if it is used as a telephone extention it
+can be pronounced simpelas a string of digits <computeroutput>
+one nine nine six </computeroutput>.  Deterimining the appropriate
+type of expansion is the job of the text analysis module.
+</para>
+<para>
+Much of this chapter is based on a project that was carried out at a
+summer workshop at Johns Hopkins University in 1999
+<citation>JHU-NSW-99</citation> and later published in
+<citation>Sproat00</citation>, the tools and techniques developed at
+that workshop were further developed and documented and now
+distributed as part of the FestVox project.  After a discussion of the
+problem in more detail, concentrating on English examples, a full
+presentation of NSW text analysis technique will be given with a
+simple example. After that we will address different appropaches that
+can be taken in Festival to build general and customized text analysis
+models.  Then we will address a number of specifc problems that
+appear in text analysis in various languages including homogra[h
+disambiguation, number pronunciation in Slavic languages, and 
+segmentation in Chinese.
+</para>
+<sect1><title>Non-standard words analysis</title>
+
+<para>
+In an attempt to avoid relying solely on a bunch of "hacky" rules, we
+can better define the task of analyzing text using a number of
+statistical trained models using either labeled or unlabeled text
+from the desired domain.  At first approximation it may seem to be a
+trival problem, but the number of non-standard words is enough even in
+what is considered clean text such as press wire news articales to
+make their synthesis sound bad without it.
+</para>
+<para>
+Full NSW model description and justification to be added,
+doan play the following (older) parts.
+</para>
+</sect1>
+<sect1><title>Token to word rules</title>
+
+<para>
+The basic model in Festival is that each <emphasis>token</emphasis> will be mapped a 
+list of <emphasis>words</emphasis> by a call to a <varname>token_to_word</varname> function. This 
+function will be called on each token and it should return a list of 
+words. It may check the tokens to context (within the current 
+utterance) too if necessary. The default action should (for most 
+languages) simply be returning the token itself as a list of own word 
+(itself). For example your basic function should look something like. 
+<blockquote><literallayout>
+(define (MYLANG_token_to_words token name)
+  "(MYLANG_token_to_words TOKEN NAME)
+Returns a list of words for the NAME from TOKEN.  This primarily
+allows the treatment of numbers, money etc."
+  (cond
+   (t
+    (list name))))
+</literallayout></blockquote>
+This function should be set in your voice selection function 
+as the function for token analysis 
+<blockquote><literallayout>
+  (set! token_to_words MYLANG_token_to_words)
+</literallayout></blockquote>
+</para>
+<para>
+This function should be added to to deal with 
+all tokens that are not in your lexicon, cannot be 
+treated by your letter-to-sound rules, or are ambiguous 
+in some way and require context to resolve. 
+</para>
+<para>
+For example suppose we wish to simply treat all tokens consisting of 
+strings of digits to be pronounced as a string of digits (rather 
+than numbers). We would add something like the following 
+<blockquote><literallayout>
+(set! MYLANG_digit_names
+   '((0 "zero")
+     (1 "one")
+     (2 "two")
+     (3 "three")
+     (4 "four")
+     (5 "five")
+     (6 "six")
+     (7 "seven")
+     (8 "eight")
+     (9 "nine")))
+
+(define (MYLANG_token_to_words token name)
+  "(MYLANG_token_to_words TOKEN NAME)
+Returns a list of words for the NAME from TOKEN.  This primarily
+allows the treatment of numbers, money etc."
+  (cond
+   ((string-matches name "[0-9]+") ;; any string of digits
+    (mapcar
+     (lambda (d)
+      (car (cdr (assoc_string d MTLANG_digit_names))))
+     (symbolexplode name)))
+   (t
+    (list name))))
+</literallayout></blockquote>
+But more elaborate rules are also necessary. Some tokens require context 
+to disambiguate and sometimes multiple tokens are really one object e.g 
+<quote><emphasis>$12 billion</emphasis></quote> must be rendered as <quote><emphasis>twelve billion dollars</emphasis></quote>, 
+where the money name crosses over the second word. Such multi-token rules 
+must be split into multiple conditions, one for each part of the 
+combined token. Thus we need to identify the <quote><emphasis>$DIGITS</emphasis></quote> is in a 
+context followed by <quote><emphasis>?illion</emphasis></quote>. The code below renders the full 
+phrase for the dollar amount. The second condition ensures nothing 
+is returned for the <quote><emphasis>?illion</emphasis></quote> word as it has already been dealt with 
+by the previous token. 
+<blockquote><literallayout>
+   ((and (string-matches name "\\$[123456789]+")
+         (string-matches (item.feat token "n.name") ".*illion.?"))
+     (append
+      (digits_to_cardinal (string-after name "$")) ;; amount
+      (list (item.feat token "n.name"))            ;; magnitude
+      (list "dollars")))                           ;; currency name
+   ((and (string-matches name ".*illion.?")
+         (string-matches (item.feat token "p.name") "\\$[123456789]+"))
+     ;; dealt with in previous token
+     nil)
+</literallayout></blockquote>
+Note this still is not enough as there may be other types of currency 
+pounds, yen, francs etc, some of which may be mass nouns and require no 
+plural (e.g. <quote><emphasis>yen}</emphasis></quote> and some of which make be count nouns require 
+plurals. Also this only deals with whole numbers of .*illions, 
+<quote><emphasis>$1.25 million</emphasis></quote> is common too. See the full example (for English) 
+in <filename>festival/lib/token.scm</filename>. 
+</para>
+<para>
+A large list of rules are typically required. They should be looked 
+upon as breaking down the problem into smaller parts, potentially 
+recursive. For example hyphenated tokens can be split into two words. 
+It is probably wise to explicitly deal with all tokens than are not 
+purely alphabetic. Maybe having a catch-all that spells out all tokens 
+that are not explicitly dealt with (e.g. the numbers). For 
+example you could add the following as the penumtilmate condition 
+in your <varname>token_to_words</varname> function 
+<blockquote><literallayout>
+   ((not (string-matches name "[A-Za-z]"))
+    (symbolexplode name))
+</literallayout></blockquote>
+Note this isn't necessary correct when certain letters may be homograpths. 
+For example the token <quote><emphasis>a</emphasis></quote> may be a determiner or a letter 
+of the alhpabet. When its a derterminer it may (often) be reduced) 
+while as a letter it probably ins't (i.e pronunciation in <quote><emphasis>@</emphasis></quote> 
+or <quote><emphasis>ei}</emphasis></quote>. Other languages also example this problem (e.g. Spanish 
+<quote><emphasis>y</emphasis></quote>. Therefore when we call symbol explode we don't want just the 
+the letter but to also specify that it is the letter pronunciation we 
+want and not the any other form. To ensure the lexicon system 
+gets the right pronunciation we there wish to specify the part 
+fo speech with the letter. Actually rather than just a string 
+of atomic words being returned by the <varname>token_to_words</varname> function 
+the words may be descriptions including features. Thus for example 
+we dont just want to return 
+<blockquote><literallayout>
+(a b c)
+</literallayout></blockquote>
+We want to be more specific and return 
+<blockquote><literallayout>
+(((name a) (pos nn))
+ ((name b) (pos nn))
+ ((name c) (pos nn)))
+</literallayout></blockquote>
+This can be done by the code 
+<blockquote><literallayout>
+   ((not (string-matches name "[A-Za-z]"))
+    (mapcar
+     (lambda (l)
+      ((list 'name l) (list 'pos 'nn)))
+     (symbolexplode name)))
+</literallayout></blockquote>
+The above assumes that all single characters symbols (letters, digits, 
+punctuation and other "funny" characters have an entry in your lexicon 
+with a part of speech field <varname>nn</varname>, with a pronunctiation of the 
+character in isolation. 
+</para>
+<para>
+The list of tokens that you may wish to write/train rules for 
+is of couse language dependent and to a certain extent domain 
+dependent. For example there are many more numbers in email text 
+that in narative novels. The number of abbreviations is also much 
+higher in email and news stories than in more normal text. It may 
+be worth having a look at some typical data to find out the distribution 
+and find out what is worth working on. For a rough guide the folowing 
+is a list if the symbol types we currentl deal with in English, many 
+of which will require some treatment in other languages. 
+<variablelist>
+<varlistentry>
+<term><emphasis>Money </emphasis></term>
+<listitem><para>
+Money amounts often have different treatment than simple numbers 
+and conventions about the sub-currency part (i.e. cents, pfennings etc). 
+Remember that you its not just numbers in the local currency you 
+have to deal with currency values from different countries are common 
+in lots of different texts (e.g dollars, yen, DMs and euro). 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>Numbers</emphasis></term>
+<listitem><para>
+strings of digits will of course need mapping even if there is only one 
+mapping for a language (rare). Consider at least telphone numbers 
+verses amounts, most languages make a distinction here. In English 
+we need to distinguish further, see below for the more detailed 
+discussion. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>number/number</emphasis></term>
+<listitem><para>
+This can be used as a date, fraction, alternate, context will help, 
+though techniques of dropping back to saying the the string of characters 
+often preserve the ambiguity which can be better that forcing 
+a decision. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>acronyms</emphasis></term>
+<listitem><para>
+List of upper case letters (with or without vowels). The decision 
+to pronounce as a word or as letters is difficult in general but 
+good guesses go far. If its short (< 4 chatacters) not in your 
+lexicon not surround by other words in upper case, its probably 
+an acronym, further analyss of vowels, consonant clusters 
+etc will help. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>number-number</emphasis></term>
+<listitem><para>
+Could be a range, of score (football), dates etc. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>word-word</emphasis></term>
+<listitem><para>
+Usually a simple split on each part is sufficient---but not as when used 
+as a dash. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>word/word</emphasis></term>
+<listitem><para>
+As an alternative, or a Unix pathname 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>'s or TOKENs</emphasis></term>
+<listitem><para>
+An appended <quote><emphasis>s</emphasis></quote> to a non alphabetic token is probably 
+some form of pluralization, removing it and recursing on the analysis 
+is a reasonable thing to try. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>times and dates</emphasis></term>
+<listitem><para>
+These exist is variaous stnadardized forms many of which are easy 
+to recognize and break down. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>telephone numbers</emphasis></term>
+<listitem><para>
+This various from country to country (and by various conventions) 
+but there may be standard forms that can be recognized. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>romain numerals</emphasis></term>
+<listitem><para>
+Sometimes these are pronounced as numbers <quote><emphasis>chapter II</emphasis></quote>, or 
+as cardinals <quote><emphasis>James II</emphasis></quote>. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>ascii art</emphasis></term>
+<listitem><para>
+If you are dealing with on line text there are often extra characters 
+in a document that should be ignored, or at least not pronounced 
+literally, e.g. lines of hyphens used as separators. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>email addresses, URLs, file names</emphasis></term>
+<listitem><para>
+Depending on your context this may be worth spending time on. 
+</para></listitem></varlistentry>
+<varlistentry>
+<term><emphasis>tokens containing any other non-alphanumeric character</emphasis></term>
+<listitem><para>
+Spliting the token around the non-alphanumeric and recursing 
+on each part before and after it may be reasonable. 
+</para></listitem></varlistentry>
+</variablelist>
+Remember the first purpose of text analysis is ensure you 
+can deal with <emphasis>anything</emphasis>, even if it is just saying 
+the word <quote><emphasis>unknown</emphasis></quote> (in the appropriate language). Also its 
+probably not worth spending time on rare token forms, though remember 
+it not easy to judge what are rare and what are not. 
+</para>
+</sect1>
+
+<sect1><title>Number pronunciation</title>
+
+<para>
+Almost every one will expect a synthesizer to be able to 
+speech numbers. As it is not feasible to list all possible 
+digit strings in your lexicon. You will need to provide a function 
+that returns a string of words for a given string of digits. 
+</para>
+<para>
+In its simplest form you should provide a function that 
+decodes the string of digits. The example <varname>spanish_number</varname> 
+(and <varname>spanish_number_from_digits}</varname> in the released Spanish 
+voice (<filename>festvox_ellpc11k.tar.gz</filename> is a good general 
+example. 
+</para>
+<sect2><title>Multi-token numbers</title>
+
+<para>
+A number of languages uses spaces within numbers where English might use 
+commas. For example German, Polish and others text may contain 
+<blockquote><literallayout>
+64 000 
+</literallayout></blockquote>
+to denote sixty four thousand. As this will be multiple tokens in 
+Festival's basic analysis it is necessary to write multiple conditions 
+in your <varname>token_to_words</varname> function. 
+</para>
+</sect2>
+
+<sect2><title>Declensions</title>
+
+<para>
+In many languages, the pronunciation of a number depends on the thing 
+that is being counted. For example the digit '1' in Spanish has 
+multiple pronunciations depending on whether it is refering to a 
+masculine or feminine object. In some languages this becomes much more 
+complex where there are a number of possible declensions. In our Polish 
+synthesizer we solved this by adding an extra argument to number 
+generation function which then selected the actual number word 
+(typically the final word in a number) based in the desired declension. 
+</para>
+<blockquote><literallayout>
+%%%%%%%%%%%%%%%%%%%
+Example to be added 
+%%%%%%%%%%%%%%%%%%%
+</literallayout></blockquote>
+
+</sect2></sect1>
+
+<sect1><title>Homograph disambiguation</title>
+
+<blockquote><literallayout>
+%%%%%%%%%%%%%%%%%%%%%%
+Discussion to be added 
+%%%%%%%%%%%%%%%%%%%%%%
+</literallayout></blockquote>
+
+</sect1>
+
+<sect1 id="bsv-ttsmodes-sect">
+<title>TTS modes</title>
+
+<blockquote><literallayout>
+%%%%%%%%%%%%%%%%%%%%%%
+Discussion to be added 
+%%%%%%%%%%%%%%%%%%%%%%
+</literallayout></blockquote>
+
+<para>
+
+</para>
+</sect1>
+
+<sect1 id="bsv-makrup-sect">
+<title>Mark-up modes</title>
+
+<para>
+In some situtation it ispossible for the user of a text-to-speech
+system to provide more information for the synthesizer that just the
+text, or the type of text.  It is near impossible for TTS engines to
+get everything right all of the time, so in such situation it is
+useful to offer the developer a method to help guide the synthesizer
+in its syntehsis process.
+</para>
+<para>
+Most speech synthesizer offer some speech method or embedded commands
+but these are specific to one interface or one API.  For
+example the Microsoft SAPI interface allows various commands
+to be embedded in a text string <comment> some examples </comment>.
+</para>
+<para>
+However there has been a move more recently to offer a general mark up
+method that is more general.  A number of people saw the potential use
+of XML as a general method for marking up text for speech synthesis.
+The earliest method we know was in a Masters thesis at Edinburgh in
+1995 <citation>isard</citation>.  This was later published under the
+name SSML.  A number of other groups were alos looking at this and a
+large consortium formed to define this further under various names
+STML, and eventually Sable.
+</para>
+<para>
+Around the same time, more serious definitions of such a mark-up were
+being developed.  The first to reach a well-define stage was JSML,
+(Java Speech Mark-up Language), which covered aspects of speech
+recognition and grammars as well as speech synthesis mark-up.  Unlike
+any of the other XML based markup languages, JSML, as it was embedded
+within Java, could define exceptions in a reasonable way.  One of the
+problems iwth a simpel XML markup is that it is one way.  You can
+request a voice or a language or some functionality, but there is no
+mechanism for feedback to know if such a feature is actually
+available.
+</para>
+<para>
+XML markup for speech have been further advances with VoiceXML, which
+defines a mark-up language for basic dialog systems.  The speech
+synthesi part of the VoiceXML is closely follows the functionality of
+JSML and its predecessors. 
+</para>
+<para>
+A new standard for markup for speech synthesis is currently being
+defined by W3C under the name SSML, confusingly the same name as the
+earliest example, but not designed to be compatible with the original,
+but take into account the functionaly and desires of users of TTS.
+SSML markup is also defined as the method for speech synthesis markup
+in Microsoft's SALT tags.
+</para>
+<blockquote><literallayout>
+%%%%%%%%%%%%%%%%%%%%%%
+Discussion to be added 
+%%%%%%%%%%%%%%%%%%%%%%
+</literallayout></blockquote>
+
+<para>
+
+</para>
+</sect1>
+
+
+</chapter>

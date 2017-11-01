@@ -1,0 +1,123 @@
+#!/bin/sh
+###########################################################################
+##                                                                       ##
+##                   Carnegie Mellon University and                      ##
+##                   Alan W Black and Kevin A. Lenzo                     ##
+##                      Copyright (c) 1998-2000                          ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Build an F0 model                                                    ##
+##                                                                       ##
+##  This model has almost no assumptions about the language hence this   ##
+##  is just an example, but may be reasonable as a first pass of an      ##
+##  intonation system.  No accents are dealt with in this model          ##
+##                                                                       ##
+##  Builds CART tree that predicts F0 at beginning, mid-vowel and end    ##
+##  of syllables                                                         ##
+##                                                                       ##
+###########################################################################
+
+#  if [ $# != 3 ]
+#  then
+#      echo "Build a duration model, requires basic utterances to be pre-built"
+#      echo "Usage: make_dur_model VOX PHONESET SILENCENAME"
+#      echo "INST is the insstitute building the language, e.g. cmu, cstr, ogi"
+#      echo "     if there isn't an appropriate institute use, net."
+#      echo "LANG is language identifier, e.g. japan, scotsgaelic"
+#      echo "VOX is speaker identifier e.g kal, awb"
+#      exit 1
+#  fi
+
+LANG=C; export LANG
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ "$SIODHEAPSIZE" = "" ]
+then
+   SIODHEAPSIZE=20000000
+   export SIODHEAPSIZE
+fi
+HEAPSIZE=$SIODHEAPSIZE
+
+SILENCENAME=pau
+VOICENAME='(voice_kal_diphone)'
+MODELNAME=cmu_us_kal
+
+DUMPFEATS=$ESTDIR/../festival/examples/dumpfeats
+WAGON=$ESTDIR/bin/wagon
+WAGON_TEST=$ESTDIR/bin/wagon_test
+
+## extract the features
+echo ";;; Extracting features from utterances"
+$DUMPFEATS -relation Syllable -eval $VOICENAME -feats festival/f0/etc/f0.feats -output festival/f0/feats/%s.feats festival/utts/*.utt
+
+## Save all features in one file removing silence phones
+echo ";;; Collecting features in training and test data"
+cat festival/f0/feats/*.feats  >festival/f0/data/f0.data
+bin/traintest festival/f0/data/f0.data
+bin/traintest festival/f0/data/f0.data.train
+
+# Build description file
+echo ";;; Build feature description file"
+$ESTDIR/bin/make_wagon_desc festival/f0/data/f0.data festival/f0/etc/f0.feats festival/f0/etc/f0.desc
+festival -b --heap $HEAPSIZE festvox/build_prosody.scm $VOICENAME '(build_f0_feats_desc)'
+
+STOP=15
+PREF=f0
+
+echo ";;; Build the F0 models themselves"
+(
+
+echo ";;; Build the syl_start F0 model"
+$WAGON -data festival/f0/data/f0.data.train.train -desc festival/f0/etc/f0.desc -test festival/f0/data/f0.data.train.test -stop $STOP -output festival/f0/tree/start.$PREF.S$STOP.tree -stepwise  -predictee syl_startpitch -ignore '(syl_midpitch syl_endpitch)'
+$WAGON_TEST -heap $HEAPSIZE -data festival/f0/data/f0.data.test -desc festival/f0/etc/f0.desc -tree festival/f0/tree/start.$PREF.S$STOP.tree -predictee syl_startpitch
+
+echo ";;; Build the syl_mid F0 model"
+$WAGON -data festival/f0/data/f0.data.train.train -desc festival/f0/etc/f0.desc -test festival/f0/data/f0.data.train.test -stop $STOP -output festival/f0/tree/mid.$PREF.S$STOP.tree -stepwise  -predictee syl_midpitch -ignore '(syl_startpitch syl_endpitch)'
+$WAGON_TEST -heap $HEAPSIZE -data festival/f0/data/f0.data.test -desc festival/f0/etc/f0.desc -tree festival/f0/tree/mid.$PREF.S$STOP.tree -predictee syl_midpitch
+
+echo ";;; Build the syl_end F0 model"
+$WAGON -data festival/f0/data/f0.data.train.train -desc festival/f0/etc/f0.desc -test festival/f0/data/f0.data.train.test -stop $STOP -output festival/f0/tree/end.$PREF.S$STOP.tree -stepwise  -predictee syl_endpitch -ignore '(syl_startpitch syl_midpitch)'
+$WAGON_TEST -heap $HEAPSIZE -data festival/f0/data/f0.data.test -desc festival/f0/etc/f0.desc -tree festival/f0/tree/end.$PREF.S$STOP.tree -predictee syl_endpitch
+
+) | tee $PREF.S$STOP.out
+
+echo ";;; Constructing the f0 model as a loadable scheme file"
+$ESTDIR/../festival/bin/festival -b --heap $HEAPSIZE festvox/build_prosody.scm $VOICENAME '(finalize_f0_model "'$MODELNAME'" "'$PREF.S$STOP.tree'")'
+
+exit
+

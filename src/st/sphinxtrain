@@ -1,0 +1,158 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                  Language Technologies Institute                      ##
+##                     Carnegie Mellon University                        ##
+##                         Copyright (c) 2002                            ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Run SphinxTrain on data to build acoustic models then label it       ##
+##  with forced alignment                                                ##
+##                                                                       ##
+###########################################################################
+
+LANG=C; export LANG
+
+. etc/voice.defs
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ ! "$SPHINXTRAINDIR" ]
+then
+   echo "environment variable SPHINXTRAINDIR is unset"
+   echo "set it to your local SphinxTrain src directory e.g."
+   echo '   bash$ export SPHINXTRAINDIR=/home/awb/projects/SphinxTrain/'
+   echo or
+   echo '   csh% setenv SPHINXTRAINDIR /home/awb/projects/SphinxTrain/'
+   exit 1
+fi
+
+if [ ! "$SPHINX2DIR" ]
+then
+   echo "environment variable SPHINX2DIR is unset"
+   echo "set it to your local Sphinx2 is installed e.g."
+   echo '   bash$ export SPHINX2DIR=/home/awb/projects/sphinx2/'
+   echo or
+   echo '   csh% setenv SPHINX2DIR /home/awb/projects/sphinx2/'
+   echo 'such that $SPHINX2DIR/bin/sphinx2-batch exists'
+   exit 1
+fi
+
+if [ $# = 0 ]
+then
+   $0 setup
+   $0 files
+   $0 feats
+   $0 train
+   $0 align
+   $0 labs
+   exit
+fi
+
+if [ "$1" = "setup" ]
+then
+  mkdir st
+  cd st
+
+  $SPHINXTRAINDIR/scripts_pl/setup_SphinxTrain $FV_VOICENAME
+  mkdir lab
+
+  cd ..
+fi
+
+#  dic, fileids, phone, filler, transcription
+if [ "$1" = "files" ]
+then
+   festival -b festvox/build_st.scm '(st_setup "etc/txt.done.data" "'$FV_VOICENAME'")'
+fi
+
+# Wave 2 feats
+if [ "$1" = "feats" ]
+then
+   find wav -name \*.wav -print |
+   while read i
+   do
+      $ESTDIR/bin/ch_wave -otype nist -F 16000 -o st/$i $i
+   done
+   (cd st; ./bin/make_feats etc/$FV_VOICENAME.fileids)
+fi
+
+if [ "$1" = "train" ]
+then
+   cd st
+   ./scripts_pl/00.verify/verify_all.pl 
+   ./scripts_pl/01.vector_quantize/slave.VQ.pl
+   ./scripts_pl/02.ci_schmm/slave_convg.pl
+   ./scripts_pl/03.makeuntiedmdef/make_untied_mdef.pl
+   ./scripts_pl/04.cd_schmm_untied/slave_convg.pl
+   ./scripts_pl/05.buildtrees/make_questions.pl
+   ./scripts_pl/05.buildtrees/slave.treebuilder.pl
+   ./scripts_pl/06.prunetree/slave.state-tie-er.pl
+   ./scripts_pl/07.cd-schmm/slave_convg.pl
+   ./scripts_pl/08.deleted-interpolation/deleted_interpolation.pl
+   ./scripts_pl/09.make_s2_models/make_s2_models.pl
+   cd ..
+fi
+
+# Alignment
+if [ "$1" = "align" ]
+then
+   echo "*align_all*" >st/etc/$FV_VOICENAME.align
+   cat st/etc/$FV_VOICENAME.transcription |
+   sed 's/<sil>//g' |
+   awk '{for (i=2; i<NF-2; i++)
+           printf("%s ",$i);
+         printf("%s\n",$(NF-2))}' >>st/etc/$FV_VOICENAME.align
+   echo "<sil> SIL" >st/etc/$FV_VOICENAME.sil
+   ./bin/sphinx_lab 
+fi
+
+# Copy back lab files
+if [ "$1" = "labs" ]
+then
+   echo Convert Sphinx2 lab output to FestVox labs
+   silence=`head -1 etc/mysilence`
+   for i in st/lab/*.lab
+   do
+     cat $i | sed 's/;.*$//;s/(.*$//' | 
+              sed 's/SIL/'$silence'/;s/CAP//' |
+     awk '{if (NF == 3)
+             printf("%1.5f %s %s\n",0.012+$1,$2,$3);
+           else
+             print $0}' >lab/`basename $i`
+   done
+fi

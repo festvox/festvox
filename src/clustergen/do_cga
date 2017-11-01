@@ -1,0 +1,227 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                     Carnegie Mellon University                        ##
+##                         Copyright (c) 2006                            ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Build voice conversion model using CART prediction (and initially)   ##
+##  using a clustergen voice as a source                                 ##
+##                                                                       ##
+###########################################################################
+
+LANG=C; export LANG
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ ! "$FESTVOXDIR" ]
+then
+   echo "environment variable FESTVOXDIR is unset"
+   echo "set it to your local festvox directory e.g."
+   echo '   bash$ export FESTVOXDIR=/home/awb/projects/festvox/'
+   echo or
+   echo '   csh% setenv FESTVOXDIR /home/awb/projects/festvox/'
+   exit 1
+fi
+
+. etc/voice.defs
+
+if [ "$CLUSTERGENDIR" = "" ]
+then
+    export CLUSTERGENDIR=$FESTVOXDIR/src/clustergen
+fi
+
+if [ "$PROMPTFILE" = "" ]
+then
+   PROMPTFILE=etc/cga.data
+fi
+
+if [ $# = 0 ]
+then
+
+   $0 setup
+   # Hmm this isn't a generic solution ...
+   cp -p awb_wav/* cga/target/wav/
+#   cp -p bdl_wav/* cga/target/wav/
+#   cp -p ksp_wav/* cga/target/wav/
+
+   $0 build_source_files
+   $0 build_target_files
+   $0 align_source_target
+   $0 build_spectral_model
+
+   exit 0
+fi
+
+
+if [ $1 = "setup" ]
+then
+
+    if [ ! -d cga ]
+    then
+       mkdir cga
+       mkdir cga/target
+       mkdir cga/target/wav
+       mkdir cga/target/etc
+       mkdir cga/target/ccoefs
+       mkdir cga/target/lab
+       mkdir cga/target/f0
+       mkdir cga/target/mcep
+       mkdir cga/target/mcep_deltas
+       mkdir cga/source
+       mkdir cga/source/etc
+       mkdir cga/source/utt
+       mkdir cga/source/wav
+       mkdir cga/source/ccoefs
+       mkdir cga/source/mcep
+       mkdir cga/source/mcep_deltas
+       mkdir cga/source/lab
+       mkdir cga/source/f0
+    fi
+    cp -pr etc/voice.defs cga/target/etc
+
+    exit 0
+fi
+
+if [ $1 = "build_source_files" ]
+then
+   ORDER=24
+   dynwin=$FESTVOXDIR/src/vc/src/win/dyn.win
+   CG_TMP=cg_tmp_$$
+
+    # build cga/source/coeff
+    $ESTDIR/../festival/bin/festival -b festvox/${FV_VOICENAME}_cg.scm '(voice_'${FV_VOICENAME}'_cg)' $CLUSTERGENDIR/clustergen_build.scm '(build_cga_source_files "'$PROMPTFILE'")'
+
+    exit 0
+    cd cga/source;
+    ../../bin/make_voicing pda ../../$PROMPTFILE
+
+   cat ../../$PROMPTFILE |
+   awk '{print $2}' |
+   while read i
+   do
+      fname=$i
+      echo $fname adding the deltas
+
+      ORDERP=`echo $ORDER | awk '{printf("%d",$1+1)}'`
+      $FESTVOXDIR/src/vc/src/mlpg/delta -nmsg -jnt -dynwinf $dynwin -dim $ORDERP mcep/$fname.mcep $CG_TMP.mcepd
+
+      cat $CG_TMP.mcepd |
+      perl $CLUSTERGENDIR/d2a.pl |
+      awk '{printf("%s ",$1); if ((NR%(2*('$ORDER'+1))) == 0) printf("\n")}' |
+      cat >$CG_TMP.ascii.mcepd
+
+      cat $CG_TMP.ascii.mcepd |
+      $ESTDIR/bin/ch_track -itype ascii -otype est_binary -s 0.005 -o mcep_deltas/$i.mcep
+      rm -f $CG_TMP.*
+    done
+
+    exit 0
+fi
+
+
+if [ $1 = "build_target_files" ]
+then
+    # build cga/target/coeff/ assuming cga/target/wav/
+    
+    cd cga/target;
+    ../../bin/find_f0_stats ../../$PROMPTFILE
+
+    export PROMPTFILE=../../$PROMPTFILE
+    ../../bin/do_clustergen mcep_static
+#    ../../bin/make_voicing pda
+
+    cat $PROMPTFILE | awk '{print $2}' |
+    while read fname
+    do
+       # F0 isn't actually used here yet, but we need something
+       $ESTDIR/bin/ch_track -c 0 mcep_static/$fname.mcep |
+       awk '{print 0.0}' |
+       $ESTDIR/bin/ch_track -o f0/$fname.f0 -itype ascii -otype est_binary -s 0.005
+    done
+
+    ../../bin/do_clustergen combine_coeffs
+    cd ../..     
+    exit 0
+fi
+
+
+if [ $1 = "align_source_target" ]
+then
+    # DTW alignment at the frame level
+    PHONEALIGN=$FESTVOXDIR/src/general/phonealign
+    cat $PROMPTFILE | awk '{print $2}' |
+    while read fname
+    do
+       echo cga aligning $fname
+       $PHONEALIGN -itrack cga/source/ccoefs/$fname.mcep -ilabel cga/source/lab/$fname.lab -otrack cga/target/ccoefs/$fname.mcep -olabel cga/target/lab/$fname.lab
+    done
+
+    exit 0
+fi
+
+
+if [ $1 = "build_spectral_model" ]
+then
+    $ESTDIR/../festival/bin/festival -b \
+       '(set! cluster_feature_filename "mcepcga.desc")' \
+       festvox/build_clunits.scm \
+       festvox/${FV_VOICENAME}_cg.scm \
+       '(voice_'${FV_VOICENAME}'_cg)' \
+       $CLUSTERGENDIR/clustergen_build.scm \
+       '(build_cga_model "'$PROMPTFILE'")'
+    exit 0
+fi
+
+if [ $1 = "build_f0_model" ]
+then
+    exit 0
+fi
+
+if [ $1 = "build_duration_model" ]
+then
+    exit 0
+fi
+
+if [ $1 = "test_cga_model" ]
+then
+
+    exit 0
+fi
+
+echo do_cga: unknown options $*
+exit 1
