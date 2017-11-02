@@ -18,6 +18,7 @@ that even the best voices in Festival (or any other speech synthesis
 system for that matter) are still nowhere near perfect quality.
 
 This distribution includes
+
     Support for designing, recording and autolabelling statistical parametric
         synthesis voices
     Support for designing, recording and autolabelling diphone databases
@@ -33,6 +34,7 @@ This distribution includes
        arbitrary languages
 
 New in 2.8
+
     Grapheme built voices can be converted to .flitevox files for android
     Database size reduction for random forest clustergen voices
     Random Forests for F0 prediction too
@@ -69,22 +71,32 @@ REQUIREMENTS
 ------------
 
 A Unix Machine
+
     although there is nothing inheritantly Unix about the scripts, no
     attempt has yet been made about porting this to other platforms
+    
 Festival and Speech Tools
+
     This uses speech tools programs and festival itself at various
     stages in builidng voices as well as (of course) for the final
     voices.  Festival and the Edinburgh Speech Tools are available from
+    
        http://www.cstr.ed.ac.uk/projects/festival/
+       
     or
+    
        http://www.festvox.org/festival
 
     It is recommended that you compile your own versions of these
     as you will need the libraries and include files to build some
     programs in this festvox.
+    
 Wavesurfer
+
     To display waveforms, spectragrams and phoneme labels.
+    
 Patience and understanding
+
     Building a new voice is a lot of work, and something will probably
     go wrong which may require the repetition of some long boring and
     tedious process.  Even with lots of care a new voice still might 
