@@ -187,7 +187,6 @@ $FLITEDIR/tools/setup_flite
 ( cd flite;
   make;
   make voicedump;
-  make add_feats;
   $FLITEDIR/bin/flite -voice ./*.flitevox "hello world" hw.wav;
   # Should give a flitevox voice file and a generated waveform file
   ls -al *.flitevox *.wav;
