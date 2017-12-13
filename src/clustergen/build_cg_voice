@@ -101,7 +101,7 @@ fi
 # Test initial build to get basic stats
 $FESTVOXDIR/src/clustergen/cg_test resynth cgp_base etc/txt.done.data.test >mcd-base.out
 # For historical compatibility we'll copy the predicted cgp files
-cp -plr test/cgp_base test/cgp
+cp -pr test/cgp_base test/cgp
 mv dur.dur.S25.out dur.dur.S25.out-base
 
 # TTS for this model
