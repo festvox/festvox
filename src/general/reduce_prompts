@@ -36,6 +36,8 @@
 ###                                                                      ##
 ###########################################################################
 
+LANG=C; export LANG
+
 if [ $# = 0 ]
 then
    echo "reduce_prompts etc/txt.done.data-all wav/*.wav >etc/txt.done.data"

@@ -50,6 +50,6 @@ fi
 
 for i in `awk '{print $2}' $2`
 do
-   grep "( "$i" " $1
+   grep -a "( "$i" " $1
 done
 

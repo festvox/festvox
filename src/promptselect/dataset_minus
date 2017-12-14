@@ -53,7 +53,7 @@ TFILENAMEBASE=/tmp/ds_min_$$
 cat $1 >$TFILENAMEBASE.1
 for i in `awk '{print $2}' $2`
 do
-   grep -v "( "$i" " $TFILENAMEBASE.1 >$TFILENAMEBASE.2
+   grep -a -v "( "$i" " $TFILENAMEBASE.1 >$TFILENAMEBASE.2
    mv $TFILENAMEBASE.2 $TFILENAMEBASE.1
 done
 cat $TFILENAMEBASE.1

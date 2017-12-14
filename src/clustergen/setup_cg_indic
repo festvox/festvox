@@ -82,7 +82,7 @@ then
     exit 1
 fi
 
-SUPPORTED_VARIANTS="asm ben guj hin kan mar pan raj tam tel"
+SUPPORTED_VARIANTS="asm ben guj hin kan mar nep pan raj san tam tel"
 
 FV_INST=$1
 FV_LANG=indic

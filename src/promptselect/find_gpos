@@ -83,8 +83,8 @@ do
            for (word in freq)
                printf "%s\t%d\n", word, freq[word]
        }' | sort --key=2 -gr |
-   grep -v OOV |
-   grep -v "[()]" |
+   grep -a -v OOV |
+   grep -a -v "[()]" |
    awk '{ if (NR < 51) x[NR] = $1}
         END {for (i=1; i<=15; i++)
               for (j=i+1; j<30; j++)

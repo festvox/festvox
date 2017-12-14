@@ -40,7 +40,7 @@
 ;; As we support code-switching we also need to setup the US English cmulex
 (setup_cmu_lex)
 
-;; Supported languages: asm ben guj hin kan mar pan raj tam tel
+;; Supported languages: asm ben guj hin kan mar nep pan raj san tam tel
 
 ;; asm Assamese
 ;; ben Bengali
@@ -48,8 +48,10 @@
 ;; hin Hindi
 ;; kan Kannada
 ;; mar Marathi
+;; mar Nepali
 ;; pan Panjabi
 ;; raj Rajasthani (not Marwati)
+;; san Sanskrit
 ;; tam Tamil
 ;; tel Telugu
 

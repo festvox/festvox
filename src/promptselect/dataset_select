@@ -78,7 +78,7 @@ do
        {
           bis[$i] += 1;
        }          
-     }' | sort -gr | grep -v "^0 " | 
+     }' | sort -gr | grep -a -v "^0 " | 
      awk '{for (i=2; i<=NF; i++)
               printf("%s ",$i);
            printf("\n")}' >/tmp/$fname.bigrams.$npass
@@ -90,7 +90,7 @@ do
        cat /tmp/$fname.bigrams.$npass | awk '{print $1}' |
        while read l
        do
-           grep " "$l" " $1
+           grep -a " "$l" " $1
        done >$1.selected          
        rm /tmp/$fname.bigrams.*
        exit
