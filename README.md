@@ -35,9 +35,11 @@ This distribution includes
 
 New in 2.8
 
+    https://github.com/festvox/festival/
     Grapheme built voices can be converted to .flitevox files for android
     Database size reduction for random forest clustergen voices
     Random Forests for F0 prediction too
+    18 English voices, and 13 Indic voices
 
 New in 2.7
 
@@ -87,6 +89,10 @@ Festival and Speech Tools
     
        http://www.festvox.org/festival
 
+    or
+
+       https://github.com/festvox
+       
     It is recommended that you compile your own versions of these
     as you will need the libraries and include files to build some
     programs in this festvox.

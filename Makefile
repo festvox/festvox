@@ -33,7 +33,7 @@
 ##                                                                       ##
 ##  Authors: Alan W Black (awb@cs.cmu.edu)                               ##
 ##           Kevin A. Lenzo (lenzo@cs.cmu.edu)                           ##
-##  Version: festvox-2.8 October 2017                                    ##
+##  Version: festvox-2.8 December 2017                                   ##
 ##                                                                       ##
 ###########################################################################
 ##                                                                       ##
@@ -42,8 +42,8 @@
 ##                                                                       ##
 ##  This project's home page is http://www.festvox.org                   ##
 ##                                                                       ##
-##  This release corresponds to the Festival 2.4 release (which          ##
-##  incorporates Edinburgh Speech Tools 2.4)                             ##
+##  This release corresponds to the Festival 2.5 release (which          ##
+##  incorporates Edinburgh Speech Tools 2.5)                             ##
 ##                                                                       ##
 ###########################################################################
 TOP=.
