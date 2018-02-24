@@ -154,6 +154,7 @@ fi
 
 if [ $1 = "getprompts_lang" ]
 then
+    echo getprompts_lang ../etc/txt.done.data data ..
    lang_dir=$5
 
    cp -pr $2 $lang_dir/prompts_txtfile.$$

@@ -61,7 +61,7 @@ for i in $*
 do
    basename $i
 done |
-sed 's/\..*//' |
+sed 's/\.[^.]*$//' |
 awk '{print "(",$1}' >tmp.xxx.data
 $FESTVOXDIR/src/promptselect/dataset_subset $PROMPTLIST tmp.xxx.data >tmp.xxx.data2
 ## As tmp.xxx.data might not be in the same order as $PROMPTLIST
