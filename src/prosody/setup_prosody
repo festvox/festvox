@@ -86,6 +86,7 @@ cp -p $FESTVOXDIR/src/intonation/make_f0_pm_get_f0 bin
 cp -p $FESTVOXDIR/src/intonation/find_f0_stats bin
 cp -p $FESTVOXDIR/src/intonation/make_f0_model bin
 cp -p $FESTVOXDIR/src/intonation/make_f0_v_sptk bin
+cp -p $FESTVOXDIR/src/intonation/make_f0_v_world bin
 cp -p $FESTVOXDIR/src/intonation/f0.feats festival/f0/etc
 cp -p $FESTVOXDIR/src/intonation/tree_f0.scm festvox
 
