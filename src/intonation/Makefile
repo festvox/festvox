@@ -40,7 +40,7 @@ BUILD_DIRS =
 ALL_DIRS = $(BUILD_DIRS)
 SCMFILES = tree_f0.scm impose.scm 
 SCRIPTS = make_f0_pm f0.feats make_f0_model find_f0_stats \
-          make_f0_pm_get_f0 make_f0_v_sptk
+          make_f0_pm_get_f0 make_f0_v_sptk make_f0_v_world
 FILES = Makefile $(SCMFILES) $(SCRIPTS)
 
 ALL = 
