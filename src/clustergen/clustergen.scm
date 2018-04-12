@@ -95,6 +95,14 @@
 (set! cg:post_filter nil)
 (set! cg:post_filter_script_name "./bin/post_filter")
 
+(defvar cg:world nil) ; World vocoder (Experimental, not yet stable)
+(if cg:world
+    (begin
+      (set! mcep_length 60)
+      (set! cg:mixed_excitation t)
+      (set! cg:mlpg t)
+      (set! cg:deltas t)))
+
 (defvar me_filter_track nil)
 (defvar lpf_track nil)
 
@@ -1129,6 +1137,28 @@ Filter synthesized voice with transformation filter and reload waveform."
 )
 (set! cg_F0_interpolate cg_F0_interpolate_spline)
 
+(define (world_postfix utt pt)
+  "(world_postfix utt param_track)
+Do voicing fixes, and attenuate the excitation params."
+  (format t "world_postfix\n")
+  (set! f 0)
+  (mapcar
+   (lambda (m)
+     (if (or (not (ClusterGen_voicing_v m))
+             (< (track.get pt f 0) 50.0))
+         (track.set pt f 0 0.0))
+     (if (equal? 0.0 (track.get pt f 0))
+         (begin
+           (track.set pt f (+ 2 (* 2 2 mcep_length) 2) 0.0)
+           (track.set pt f (+ 2 (* 2 2 mcep_length) 4) 0.0)
+           (track.set pt f (+ 2 (* 2 2 mcep_length) 6) 0.0)
+           (track.set pt f (+ 2 (* 2 2 mcep_length) 8) 0.0)))
+     (set! f (+ f 1))
+     )
+   (utt.relation.items utt 'mcep))
+  t
+  )
+
 (define (ClusterGen_predict_mcep utt)
   (let ((param_track nil)
         (frame_advance cg:frame_shift)
@@ -1276,25 +1306,32 @@ Filter synthesized voice with transformation filter and reload waveform."
           (+ cg:initial_frame_offset (* i frame_advance)))
          (set! i (+ 1 i))))
      (utt.relation.items utt 'mcep))
+    
+    (if cg:F0_interpolate (cg_F0_interpolate utt param_track))
+
+    (if cg:world
+        (world_postfix utt param_track)) ;; fix some voicing things 
 
     (if cg:mixed_excitation
         (let ((nf (track.num_frames param_track))
-              (f 0) (c 0))
+              (f 0) (c 0)
+              (vpos (- (track.num_channels param_track) 2)))
           (set! str_params (track.resize nil nf 5))
           (set! f 0)
           (while (< f nf)
-             (track.set_time str_params f (track.get_time param_track f)) 
+             (track.set_time str_params f (track.get_time param_track f))
              (set! c 0)
              (while (< c 5)
-              (track.set str_params f c 
-                         (track.get param_track f (* (if cg:mlpg 2 1) (+ c 
-                                                     (+ 1 (* 2 mcep_length))  ; after all mcep and deltas
-                                                     ))))
-              (set! c (+ 1 c)))
+                (track.set
+                 str_params f c 
+                 (track.get param_track f
+                            (* (if cg:mlpg 2 1)
+                               (+ c 
+                                  (+ 1 (* 2 mcep_length))  ; after all mcep and deltas
+                                  ))))
+                (set! c (+ 1 c)))
              (set! f (+ 1 f)))
           (utt.set_feat utt "str_params" str_params)))
-
-    (if cg:F0_interpolate (cg_F0_interpolate utt param_track))
 
     (if (or cg:vuv cg:with_v)
            ;; need to get rid of the vuv coefficient (last one)
@@ -1359,13 +1396,36 @@ Filter synthesized voice with transformation filter and reload waveform."
             (set! new_param_track (cg_do_mlpg param_track))
             (utt.set_feat utt "param_track" new_param_track)
             (set! param_track new_param_track)))
+    (if cg:world  ;; we've extracted the str params, so put them back
+        (begin
+          (let ((nf (track.num_frames param_track))
+                (nc (track.num_channels param_track))
+                (f 0) (c 0) (i 0))
+            (set! nnn_track (track.resize nil nf (+ nc 5 1)))
+            (while (< f nf)
+               (track.set_time nnn_track f (track.get_time param_track f)) 
+               (set! c 0)
+               (while (< c nc)
+                  (track.set nnn_track f c (track.get param_track f c))
+                  (set! c (+ 1 c)))
+               (set! i 0)
+               (while (< i 5)
+                  (track.set nnn_track f c (track.get str_params f i))
+                  (set! i (+ i 1))
+                  (set! c (+ 1 c)))
+               (track.set nnn_track f c 0) ;; fake "voicing flag"
+               (set! f (+ 1 f)))
+            (set! param_track nnn_track)
+            (utt.set_feat utt "param_track" param_track))))
     (if (and (not cg:mlpg) cg:deltas)
         (begin   ;; have to reduce param_track to remove deltas
           (set! new_param_track 
                 (track.resize 
                  param_track
                  (track.num_frames param_track)
-                 26)) ;; not very portable
+                 (if cg:world
+                     (track.num_channels param_track)
+                     26))) ;; not very portable
           (utt.set_feat utt "param_track" new_param_track)
           (set! param_track new_param_track)))
     
@@ -1831,7 +1891,20 @@ Add trajectory to daughters of state, interpolating as necessary."
 ;      cg_wave_synth
 ;      cg_wave_synth_external ))
 
-; (require 'hsm_cg)
+                                        ; (require 'hsm_cg)
+
+(define (cg_wave_synth_world utt)
+  (let ((trackname (make_tmp_filename))
+        (wavename (make_tmp_filename))
+        )
+    (track.save (utt.feat utt "param_track") trackname "est")
+    (system
+     (format nil "$FESTVOXDIR/src/clustergen/cg_resynth_world %s %s"
+             trackname wavename))
+    (utt.import.wave utt wavename)
+    (delete-file trackname)
+    (delete-file wavename)
+    utt))
 
 (define (cg_wave_synth_deltas utt)
   ;; before we had it built-in to Festival
@@ -1848,6 +1921,9 @@ Add trajectory to daughters of state, interpolating as necessary."
     utt)
 )
 (set! cluster_synth_method cg_wave_synth)
+(if cg:world
+    (set! cluster_synth_method cg_wave_synth_world))
+    
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

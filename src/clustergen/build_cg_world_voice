@@ -1,0 +1,120 @@
+#!/bin/sh
+###########################################################################
+##                                                                       ##
+##                   Language Technologies Institute                     ##
+##                     Carnegie Mellon University                        ##
+##                       Copyright (c) 2008-2012                         ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##  Generic build all, clustergen voice script (simple case)             ##
+###########################################################################
+
+NAME=$1
+PARALLEL=
+PARALLEL=parallel
+
+# Initial labeling
+
+./bin/do_build $PARALLEL build_prompts
+./bin/do_build label
+
+mv festvox/clustergen.scm festvox/clustergen.scm.xxx
+cat festvox/clustergen.scm.xxx |
+sed 's/cg:world nil/cg:world t/' |
+cat >festvox/clustergen.scm
+
+# Remove all short silences <80ms (you can change that number in 
+# festvox/clustergen_build.scm in ClusterGen_ml_delete_short_pauses)
+#./bin/do_clustergen remove_all_short_silences
+
+./bin/do_clustergen $PARALLEL build_utts
+
+# Build first generation of voice
+
+# A slightly different set of duration features for flite (ok for festival)
+#cp -p $FESTVOXDIR/src/clustergen/statedur.feats_flite festival/dur/etc/statedur.feats
+./bin/do_clustergen generate_statenames
+./bin/do_clustergen generate_filters
+
+./bin/do_clustergen parallel world_params
+./bin/do_clustergen parallel world_f0_v
+./bin/do_clustergen parallel combine_coeffs_world 
+
+# If there isn't a predefined train/test split, we'll make one
+if [ ! -f etc/txt.done.data.test ]
+then
+   ./bin/traintest etc/txt.done.data
+fi
+
+./bin/do_clustergen $PARALLEL cluster etc/txt.done.data.train
+./bin/do_clustergen dur etc/txt.done.data.train
+
+# Test initial build to get basic stats
+$FESTVOXDIR/src/clustergen/cg_test resynth cgp_base etc/txt.done.data.test >mcd-base.out
+# For historical compatibility we'll copy the predicted cgp files
+cp -pr test/cgp_base test/cgp
+mv dur.dur.S25.out dur.dur.S25.out-base
+
+# TTS for this model
+$FESTVOXDIR/src/clustergen/cg_test tts tts_base etc/txt.done.data.test 
+
+exit
+
+# Optimize number of states in hmms
+./bin/do_clustergen nstates
+
+# Optimize wagon stop values for mcep trees
+./bin/do_clustergen wstop
+
+# Do 10 iterations of move label to improve build
+$FESTVOXDIR/src/clustergen/do_move_label $PARALLEL 20
+# Select the best build
+$FESTVOXDIR/src/clustergen/do_move_label select
+
+# Rebuild with best labels
+./bin/do_clustergen cluster etc/txt.done.data.train
+./bin/do_clustergen dur etc/txt.done.data.train
+mv dur.dur.S25.out dur.dur.S25.out-ml
+
+# Final stats
+$FESTVOXDIR/src/clustergen/cg_test resynth cgp_all >mcd-ml.out
+
+exit
+
+# Build a flite voice from this build
+rm -rf flite
+$FLITEDIR/tools/setup_flite
+./bin/build_flite cg
+cd flite
+make
+
+./flite_cmu_us_${NAME} "A whole joy was reaping, but they've gone south, go fetch azure mike." whole_${NAME}.wav
+
+ls -altr flite_cmu_us_${NAME}
+
+

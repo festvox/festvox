@@ -1,0 +1,98 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                     Carnegie Mellon University                        ##
+##                         Copyright (c) 2018                            ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Resynth a track file into a waveform file                            ##
+##  Using World                                                          ##
+##                                                                       ##
+##  Assumes installed version of World                                   ##
+##                                                                       ##
+##  git clone https://github.com/mmorise/World                           ##
+##  cd World                                                             ##
+##  make                                                                 ##
+##  export WORLDDIR=`pwd`/build                                          ##
+##  cd examples/analysis_synthesis/                                      ##
+##  make                                                                 ##
+##                                                                       ##
+###########################################################################
+
+LANG=C; export LANG
+
+TRACK=$1
+WAVEFORM=$2
+
+TMPFILENAME=/tmp/cg_$$
+TFN=$TMPFILENAME
+
+synthesis=$WORLDDIR/synthesis
+x2x=$SPTKDIR/bin/x2x
+mgc2sp=$SPTKDIR/bin/mgc2sp
+SOPR=$SPTKDIR/bin/sopr
+
+nFFTHalf=1024 
+alpha=0.58
+mc_size=59
+order=4
+
+$ESTDIR/bin/ch_track -info $TRACK | grep frames:
+$ESTDIR/bin/ch_track -info $TRACK | grep channels:
+NC=`$ESTDIR/bin/ch_track -info $TRACK | grep channels: | awk '{print $NF}'`
+
+# F0
+$ESTDIR/bin/ch_track -c 0 $TRACK | $x2x +ad >$TFN.f0
+
+# SP
+$ESTDIR/bin/ch_track $TRACK |
+    awk '{for (i=2; i<62; i++)
+             print $i}' |
+    $x2x +af >$TFN.sp_mgc
+$mgc2sp -a $alpha -g 0 -m $mc_size -l $nFFTHalf -o 2 $TFN.sp_mgc |
+    $SOPR -d 32768.0 -P | $x2x +fd >$TFN.raw_sp
+# Add header to .sp file (sample rate (int) and frame_period (double))
+echo 16000 | $x2x +ai >$TFN.sp
+echo 5 | $x2x +ad >>$TFN.sp
+cat $TFN.raw_sp >>$TFN.sp
+
+# AP
+$ESTDIR/bin/ch_track $TRACK |
+    awk '{for (i=1; i<=5; i++)
+             print $(i+'$NC'-6)}' | 
+    $x2x +af >$TFN.ap_mgc
+$mgc2sp -a $alpha -g 0 -m $order -l $nFFTHalf -o 2 $TFN.ap_mgc |
+    $SOPR -d 32768.0 -P | $x2x +fd > $TFN.ap
+
+$synthesis $TFN.f0 $TFN.sp $TFN.ap $WAVEFORM
+
+rm -f $TFN.*
+
+
+

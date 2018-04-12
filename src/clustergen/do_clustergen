@@ -37,8 +37,6 @@
 ##                                                                       ##
 ##  Build a clustergen voice (sort of HMM-generation synthesis).         ##
 ##                                                                       ##
-##  With no arguments is does (mostly) the right thing                   ##
-##                                                                       ##
 ##  Its assumes there is already a labeled voice with a set of           ##
 ##  utterances.  It naively believes it was labeled with ehmm and the    ##
 ##  state names are available from that (and voicing information)        ##
@@ -289,6 +287,81 @@ then
     fi
 
     ./bin/get_str_sptk $PROMPTFILE
+    exit 0
+fi
+
+if [ $1 = "world_params" ]
+then
+    if [ ! "$WORLDDIR" ]
+    then
+	echo "environment variable WORLDDIR is unset"
+	echo "set it to your world build directory e.g."
+	echo '   bash$ export WORLDDIR=/usr/local/world/'
+	echo or
+	echo '   csh% setenv WORLDDIR /usr/local/world/'
+	exit 1
+    fi
+
+    x2x=$SPTKDIR/bin/x2x
+    delta=$SPTKDIR/bin/delta
+    mcep=$SPTKDIR/bin/mcep
+    SOPR=$SPTKDIR/bin/sopr
+
+    # These are set up for 16KHz, they will be different for other sample rates
+    nFFTHalf=1024 
+    alpha=0.58
+    mc_size=59
+    mc_size1=60
+    order=4
+    order1=5
+
+    if [ ! -d world ]
+    then
+       mkdir world
+    fi
+
+    cat $PROMPTFILE |
+        awk '{print $2}' |
+        while read i
+        do
+            fname=$i
+            echo $fname World: f0,sp,ap
+            $WORLDDIR/analysis wav/$fname.wav world/$fname.f0 world/$fname.sp world/$fname.ap
+
+            # Compute MGC on spectrum (have to skip the 12 byte header on .sp)
+            #      $x2x +Ca world/${fname}.sp | sed 1,12d | $x2x +aC |
+            dd status=none if=world/${fname}.sp bs=4 skip=3 |
+                $x2x +df | $SOPR -R -m 32768.0 |
+                $mcep -a $alpha -m $mc_size -l $nFFTHalf -e 1.0E-8 -j 0 -f 0.0 -q 3  |
+                $x2x +fa${mc_size1} > world/${fname}.sp_mcep
+            
+#                awk '{
+#                      if (NR > 2)
+#                         print l,ll,$0
+#                      if (NR > 1) ll=l;
+#                      l=$0
+#                      this=$0 }
+#                     END {print l,ll,l; print l,ll,l }' 
+
+            # Deltas
+            $x2x +af <world/${fname}.sp_mcep |
+                $delta -m $mc_size -d -0.5 0.0 0.5 |
+	        $x2x +fa$(expr 2 \* $mc_size1) >world/${fname}.sp_deltas
+
+            # Compute MGC on aperiodicity
+            $x2x +df world/${fname}.ap |
+                $SOPR -R -m 32768.0 |
+                $mcep -a $alpha -m $order -l $nFFTHalf -e 1.0E-8 -j 0 -f 0.0 -q 3 | $x2x +fa${order1} > world/${fname}.ap_mcep
+
+        done
+
+    exit 0
+fi
+
+if [ $1 = "world_f0_v" ]
+then
+    ./bin/make_f0_v_world $PROMPTFILE
+
     exit 0
 fi
 
@@ -592,6 +665,34 @@ then
               print $0}' |
       $ESTDIR/bin/ch_track -itype ascii -otype est_binary -s 0.005 -end $enddur -o ccoefs/$fname.mcep
       rm -f $CG_TMP.*
+   done
+   exit 0
+fi
+
+if [ $1 = "combine_coeffs_world" ]
+then
+   if [ ! -d ccoefs ]
+   then
+      mkdir ccoefs 
+   fi
+
+   cat $PROMPTFILE |
+   awk '{print $2}' |
+   while read i
+   do
+      fname=$i
+      echo $fname "COMBINE_COEFFS (world: f0,sp,spd,ap,v)"
+
+      if [ -f festival/utts/$fname.utt ]
+      then
+         enddur=`$ESTDIR/../festival/examples/dumpfeats -relation Segment -feats '(end)' festival/utts/$fname.utt | tail -1 | awk '{printf("%0.3f",$1+0.0005)}'`
+      else
+         enddur=`$ESTDIR/bin/ch_track -otype est_ascii mcep_deltas/$fname.mcep | awk '{time=$1} END {printf("%0.3f",time)}'`
+      fi
+
+      #      paste f0/$fname.af0 world/$fname.sp_deltas world/$fname.ap_mcep v/$fname.v |
+      paste f0/$fname.af0 world/$fname.sp_deltas world/$fname.ap_mcep v/$fname.v |
+          $ESTDIR/bin/ch_track -itype ascii -otype est_binary -s 0.005 -end $enddur -o ccoefs/$fname.mcep
    done
    exit 0
 fi

@@ -1,0 +1,171 @@
+#!/bin/sh
+###########################################################################
+##                                                                       ##
+##                   Language Technologies Institute                     ##
+##                     Carnegie Mellon University                        ##
+##                         Copyright (c) 2014                            ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##  Generic build all for Random Forest CG Voices                        ##
+##  All the way to a flite .flitevox file                                ##
+##  Primarily set up as a regression test for arctic voices, but also    ##
+##  useful to show you want to do for RFS voices                         ##
+###########################################################################
+##  Approximate times are given for rms arctic (a and b sets)
+##  on a 6 core machine
+##
+##  build_cg_rfs_voice [[VOICEID] [VOICESOURCEDIR]]
+##  e.g. build_cg_rfs_voice cmu us rms /home/awb/data/arctic/cmu_us_rms_arctic
+##  Without any arguments, assumes you are in an already set up voice 
+##  directory with etc/txt.done.data and wav/*.wav.
+##
+##  You should be able to use the no argument option when you're building
+##  other random language voices and externally set that up first.
+##
+##  I don't recommend using this unless you know that build_cg_voice (the
+##  simple build script) successfully completes.  
+
+## Set up the voice, and copy in the ttd and wavs if arguments are given
+if [ $# != 0 ]
+then
+   mkdir ${1}_${2}_${3}
+   cd ${1}_${2}_${3}
+
+   $FESTVOXDIR/src/clustergen/setup_cg $1 $2 $3
+
+   if [ $# = 4 ]
+   then
+       VOXSOURCEDIR=$4
+   else
+      # "somewhat" specific to somebody's test environment 
+       VOXSOURCEDIR=/home/awb/data/arctic/cmu_us_${3}_arctic
+   fi
+   cp -pr $VOXSOURCEDIR/wav/* wav
+   cp -pr $VOXSOURCEDIR/etc/txt.done.data etc
+fi
+
+## Because I often make an error in not copying the flite specific
+## dur feats, I'll copy them here if the current one equals the default
+if cmp -s festival/dur/etc/statedur.feats $FESTVOXDIR/src/clustergen/statedur.feats
+then
+    echo updating duration feats for flite
+    cp -p $FESTVOXDIR/src/clustergen/statedur.feats_flite festival/dur/etc/statedur.feats
+fi
+
+## Basic build   [ 1 hr 30 min ]
+# sets cg_world
+$FESTVOXDIR/src/clustergen/build_cg_world_voice
+
+## Will (eventually) generate an MCD score in mcd-base.out
+grep MCD mcd-base.out
+
+#  Generate some test examples
+./bin/do_clustergen parallel utt_by_utt_tts etc/txt.done.data.test tts_base
+rm -rf test/tts_base
+mv test/all test/tts_base
+
+## Build 20 random forests on params  [ 2 hrs ]
+mv festvox/clustergen.scm festvox/clustergen.scm.xxx
+cat festvox/clustergen.scm.xxx |
+sed 's/mcep_clustersize 50/mcep_clustersize 15/' |
+sed 's/f0_clustersize 200/f0_clustersize 150/' |
+sed 's/cg:rfs nil/cg:rfs 20/' |
+cat >festvox/clustergen.scm
+./bin/do_clustergen parallel cluster etc/txt.done.data.train
+## Will generate 20 trees for each HMM state in all_rf/
+## Put the random forests together into full models (and duplicate
+## trees if there are any missing)
+./bin/build_rfs rf_post_build
+
+## Do 20 random forests on duration [ 1 hrs 30min ]
+## note we don't need to set anything in clustergen.scm to do the build
+## but lets limit how many (param) rf_models are loaded during the
+## duration build
+echo "01" >rf_models/mlist
+echo "01" >rf_models/mlistf0
+./bin/build_rfs build_dur_rfs
+## Will generate 20 models in dur_rf_models/
+
+## Find best subset of trees for duration   [ 10 mins ]
+./bin/build_rfs minimize_rfs_dur
+## Will generate scores for best N models in mlist_dur.betters
+## Take best 3 dur models (this might not be optimal)
+tail -6 mlist_dur.betters | head -1 >dur_rf_models/mlist
+
+## Find best 3 trees for params             [ 2 hrs / 10 hrs ]
+./bin/build_rfs minimize_rfs_mcep_3
+## Take best 3 param models (this might not be optimal)
+tail -1 mlist.best.all | awk '{print $1,$2,$3}' >rf_models/mlist
+
+## Find best 3 trees for f0             [ 2 hrs / 10 hrs ]
+./bin/build_rfs minimize_rfs_f0_3
+## Take best 3 f0 models (this might not be optimal)
+tail -1 mlistf0.best.all | awk '{print $1,$2,$3}' >rf_models/mlistf0
+
+## This second one (optional to above technique) does a greater search
+## but gives the same results as the above -- but it'll give you information
+## to know if you want 4 or 5 models rather than 3
+#./bin/build_rfs minimize_rfs_mcep
+## Will generate scores for best N models in mlist.best.all/mlist.betters
+## Selection line if you used minimize_rfs_mcep rather than minimize_rfs_mcep_3
+#tail -6 mlist.betters | head -1 >rf_models/mlist
+
+# Now we can switch on rf dur, it'll get the name/number of models to load
+# from dur_rf_models/mlist which is set above
+mv festvox/clustergen.scm festvox/clustergen.scm.xxx
+cat festvox/clustergen.scm.xxx |
+sed 's/cg:rfs_dur nil/cg:rfs_dur 20/' |
+cat >festvox/clustergen.scm
+
+#  Generate some test examples
+./bin/do_clustergen cg_test resynth cgp_rf3 etc/txt.done.data.test >mcd-rf3.out
+./bin/do_clustergen parallel utt_by_utt_tts etc/txt.done.data.test tts_rf3
+rm -rf test/tts_rf3
+mv test/all test/tts_rf3
+
+exit
+
+# Build flite rf3 voice [ 15 mins ]
+$FLITEDIR/tools/setup_flite
+./bin/build_flite
+( cd flite;
+  make;
+  make voicedump;
+  $FLITEDIR/bin/flite -voice ./*.flitevox "hello world" hw.wav;
+  # Should give a flitevox voice file and a generated waveform file
+  ls -al *.flitevox *.wav;
+  cd ..
+)
+# Build a distributable Festival voice
+./bin/do_clustergen festvox_dist
+
+# OK, let's show some stats at the end
+grep MCD mcd-base.out
+grep MCD mcd-rf3.out
+ls -al flite_base/*.wav flite_base/*.flitevox
+ls -al flite/*.wav flite/*.flitevox

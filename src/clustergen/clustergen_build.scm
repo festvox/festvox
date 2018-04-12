@@ -287,7 +287,11 @@ Build cluster synthesizer for the given recorded data and domain."
                    (+ (* cg:delta_factor mcep_length) 5))) ;; with str, w/o v
           (set! cg::cluster_feats 
                 (format nil "-track_feats 1-%d" 
-                   (* cg:delta_factor mcep_length)))) ;; w/o v
+                        (* cg:delta_factor mcep_length)))) ;; w/o v
+      (if cg:world
+          (set! cg::cluster_feats
+                (format nil "-track_feats 1-%d"
+                        (+ 5 (* cg:delta_factor mcep_length)))))
       (format t "Do clustering\n")
       (clustergen::do_clustering 
        cg::unittypes clustergen_params 
@@ -2652,7 +2656,7 @@ x))))
            (set! i (+ 1 i)))
          (utt.relation.items utt1 'mcep))
         (set! cg_predict_unvoiced nil)
-        (cg_wave_synth utt1)
+        (cluster_synth_method utt1) ;; whatever waveform method is selected
         (wave.save (utt.wave utt1)
          (format nil "%s/%s.wav" testdir (car x)))
         )) ;; end of resynth wave
