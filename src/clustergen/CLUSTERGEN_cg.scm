@@ -280,7 +280,9 @@ Dump the names of the files that must be included in the distribution."
           (format ofd "festival/lib/voices/LANG/INST_LANG_VOX_cg/rf_models/mlist\n")
           (mapcar
            (lambda (mn)
-             (format ofd "festival/lib/voices/LANG/INST_LANG_VOX_cg/rf_models/trees_%02d/INST_LANG_VOX_f0.tree\n" mn))
+             ;; Don't list this again if already in mlist
+             (if (not (member_string mn (load "rf_models/mlist" t)))
+                 (format ofd "festival/lib/voices/LANG/INST_LANG_VOX_cg/rf_models/trees_%02d/INST_LANG_VOX_f0.tree\n" mn)))
            (load "rf_models/mlistf0" t))
           (format ofd "festival/lib/voices/LANG/INST_LANG_VOX_cg/rf_models/mlistf0\n")
           ))
