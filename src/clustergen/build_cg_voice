@@ -67,7 +67,7 @@ else
    ./bin/do_clustergen $PARALLEL f0_v_sptk
    # Because sometimes f0 extraction fails
    mv etc/txt.done.data etc/txt.done.data.0
-   ./bin/reduce_prompts etc/txt.done.data.0 f0/* >etc/txt.done.data
+   ./bin/reduce_prompts etc/txt.done.data.0 f0/*.f0 >etc/txt.done.data
    ./bin/do_clustergen $PARALLEL mcep_sptk
 fi
 ./bin/do_clustergen $PARALLEL combine_coeffs_v
