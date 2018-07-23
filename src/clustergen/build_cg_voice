@@ -84,10 +84,9 @@ cat bad.files |
 while read x
 do
     fname=`basename $x .mcep`
-    cat etc/txt.done.data |
-        awk '{if ($2 == "'$fname'") print $0}' >etc/txt.done.data.xxx
-   mv etc/txt.done.data.xxx etc/txt.done.data
-done
+    echo "( "$fname
+done >etc/bad.data
+$FESTVOXDIR/src/promptselect/dataset_minus etc/txt.done.data.precombine etc/bad.data >etc/txt.done.data
 
 # If there isn't a predefined train/test split, we'll make one
 if [ ! -f etc/txt.done.data.test ]
