@@ -186,7 +186,7 @@ Return pronunciation of word not in lexicon."
      (lambda (gg)
        (set! sp (assoc_string gg unicode_sampa_mapping))
        (if sp
-           (set! phlist (append (car (cadr sp)) phlist))
+           (set! phlist (append (reverse (car (cadr sp))) phlist))
            (set! phlist (cons gg phlist))))
      gphones)
     (reverse phlist)))
