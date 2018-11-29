@@ -572,6 +572,60 @@ then
     exit 0
 fi
 
+if [ $1 = "extract_pm" ]
+then
+    # Extract Pitchmarks
+    FIX_PM=$FESTVOXDIR/src/general/fix_pm
+
+    PM_ARGS='-min 0.0057 -max 0.012 -def 0.01 -wave_end -lx_lf 140 -lx_lo 111 -lx_hf 80 -lx_ho 51 -med_o 0'
+
+    if [ -f etc/pm_args ]
+    then
+        PM_ARGS=`cat etc/pm_args`
+    else
+        if [ -f etc/f0.params ]
+        then
+            . ./etc/f0.params
+            PM_ARGS=`echo $F0MEAN $F0STD $F0MAX $F0MIN | awk '{printf("-min %f -max %f -def %f -wave_end -lx_lf 180 -lx_lo 201 -lx_hf 80 -lx_ho 201 -med_o 0\n",1.0/$3,1.0/($1-(1.5*$2)),1.0/$1)}'`
+        fi
+    fi
+
+    #FEMALE_ARGS='-min 0.00333 -max 0.0075 -def 0.006 -wave_end -lx_lf 220 -lx_lo 121 -lx_hf 80 -lx_ho 51 -med_o 0'
+
+#    PM_ARGS='-min 0.0057 -max 0.012 -def 0.01 -wave_end -lx_lf 140 -lx_lo 111 -lx_hf 80 -lx_ho 51 -med_o 0'
+    echo $PM_ARGS >etc/pm_args
+
+    awk '{print $2}' $PROMPTFILE |
+        while read i
+        do
+            fname=$i
+            echo $i PM_WAVE
+            $ESTDIR/bin/ch_wave -scaleN 0.9 wav/$i.wav -F 16000 -o tmp$$.wav
+            # You may (or may not) require -inv and many of the parameters here
+            # may be worth modifying, see the section on Extracting 
+            # pitchmarks from waveforms in the document
+            $ESTDIR/bin/pitchmark tmp$$.wav -o pm/$fname.pm -otype est $PM_ARGS -fill
+            $FIX_PM -wave wav/$fname.wav -pm pm/$fname.pm -window 32 -o $fname.pm  
+            mv $fname.pm pm/$fname.pm
+            rm -f tmp$$.wav
+        done
+
+    exit 0
+fi
+
+if [ $1 = "check_pm" ]
+then
+    awk '{print $2}' $PROMPTFILE |
+        while read i
+        do
+            fname=$i
+            echo $i PM_to_LAB
+            ./bin/make_pmlab_pm pm/$i.pm
+        done
+
+    exit 0 
+fi
+
 if [ $1 = "combine_coeffs" ]
 then
    if [ ! -d ccoefs ]
@@ -690,9 +744,10 @@ then
          enddur=`$ESTDIR/bin/ch_track -otype est_ascii mcep_deltas/$fname.mcep | awk '{time=$1} END {printf("%0.3f",time)}'`
       fi
 
+      awk '{if ($1 < 50) print 0; else print 1}' 1msec/$fname.f0_ascii >v/$fname.v
       #      paste f0/$fname.af0 world/$fname.sp_deltas world/$fname.ap_mcep v/$fname.v |
-      paste f0/$fname.af0 world/$fname.sp_deltas world/$fname.ap_mcep v/$fname.v |
-          $ESTDIR/bin/ch_track -itype ascii -otype est_binary -s 0.005 -end $enddur -o ccoefs/$fname.mcep
+      paste 1msec/$fname.f0_ascii 1msec/$fname.ccoeffs_ascii v/$fname.v |
+          $ESTDIR/bin/ch_track -itype ascii -otype est_binary -s 0.001 -end $enddur -o ccoefs/$fname.mcep
    done
    exit 0
 fi
