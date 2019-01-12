@@ -199,7 +199,7 @@ fi
 
 rm -f festvox/unicode_sampa_mapping.scm
 ## Get the UIUC license too 
-head -n 26 $FESTVOXDIR/src/grapheme/unicode_sampa_mapping.scm > festvox/unicode_sampa_mapping.scm
+head -n 28 $FESTVOXDIR/src/grapheme/unicode_sampa_mapping.scm > festvox/unicode_sampa_mapping.scm
 awk 'BEGIN{while(getline<"festvox/'${FV_INST}'_'${FV_LANG}'_'${FV_NAME}'_char_phone_map.scm")
         {graph[$3]=1;}}
     {if (graph[$2]==1){print $0}}' $FESTVOXDIR/src/grapheme/unicode_sampa_mapping.scm >> festvox/unicode_sampa_mapping.scm
