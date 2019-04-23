@@ -1025,11 +1025,11 @@ DVECTOR xget_sumgvec_gammamat_file(char *gaussmatfile,
     sumgvec = xdvzeros(col);
 
     // open file
-    if ((ifp = fopen(gaussmatfile, "rb")) == NUL) {
+    if ((ifp = fopen(gaussmatfile, "rb")) == NULL) {
 	fprintf(stderr, "can't open file: %s\n", gaussmatfile);
 	exit(1);
     }
-    if ((ofp = fopen(gammamatfile, "wb")) == NUL) {
+    if ((ofp = fopen(gammamatfile, "wb")) == NULL) {
 	fprintf(stderr, "can't open file: %s\n", gammamatfile);
 	exit(1);
     }
