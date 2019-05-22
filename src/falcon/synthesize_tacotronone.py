@@ -56,7 +56,7 @@ def tts(model, text):
     mel_outputs, linear_outputs, alignments = model(sequence)
 
     linear_output = linear_outputs[0].cpu().data.numpy()
-    spectrogram = audio._denormalize(linear_output)
+    spectrogram = audio.denormalize(linear_output)
     alignment = alignments[0].cpu().data.numpy()
 
     # Predicted audio signal
@@ -79,7 +79,7 @@ if __name__ == "__main__":
     with open(checkpoints_dir + '/ids.json') as  f:
        charids = json.load(f)
 
-    model = Tacotron(n_vocab=100,
+    model = Tacotron(n_vocab=len(charids)+1,
                      embedding_dim=256,
                      mel_dim=hparams.num_mels,
                      linear_dim=hparams.num_freq,

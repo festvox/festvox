@@ -134,7 +134,7 @@ class TextDataSource(DataSource):
         self.data_dir = data_dir
 
     def collect_files(self):
-        meta = join(self.data_dir, "train.txt")
+        meta = join(self.data_dir, "txt.done.data.tacotron")
         with open(meta, "rb") as f:
             lines = f.readlines()
         lines = list(map(lambda l: l.decode("utf-8").split("|")[-1], lines))
@@ -154,11 +154,11 @@ class _NPYDataSource(DataSource):
         self.data_dir = data_dir
 
     def collect_files(self):
-        meta = join(self.data_dir, "train.txt")
+        meta = join(self.data_dir, "txt.done.data.tacotron")
         with open(meta, "rb") as f:
             lines = f.readlines()
         lines = list(map(lambda l: l.decode("utf-8").split("|")[self.col], lines))
-        paths = list(map(lambda f: join(self.data_dir, f), lines))
+        paths = list(map(lambda f: join(f), lines))
         return paths
 
     def collect_features(self, path):

@@ -188,3 +188,24 @@ class TacotronOne(nn.Module):
         linear_outputs = self.last_linear(linear_outputs)
 
         return mel_outputs, linear_outputs, alignments
+
+
+    def forward_nomasking(self, inputs, targets=None, input_lengths=None):
+        B = inputs.size(0)
+
+        inputs = self.embedding(inputs)
+        # (B, T', in_dim)
+        encoder_outputs = self.encoder(inputs, input_lengths)
+
+        memory_lengths = None
+
+        mel_outputs, alignments = self.decoder(
+            encoder_outputs, targets, memory_lengths=memory_lengths)
+
+        mel_outputs = mel_outputs.view(B, -1, self.mel_dim)
+
+        linear_outputs = self.postnet(mel_outputs)
+        linear_outputs = self.last_linear(linear_outputs)
+
+        return mel_outputs, linear_outputs, alignments
+

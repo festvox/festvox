@@ -11,7 +11,7 @@ hparams = tf.contrib.training.HParams(
     # Audio:
     num_mels=80,
     num_freq=1025,
-    sample_rate=20000,
+    sample_rate=16000,
     frame_length_ms=50,
     frame_shift_ms=12.5,
     preemphasis=0.97,
@@ -34,7 +34,7 @@ hparams = tf.contrib.training.HParams(
     adam_beta2=0.999,
     initial_learning_rate=0.002,
     decay_learning_rate=True,
-    nepochs=1000,
+    nepochs=10000,
     weight_decay=0.0,
     clip_thresh=1.0,
 

@@ -7,6 +7,7 @@ options:
     --checkpoint-dir=<dir>    Directory where to save model checkpoints [default: checkpoints].
     --checkpoint-path=<name>  Restore model from checkpoint path if given.
     --hparams=<parmas>        Hyper parameters [default: ].
+    --log-event-path=<dir>    Log Path [default: exp/log_tacotronOne]
     -h, --help                Show this help message and exit
 """
 from docopt import docopt
@@ -71,6 +72,7 @@ def train(model, data_loader, optimizer,
     linear_dim = model.linear_dim
 
     criterion = nn.L1Loss()
+    criterion_noavg = nn.L1Loss(reduction='none')
 
     global global_step, global_epoch
     while global_epoch < nepochs:
@@ -130,7 +132,11 @@ def train(model, data_loader, optimizer,
 
         averaged_loss = running_loss / (len(data_loader))
         log_value("loss (per epoch)", averaged_loss, global_epoch)
+        noavg_loss = criterion_noavg(mel_outputs, mel)
+        noavg_loss = noavg_loss.reshape(noavg_loss.shape[0], -1)
+        print("No avg output: ", torch.mean(noavg_loss, dim=-1))
         print("Loss: {}".format(running_loss / (len(data_loader))))
+
 
         global_epoch += 1
 
@@ -140,6 +146,7 @@ if __name__ == "__main__":
     print("Command line args:\n", args)
     checkpoint_dir = args["--checkpoint-dir"]
     checkpoint_path = args["--checkpoint-path"]
+    log_path = args["--log-event-path"]
     data_root = args["--data-root"]
     if data_root:
         DATA_ROOT = data_root
@@ -150,7 +157,7 @@ if __name__ == "__main__":
     os.makedirs(checkpoint_dir, exist_ok=True)
 
     # Vocab size
-    charids = make_charids(DATA_ROOT + '/train.txt')
+    charids = make_charids(DATA_ROOT + '/txt.done.data.tacotron')
     outfile = checkpoint_dir + '/ids.json'
     with open(outfile, 'w') as outfile:
        json.dump(charids, outfile)
@@ -168,7 +175,7 @@ if __name__ == "__main__":
         collate_fn=collate_fn, pin_memory=hparams.pin_memory)
 
     # Model
-    model = Tacotron(n_vocab=100,
+    model = Tacotron(n_vocab=1+ len(charids),
                      embedding_dim=256,
                      mel_dim=hparams.num_mels,
                      linear_dim=hparams.num_freq,
@@ -197,7 +204,7 @@ if __name__ == "__main__":
             pass
 
     # Setup tensorboard logger
-    tensorboard_logger.configure("log/run-test")
+    tensorboard_logger.configure(log_path)
 
     print(hparams_debug_string())
 
