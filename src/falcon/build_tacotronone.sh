@@ -2,9 +2,8 @@
 export FALCONDIR=$FESTVOXDIR/src/falcon
 
 ### Prepare data
-cat etc/txt.done.data | tr '(' ' ' | tr ')' ' ' | tr '"' ' ' > etc/txt.done.data.tacotron
-mkdir -p data/dataprep_tacotron1
-python3.5 $FALCONDIR/prepare_data.py etc/txt.done.data data/dataprep_tacotron1 wav
+cat etc/txt.done.data | tr '(' ' ' | tr ')' ' ' | tr '"' ' ' > etc/tddmkdir -p data/dataprep_tacotron1
+python3.5 $FALCONDIR/prepare_data.py etc/tdd data/dataprep_tacotron1 wav
 
 
 ### Train Baseline Model
