@@ -2,6 +2,7 @@
 export FALCONDIR=$FESTVOXDIR/src/falcon
 
 ### Prepare data
+mkdir -p data/dataprep_tacotron1
 python3.5 $FALCONDIR/prepare_data.py etc/txt.done.data data/dataprep_tacotron1 wav
 
 
