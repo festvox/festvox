@@ -1,3 +1,6 @@
+### To get to this branch
+git checkout VIRAT
+
 ### Setup global paths
 export FALCONDIR=$FESTVOXDIR/src/falcon
 
