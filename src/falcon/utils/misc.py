@@ -148,6 +148,28 @@ class TextDataSource(DataSource):
     def get_charids(self):
         return self.charids
 
+class ToneDataSource(DataSource):
+
+    def __init__(self, data_dir, charids):
+        self.charids = defaultdict(lambda: len(self.charids))
+        self.charids = charids
+        self.data_dir = data_dir
+
+    def collect_files(self):
+        meta = join(self.data_dir, "txt.done.data.tacotron")
+        with open(meta, "rb") as f:
+            lines = f.readlines()
+        lines = list(map(lambda l: l.decode("utf-8").split("|")[-2], lines))
+        return lines
+
+    def collect_features(self, text):
+        text_ids = ' '.join(str(self.charids[k]) for k in text).split()
+        return np.asarray(text_ids,
+                          dtype=np.int32)
+
+    def get_charids(self):
+        return self.charids
+
 class _NPYDataSource(DataSource):
     def __init__(self, data_dir, col):
         self.col = col
@@ -214,5 +236,36 @@ def collate_fn(batch):
     y_batch = torch.FloatTensor(c)
     return x_batch, input_lengths, mel_batch, y_batch
 
+
+
+def collate_fn_tones(batch):
+    """Create batch"""
+    #print(batch[0])
+    r = hparams.outputs_per_step
+    input_lengths = [len(x[0]) for x in batch]
+    max_input_len = np.max(input_lengths)
+    # Add single zeros frame at least, so plus 1
+    max_target_len = np.max([len(x[2]) for x in batch]) + 1
+    if max_target_len % r != 0:
+        max_target_len += r - max_target_len % r
+        assert max_target_len % r == 0
+
+    a = np.array([_pad(x[0], max_input_len) for x in batch], dtype=np.int)
+    x_batch = torch.LongTensor(a)
+
+    a_tone = np.array([_pad(x[1], max_input_len) for x in batch], dtype=np.int)
+    xtone_batch = torch.LongTensor(a_tone)
+
+    input_lengths = torch.LongTensor(input_lengths)
+
+    b = np.array([_pad_2d(x[2], max_target_len) for x in batch],
+                 dtype=np.float32)
+    mel_batch = torch.FloatTensor(b)
+
+    c = np.array([_pad_2d(x[3], max_target_len) for x in batch],
+                 dtype=np.float32)
+    y_batch = torch.FloatTensor(c)
+    #print("Returning a batch", x_batch.shape, xtone_batch.shape, input_lengths)
+    return x_batch, xtone_batch, input_lengths, mel_batch, y_batch
 
 

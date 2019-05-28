@@ -36,10 +36,16 @@ for line in f:
  if len(line) > 2:
     line = line.split('\n')[0].split()
     line = ' '.join(k for k in line)
-    line = re.sub(r'[^\w\s]','', line).strip().split()
+    text = re.sub(r'[^\w\s]','', ' '.join(k for k in line.split()[1:])).strip().split()
 
-    fname = line[0]
-    text = ' '.join(k for k in line[1:])
+    fname = line.split()[0]
+    text = ' '.join(k for k in text)
+
+    ### This is not a good fix - Sai Krishna 27 May 2019 #########
+    # https://stackoverflow.com/questions/9942594/unicodeencodeerror-ascii-codec-cant-encode-character-u-xa0-in-position-20 
+    text = text.encode('ascii', 'ignore').decode('ascii') 
+    ##############################################################
+
     wav_fname = wav_dir + '/' + fname + '.wav'
 
     wav = audio.load_wav(wav_fname)
@@ -55,5 +61,5 @@ for line in f:
     np.save(mspec_fname, mel_spectrogram.T, allow_pickle=False)
 
     g = open(train_file, 'a')
-    g.write(lspec_fname + '|' + mspec_fname + '|' + str(n_frames) + '| { ' + text + '}' + '\n')
+    g.write(lspec_fname + '|' + mspec_fname + '|' + str(n_frames) + '| ' + text  + '\n')
     g.close()

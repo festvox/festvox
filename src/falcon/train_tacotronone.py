@@ -16,15 +16,14 @@ from collections import defaultdict
 # Use text & audio modules from existing Tacotron implementation.
 import sys
 from os.path import dirname, join
-#tacotron_lib_dir = join(dirname(__file__), "lib", "tacotron")
-#sys.path.append(tacotron_lib_dir)
 from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 
-# The tacotron model
-FALCON_DIR = '/home/srallaba/projects/text2speech/repos/festvox/src/falcon/'
+### This is not supposed to be hardcoded #####
+FALCON_DIR = '/home/srallaba/projects/project_emphasis/repos/festvox/src/falcon/'
 sys.path.append(FALCON_DIR)
+##############################################
 from utils.misc import *
 
 from models import TacotronOne as Tacotron
