@@ -20,8 +20,7 @@ git checkout VIRAT
 
 ### Docker
 docker pull  srallaba/falcon:TacotronOne
-nvidia-docker run -it -v /home1:/home1  srallaba/falcon:TacotronOne
-
+nvidia-docker run -it --shm-size 10GB -v /home1:/home1  srallaba/falcon:TacotronOne
 # Check that FALCONDIR variable is set
 echo $FALCONDIR
 # Should output $FESTVOXDIR/src/falcon where FESTVOXDIR is the location of festvox. 
