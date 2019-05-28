@@ -11,6 +11,12 @@ git checkout VIRAT
 ## To update the changes made in interative session, we need to commit and push. Three steps: exit the container, find container id, commit container id to image. push the image. docker ps -a lists the details
 # docker commit container_name image_name
 # docker push image_name
+## Most scripts that are memory intense need more shared memory. We can use argument --shm-size for that
+# docker run -it --shm-size 10GB X
+## We can specify a name to the container for easier access later
+# docker run -it --name container_name --shm-size 10GB X
+## We can mount our disks onto docker
+# docker run -it -v /loc_on_hdd : /loc_on_container --name container_name --shm-size 10GB X
 
 ### Setup global paths
 export FALCONDIR=$FESTVOXDIR/src/falcon
