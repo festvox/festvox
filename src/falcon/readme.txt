@@ -18,8 +18,23 @@ git checkout VIRAT
 ## We can mount our disks onto docker
 # docker run -it -v /loc_on_hdd : /loc_on_container --name container_name --shm-size 10GB X
 
-### Setup global paths
-export FALCONDIR=$FESTVOXDIR/src/falcon
+### Docker
+docker pull  srallaba/falcon:TacotronOne
+nvidia-docker run -it --shm-size 10GB -v /home1:/home1  srallaba/falcon:TacotronOne
+# Check that FALCONDIR variable is set
+echo $FALCONDIR
+# Should output $FESTVOXDIR/src/falcon where FESTVOXDIR is the location of festvox. 
+
+
+### Falcon directory: Clone festvox dir, change to branch VIRAT and set the variable FALCON_DIR 
+cd /home/srallaba/projects/text2speech/repos
+git clone https://github.com/festvox/festvox
+cd festvox
+git checkout VIRAT
+export FALCONDIR= /home/srallaba/projects/text2speech/repos/festvox/src/falcon
+
+### Sample build
+Navigate to /home/srallaba/projects/text2speech/voices/cmu_us_rms_arctic
 
 ### Prepare data
 cat etc/txt.done.data | tr '(' ' ' | tr ')' ' ' | tr '"' ' ' > etc/tdd
