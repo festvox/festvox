@@ -79,7 +79,7 @@ if __name__ == "__main__":
     with open(checkpoints_dir + '/ids.json') as  f:
        phids = json.load(f)
 
-    model = Tacotron(n_vocab=len(charids)+1,
+    model = Tacotron(n_vocab=len(phids)+1,
                      embedding_dim=256,
                      mel_dim=hparams.num_mels,
                      linear_dim=hparams.num_freq,
@@ -106,7 +106,6 @@ if __name__ == "__main__":
             print(text)
             text = [phids[l] for l in text.split()]
             print("{}: {} ({} chars, {} words)".format(idx, text, len(text), len(words)))
-            sys.exit()
             waveform, alignment, _ = tts(model, text)
             dst_wav_path = join(dst_dir, "{}{}.wav".format(idx, file_name_suffix))
             dst_alignment_path = join(dst_dir, "{}_alignment.png".format(idx))
