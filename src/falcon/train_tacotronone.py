@@ -156,13 +156,14 @@ if __name__ == "__main__":
     os.makedirs(checkpoint_dir, exist_ok=True)
 
     # Vocab size
-    charids = make_charids(DATA_ROOT + '/txt.done.data.tacotron')
+    charids = make_charids(DATA_ROOT + '/txt.done.data.tacotron.train')
     outfile = checkpoint_dir + '/ids.json'
     with open(outfile, 'w') as outfile:
        json.dump(charids, outfile)
+    charids = dict(charids)
  
     # Input dataset definitions
-    X = FileSourceDataset(TextDataSource(DATA_ROOT, charids))
+    X = FileSourceDataset(TextDataSource(DATA_ROOT, charids, 'txt.done.data.tacotron.train'))
     Mel = FileSourceDataset(MelSpecDataSource(DATA_ROOT))
     Y = FileSourceDataset(LinearSpecDataSource(DATA_ROOT))
 

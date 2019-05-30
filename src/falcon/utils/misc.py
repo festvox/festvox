@@ -172,20 +172,23 @@ class FeatDataSource(FalconDataSource):
 
 class TextDataSource(DataSource):
 
-    def __init__(self, data_dir, charids):
-        self.charids = defaultdict(lambda: len(self.charids))
+    def __init__(self, data_dir, charids, tdd_file):
         self.charids = charids
         self.data_dir = data_dir
+        self.tdd_file = tdd_file
 
     def collect_files(self):
-        meta = join(self.data_dir, "txt.done.data.tacotron")
+        meta = join(self.data_dir, self.tdd_file)
         with open(meta, "rb") as f:
             lines = f.readlines()
         lines = list(map(lambda l: l.decode("utf-8").split("|")[-1], lines))
         return lines
 
     def collect_features(self, text):
-        text_ids = ' '.join(str(self.charids[k]) for k in text).split()
+        #print("I got this as text: ", text)
+        #print(self.charids)
+        #sys.exit()
+        text_ids = ' '.join(str(self.charids[k]) for k in text.strip()).split()
         return np.asarray(text_ids,
                           dtype=np.int32)
 

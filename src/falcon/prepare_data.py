@@ -9,6 +9,7 @@ import re
 '''Syntax
 python3.5 prepare_data.py tdd_file dest_dir wav_dir
 python3.5 prepare_data.py etc/txt.done.data data/all wav 
+python3.5 prepare_data.py etc/tdd .
 
 tdd_file = 'etc/txt.done.data_nocarets'
 dest_dir = '/home1/srallaba/challenges/blizzard2019/dataprep_tacotron_top2000_hpf/'
