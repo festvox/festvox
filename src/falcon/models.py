@@ -20,6 +20,16 @@ class Encoder_TacotronOne(nn.Module):
         inputs = self.prenet(inputs)
         return self.cbhg(inputs, input_lengths)
 
+class Encoder_TacotronOne_Tones(nn.Module):
+    def __init__(self, in_dim):
+        super(Encoder_TacotronOne, self).__init__()
+        self.prenet = Prenet_tones(in_dim, sizes=[256, 128])
+        self.cbhg = CBHG(128, K=16, projections=[128, 128])
+
+    def forward(self, inputs, tones, input_lengths=None):
+        inputs = self.prenet(inputs, tones)
+        return self.cbhg(inputs, input_lengths)
+
 
 class Decoder_TacotronOne(nn.Module):
     def __init__(self, in_dim, r):
@@ -167,6 +177,83 @@ class TacotronOne(nn.Module):
         B = inputs.size(0)
 
         inputs = self.embedding(inputs)
+        # (B, T', in_dim)
+        encoder_outputs = self.encoder(inputs, input_lengths)
+
+        if self.use_memory_mask:
+            memory_lengths = input_lengths
+        else:
+            memory_lengths = None
+        # (B, T', mel_dim*r)
+        mel_outputs, alignments = self.decoder(
+            encoder_outputs, targets, memory_lengths=memory_lengths)
+
+        # Post net processing below
+
+        # Reshape
+        # (B, T, mel_dim)
+        mel_outputs = mel_outputs.view(B, -1, self.mel_dim)
+
+        linear_outputs = self.postnet(mel_outputs)
+        linear_outputs = self.last_linear(linear_outputs)
+
+        return mel_outputs, linear_outputs, alignments
+
+
+    def forward_nomasking(self, inputs, targets=None, input_lengths=None):
+        B = inputs.size(0)
+
+        inputs = self.embedding(inputs)
+        # (B, T', in_dim)
+        encoder_outputs = self.encoder(inputs, input_lengths)
+
+        memory_lengths = None
+
+        mel_outputs, alignments = self.decoder(
+            encoder_outputs, targets, memory_lengths=memory_lengths)
+
+        mel_outputs = mel_outputs.view(B, -1, self.mel_dim)
+
+        linear_outputs = self.postnet(mel_outputs)
+        linear_outputs = self.last_linear(linear_outputs)
+
+        return mel_outputs, linear_outputs, alignments
+
+
+
+class TacotronOne_tones(nn.Module):
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False):
+        super(TacotronOne_tones, self).__init__()
+        self.mel_dim = mel_dim
+        self.linear_dim = linear_dim
+        self.use_memory_mask = use_memory_mask
+        self.embedding = nn.Embedding(n_vocab, embedding_dim,
+                                      padding_idx=padding_idx)
+        # Trying smaller std
+        self.embedding.weight.data.normal_(0, 0.3)
+        self.encoder = Encoder_TacotronOne(embedding_dim)
+        self.decoder = Decoder_TacotronOne(mel_dim, r)
+
+        self.postnet = CBHG(mel_dim, K=8, projections=[256, mel_dim])
+        self.last_linear = nn.Linear(mel_dim * 2, linear_dim)
+
+        self.toneNchar2embedding = SequenceWise(nn.Linear(embedding_dim*2,embedding_dim))
+
+    def forward(self, inputs, tones, targets=None, input_lengths=None):
+        B = inputs.size(0)
+ 
+        inputs = self.embedding(inputs)
+
+        '''Sai Krishna Rallabandi
+        This might not be the best place to handle concatenation of inputs and tones
+        '''
+        #print("Shapes of inputs and tones: ", inputs.shape, tones.shape)
+        assert inputs.shape[1] == tones.shape[1]
+        inputs_tones = self.embedding(tones)
+        inputs = torch.cat([inputs, inputs_tones], dim=-1)
+        inputs = self.toneNchar2embedding(inputs)
+
         # (B, T', in_dim)
         encoder_outputs = self.encoder(inputs, input_lengths)
 

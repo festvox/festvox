@@ -16,14 +16,14 @@ from collections import defaultdict
 # Use text & audio modules from existing Tacotron implementation.
 import sys
 from os.path import dirname, join
-from utils import audio
-from utils.plot import plot_alignment
-from tqdm import tqdm, trange
-
 ### This is not supposed to be hardcoded #####
 FALCON_DIR = '/home/srallaba/projects/project_emphasis/repos/festvox/src/falcon/'
 sys.path.append(FALCON_DIR)
 ##############################################
+
+from utils import audio
+from utils.plot import plot_alignment
+from tqdm import tqdm, trange
 from utils.misc import *
 
 from models import TacotronOne as Tacotron
@@ -156,13 +156,17 @@ if __name__ == "__main__":
     os.makedirs(checkpoint_dir, exist_ok=True)
 
     # Vocab size
-    charids = make_charids(DATA_ROOT + '/txt.done.data.tacotron')
+    phids = make_phids(DATA_ROOT + '/txt.done.data.tacotron.phseq.train')
     outfile = checkpoint_dir + '/ids.json'
     with open(outfile, 'w') as outfile:
-       json.dump(charids, outfile)
- 
+       json.dump(phids, outfile)
+    print(phids)
+    print("Length of vocabulary: ", len(phids))
+    phids = dict(phids)
+    #sys.exit()
+
     # Input dataset definitions
-    X = FileSourceDataset(TextDataSource(DATA_ROOT, charids))
+    X = FileSourceDataset(PhoneDataSource(DATA_ROOT, phids, "txt.done.data.tacotron.phseq.train"))
     Mel = FileSourceDataset(MelSpecDataSource(DATA_ROOT))
     Y = FileSourceDataset(LinearSpecDataSource(DATA_ROOT))
 
@@ -174,7 +178,7 @@ if __name__ == "__main__":
         collate_fn=collate_fn, pin_memory=hparams.pin_memory)
 
     # Model
-    model = Tacotron(n_vocab=1+ len(charids),
+    model = Tacotron(n_vocab=1+ len(phids),
                      embedding_dim=256,
                      mel_dim=hparams.num_mels,
                      linear_dim=hparams.num_freq,

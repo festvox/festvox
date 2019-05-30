@@ -104,6 +104,20 @@ class Prenet(nn.Module):
             inputs = self.dropout(self.relu(linear(inputs)))
         return inputs
 
+class Prenet_tones(nn.Module):
+    def __init__(self, in_dim, sizes=[256, 128]):
+        super(Prenet, self).__init__()
+        in_sizes = [in_dim] + sizes[:-1]
+        self.layers = nn.ModuleList(
+            [nn.Linear(in_size, out_size)
+             for (in_size, out_size) in zip(in_sizes, sizes)])
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(0.5)
+
+    def forward(self, inputs, inputs_tones):
+        for linear in self.layers:
+            inputs = self.dropout(self.relu(linear(inputs)))
+        return inputs
 
 
 class BatchNormConv1d(nn.Module):
