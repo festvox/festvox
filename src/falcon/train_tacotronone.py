@@ -164,8 +164,8 @@ if __name__ == "__main__":
  
     # Input dataset definitions
     X = FileSourceDataset(TextDataSource(DATA_ROOT, charids, 'txt.done.data.tacotron.train'))
-    Mel = FileSourceDataset(MelSpecDataSource(DATA_ROOT))
-    Y = FileSourceDataset(LinearSpecDataSource(DATA_ROOT))
+    Mel = FileSourceDataset(MelSpecDataSource(DATA_ROOT, 'txt.done.data.tacotron.train'))
+    Y = FileSourceDataset(LinearSpecDataSource(DATA_ROOT, 'txt.done.data.tacotron.train'))
 
     # Dataset and Dataloader setup
     dataset = PyTorchDataset(X, Mel, Y)

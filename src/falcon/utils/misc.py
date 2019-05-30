@@ -241,12 +241,13 @@ class ToneDataSource(DataSource):
         return self.charids
 
 class _NPYDataSource(DataSource):
-    def __init__(self, data_dir, col):
+    def __init__(self, data_dir, col, tdd_file):
         self.col = col
         self.data_dir = data_dir
+        self.tdd_file = tdd_file
 
     def collect_files(self):
-        meta = join(self.data_dir, "txt.done.data.tacotron")
+        meta = join(self.data_dir, self.tdd_file)
         with open(meta, "rb") as f:
             lines = f.readlines()
         lines = list(map(lambda l: l.decode("utf-8").split("|")[self.col], lines))
@@ -259,13 +260,13 @@ class _NPYDataSource(DataSource):
 
 
 class MelSpecDataSource(_NPYDataSource):
-    def __init__(self, data_dir):
-        super(MelSpecDataSource, self).__init__(data_dir, 1)
+    def __init__(self, data_dir, tdd_file):
+        super(MelSpecDataSource, self).__init__(data_dir, 1, tdd_file)
 
 
 class LinearSpecDataSource(_NPYDataSource):
-    def __init__(self, data_dir):
-        super(LinearSpecDataSource, self).__init__(data_dir, 0)
+    def __init__(self, data_dir, tdd_file):
+        super(LinearSpecDataSource, self).__init__(data_dir, 0, tdd_file)
 
 
 class PyTorchDataset(object):
