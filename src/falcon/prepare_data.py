@@ -39,11 +39,12 @@ for line in f:
     text = re.sub(r'[^\w\s]','', ' '.join(k for k in line.split()[1:])).strip().split()
 
     fname = line.split()[0]
-    text = ' '.join(k for k in text)
-
+    text = ' '.join(k.lower() for k in text)
+    
     ### This is not a good fix - Sai Krishna 27 May 2019 #########
     # https://stackoverflow.com/questions/9942594/unicodeencodeerror-ascii-codec-cant-encode-character-u-xa0-in-position-20 
-    text = text.encode('ascii', 'ignore').decode('ascii') 
+    text = text.encode('ascii', 'ignore').decode('ascii')
+    text = '< ' + text + ' >'  
     ##############################################################
 
     wav_fname = wav_dir + '/' + fname + '.wav'
