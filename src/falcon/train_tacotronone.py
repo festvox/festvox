@@ -12,7 +12,9 @@ options:
 """
 from docopt import docopt
 from collections import defaultdict
-
+import os
+import re
+os.environ["CUDA_VISIBLE_DEVICES"]='1'
 # Use text & audio modules from existing Tacotron implementation.
 import sys
 from os.path import dirname, join

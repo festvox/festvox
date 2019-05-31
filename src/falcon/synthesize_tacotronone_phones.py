@@ -101,14 +101,17 @@ if __name__ == "__main__":
     with open(text_list_file_path, "rb") as f:
         lines = f.readlines()
         for idx, line in enumerate(lines):
-            text = line.decode("utf-8")[:-1]
+            fname = line.decode("utf-8").split()[0]
+            fname += '_' + os.path.basename(checkpoint_path).split('.')[0].split('_')[-1]
+            text = ' '.join(k for k in line.decode("utf-8").split()[1:][:-1])
             words = nltk.word_tokenize(text)
-            print(text)
+            print(text, fname)
+            #sys.exit()
             text = [phids[l] for l in text.split()]
             print("{}: {} ({} chars, {} words)".format(idx, text, len(text), len(words)))
             waveform, alignment, _ = tts(model, text)
-            dst_wav_path = join(dst_dir, "{}{}.wav".format(idx, file_name_suffix))
-            dst_alignment_path = join(dst_dir, "{}_alignment.png".format(idx))
+            dst_wav_path = join(dst_dir, "{}{}.wav".format(fname, file_name_suffix))
+            dst_alignment_path = join(dst_dir, "{}_alignment.png".format(fname))
             plot_alignment(alignment.T, dst_alignment_path,
                            info="tacotron, {}".format(checkpoint_path))
             audio.save_wav(waveform, dst_wav_path)
