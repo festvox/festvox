@@ -201,10 +201,10 @@ class TacotronOne(nn.Module):
 
     '''Fix for end prediction
     Section 4 in "TACOTRON: TOWARDS END-TO-END SPEECH SYNTHESIS" https://arxiv.org/pdf/1703.10135.pdf
-    "It’s a common practice to train sequence models with a loss mask, which masks loss on zero-padded frames.
-However, we found that models trained this way don’t know when to stop emitting outputs, causing
-repeated sounds towards the end. One simple trick to get around this problem is to also reconstruct
-the zero-padded frames."
+      "It’s a common practice to train sequence models with a loss mask, which masks loss on zero-padded frames.
+      However, we found that models trained this way don’t know when to stop emitting outputs, causing
+      repeated sounds towards the end. One simple trick to get around this problem is to also reconstruct
+      the zero-padded frames."
     ''' 
     def forward_nomasking(self, inputs, targets=None, input_lengths=None):
         B = inputs.size(0)
