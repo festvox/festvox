@@ -1,3 +1,5 @@
+import numpy as np
+
 import torch
 from torch.autograd import Variable
 from torch import nn
@@ -9,6 +11,8 @@ from layers  import *
 # https://github.com/r9y9/tacotron_pytorch/blob/master/tacotron_pytorch/tacotron.py
 
 '''
+
+print_flag = 0
 
 class Encoder_TacotronOne(nn.Module):
     def __init__(self, in_dim):
@@ -302,3 +306,172 @@ class TacotronOne_tones(nn.Module):
 
         return mel_outputs, linear_outputs, alignments
 
+
+
+class Wavenet_Barebones(nn.Module):
+
+    def __init__(self):
+        super(Wavenet_Barebones, self).__init__()
+
+        self.embedding = nn.Embedding(259, 128)
+        self.encoder_fc = SequenceWise(nn.Linear(128, 128))
+        self.encoder_dropout = nn.Dropout(0.3)
+        self.kernel_size = 3
+        self.stride = 1
+
+        layers = 24
+        stacks = 4
+        layers_per_stack = layers // stacks
+
+        self.conv_modules = nn.ModuleList()
+        for layer in range(layers):
+            dilation = 2**(layer % layers_per_stack)
+            self.padding = int((self.kernel_size - 1) * dilation)
+            conv = residualconvmodule(128,128, self.kernel_size, self.stride, self.padding,dilation)
+            self.conv_modules.append(conv)
+
+        self.final_fc1 = SequenceWise(nn.Linear(128, 512))
+        self.final_fc2 = SequenceWise(nn.Linear(512, 259))
+        
+        self.upsample_fc = SequenceWise(nn.Linear(80,60))
+        upsample_factors = [4,4,4,4]
+        self.upsample_network = UpsampleNetwork_r9y9(80, upsample_factors)        
+
+    def encode(self, x, teacher_forcing_ratio):
+        x = self.embedding(x.long())
+        if len(x.shape) < 3:
+           x = x.unsqueeze(1)
+        x = F.relu(self.encoder_fc(x))
+        if teacher_forcing_ratio > 0.1:
+           #print("Dropping out")
+           x = self.encoder_dropout(x)
+        return x
+
+    def upsample_ccoeffs(self, c, frame_period=80):
+        c = self.upsample_network(c)
+        print("Shape of upsampled c: ", c.shape)
+        return c
+
+        if print_flag:
+           print("Shape of ccoeffs in upsampling routine is ", c.shape)
+        c = c.transpose(1,2)
+        c = F.interpolate(c, size=[c.shape[-1]*frame_period])
+        c = c.transpose(1,2)
+        if print_flag:
+           print("Shape of ccoeffs after upsampling is ", c.shape)
+        c = self.upsample_fc(c)   
+        return c #[:,:-1,:]
+
+
+    def upsample_ccoeffs_conv(self, c, frame_period=80):
+        c = self.upsample_network(c)
+        return c
+
+
+    def forward(self,x, c, tf=1):
+
+
+       # Do something about the wav
+       x = self.encode(x.long(), 1.0)
+
+       # Do something about the ccoeffs
+       frame_period = 256
+       c = self.upsample_ccoeffs(c, frame_period)       
+
+       # Feed to Decoder
+       x = x.transpose(1,2)
+       for module in self.conv_modules:
+          x = F.relu(module(x, c))
+
+       x = x.transpose(1,2)
+
+       x = F.relu(self.final_fc1(x))
+       x = self.final_fc2(x)
+
+       return x[:,:-1,:]
+ 
+
+    def forward_convupsampling(self,x, c, tf=1):
+
+
+       # Do something about the wav
+       x = self.encode(x.long(), 1.0)
+
+       # Do something about the ccoeffs
+       frame_period = 256
+       c = self.upsample_ccoeffs_conv(c, frame_period)       
+
+       # Feed to Decoder
+       x = x.transpose(1,2)
+       for module in self.conv_modules:
+          x = module(x, c)
+
+       x = x.transpose(1,2)
+
+       x = torch.tanh(self.final_fc1(x))
+       x = self.final_fc2(x)
+
+       return x[:,:-1,:]
+
+    def clear_buffers(self):
+
+       for module in self.conv_modules:
+           module.clear_buffer()
+
+    def forward_incremental(self, c):
+ 
+       self.clear_buffers()
+
+       max_length = c.shape[1] * 256
+       print("Max Length is ", max_length)
+
+       bsz = c.shape[0]
+       x = c.new(bsz,1)
+       a = 0
+       x.fill_(a)
+
+       outputs = []
+       samples = []
+
+       # Do something about the ccoeffs
+       frame_period = 256
+       if print_flag:
+          print(" Model: Shape of c before upsampling: ", c.shape)
+       c = self.upsample_ccoeffs_conv(c.transpose(1,2), frame_period).transpose(1,2)
+       if print_flag:
+          print(" Model: Shape of c after upsampling: ", c.shape)
+
+       for i in range(max_length-1):
+
+          # Do something about the wav
+          x = self.encode(x.long(), 0.0)
+
+          # Feed to Decoder
+          ct = c[:,i,:].unsqueeze(1)
+
+          assert len(x.shape) == 3
+
+          for module in self.conv_modules:
+             x = module.incremental_forward(x, ct)
+
+          #x = x.transpose(1,2)
+          if print_flag:
+             print(" Model: Shape of output from the modules: ", x.shape)  
+          x = torch.tanh(self.final_fc1(x))
+          x = self.final_fc2(x)
+
+          probs = F.softmax(x.view(bsz, -1), dim=1)
+          predicted = torch.max(x.view(bsz, -1), dim=1)[1]
+          sample = np.random.choice(np.arange(259), p = probs.view(-1).data.cpu().numpy())
+          predicted = np.array([sample])
+          sample_onehotk = x.new(x.shape[0], 259)
+          sample_onehotk.zero_()
+          sample_onehotk[:,predicted] = 1
+          outputs.append(x)
+          #samples.append(predicted)
+          samples.append(sample_onehotk)
+          x = torch.LongTensor(predicted).cuda()
+
+       outputs = torch.stack(outputs)
+       samples = torch.stack(samples)
+       return outputs

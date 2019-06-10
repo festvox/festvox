@@ -3,12 +3,13 @@ from torch.autograd import Variable
 from torch import nn
 import torch.nn.functional as F
 
+from layers import *
 '''Excerpts from the following sources
 # https://github.com/r9y9/tacotron_pytorch/blob/master/tacotron_pytorch/tacotron.py
 
 '''
 
-
+print_flag = 0
 
 class BahdanauAttention(nn.Module):
     def __init__(self, dim):
@@ -230,4 +231,102 @@ class CBHG(nn.Module):
                 outputs, batch_first=True)
 
         return outputs
+
+
+class residualconvmodule(nn.Module):
+
+    def __init__(self,  in_channels, out_channels, kernel_size, stride, padding, dilation):
+        super(residualconvmodule, self).__init__()
+
+        self.conv = self.weightnorm_conv1d( in_channels, out_channels, kernel_size, stride, padding, dilation )
+        self.prefinal_fc = SequenceWise(nn.Linear(128, 128))
+
+
+    def weightnorm_conv1d(self, in_channels, out_channels, kernel_size, stride, padding, dilation):
+        dropout = 0
+        std_mul = 1.0
+        m = Conv1dplusplus(in_channels,out_channels, kernel_size=kernel_size, stride=stride, padding = padding, dilation = dilation)
+        std = math.sqrt((std_mul * (1.0 - dropout)) / (m.kernel_size[0] * in_channels))
+        m.weight.data.normal_(mean=0, std=std)
+        m.bias.data.zero_()
+        return nn.utils.weight_norm(m)
+
+    def clear_buffer(self):
+        self.conv.clear_buffer()
+
+
+    def forward(self, x, c, g=None):
+        return self._forward(x, c, g, False)
+
+
+    def incremental_forward(self, x, c=None, g=None):
+        return self._forward(x, c, g, True)
+
+
+    def _forward(self,x, c, g, incremental_flag):
+
+        residual = x        
+
+        # Feed to the module
+        if incremental_flag:
+           if print_flag:
+              print("   Module: The shape of residual in the module is ", residual.shape, " and that of x is ", x.shape) 
+           assert residual.shape[1] == x.shape[1]
+           x = F.relu(self.conv.incremental_forward(x))
+
+        else:
+           x = F.relu(self.conv(x))
+           x = x.transpose(1,2)
+           # Causal
+           x = x[:,:residual.shape[2],:] 
+
+        if print_flag:
+           print("   Module: The shape of residual in the module is ", residual.shape)
+           print("   Module: Shape of x after residual convs is ", x.shape)
+           print("   Module: Shape of x before prefinal fc is ", x.shape)
+ 
+        x = self.prefinal_fc(x)
+
+        if incremental_flag:
+           pass
+        else:
+           x = x.transpose(1,2)
+
+        if print_flag:
+           print("   Module: Shape of x right before adding the residual and the residual: ", x.shape, residual.shape)
+        assert x.shape == residual.shape
+
+        x = (x + residual) * math.sqrt(0.5)
+
+        return x
+
+
+class UpsampleNetwork_r9y9(nn.Module):
+
+     def __init__(self, feat_dims, upsample_scales):
+         super().__init__()
+         self.upsample_conv = nn.ModuleList()
+         freq_axis_kernel_size=3
+         weight_normalization = True
+         for s in upsample_scales:
+                freq_axis_padding = (freq_axis_kernel_size - 1) // 2
+                convt = ConvTranspose2d(1, 1, (freq_axis_kernel_size, s),
+                                        padding=(freq_axis_padding, 0),
+                                        dilation=1, stride=(1, s),
+                                        weight_normalization=weight_normalization)
+                self.upsample_conv.append(convt)
+                # assuming we use [0, 1] scaled features
+                # this should avoid non-negative upsampling output
+                self.upsample_conv.append(nn.ReLU(inplace=True))
+
+
+     def forward(self, c):
+
+            c = c.unsqueeze(1)
+            for f in self.upsample_conv:
+                c = f(c)
+            # B x C x T
+            c = c.squeeze(1) 
+            return c
+
 

@@ -4,17 +4,20 @@ from collections import defaultdict
 import numpy as np
 import torch
 from .audio import *
-import sys
+import sys,os
+
+from torch.utils.data import Dataset
+from torch.utils.data import DataLoader
 
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 
-
-# Default DATA_ROOT
-DATA_ROOT = join(expanduser("~"), "tacotron", "training")
-
+def assure_path_exists(path):
+    if not os.path.exists(path):
+        os.makedirs(path)
+        print("Made the directory ", path) 
 
 def plot_alignment(alignment, path, info=None):
   fig, ax = plt.subplots()
@@ -66,6 +69,12 @@ def update_charids(char_ids, file):
         for char in line:
             _ = char_ids[char]
     return char_ids    
+
+def get_padded_1d(seq):
+    lengths = [len(x) for x in seq]
+    max_len = np.max(lengths)
+    return _pad(seq, max_len)
+ 
 
 def _pad(seq, max_len):
     #print("Shape of seq: ", seq.shape, " and the max length: ", max_len)     
@@ -162,13 +171,169 @@ class FalconDataSource(object):
         raise NotImplementedError
 
 class FeatDataSource(FalconDataSource):
-    
+
     def __init__(self, tdd_file, data_dir):
         self.tdd_file = tdd_file
 
     def collect_files(self):
-        pass 
+        pass
 
+def get_fnames(fnames_file):
+    filenames_array = []
+    f = open(fnames_file)
+    for line in f:
+      line = line.split('\n')[0]
+      filenames_array.append(line)
+    return filenames_array
+
+def populate_featdict(desc_file):
+    f = open(desc_file)
+    dict = {}
+    dict_featnames = {}
+    idx = 0
+    for line in f:
+       line = line.split('\n')[0] 
+       name, length, type = line.split('|')[0], line.split('|')[1], line.split('|')[2]
+       dict[name + '_length'] = length
+       dict[name + '_type'] = type
+       dict_featnames[idx] = name
+       idx += 1
+    return dict, dict_featnames
+
+
+class CombinedDataSource(Dataset):
+  
+  def __init__(self, list):
+      self.list = list
+      self.num_sets = len(list)
+      
+  def __len__(self):
+      assert len(self.list[0]) == len(self.list[1])
+      return len(self.list[0])
+    
+  def __getitem__(self, idx):
+      return [k[idx] for k in self.list]
+
+  def get_nsets(self):
+      return self.num_sets
+  
+
+class CategoricalDataSource_v1(Dataset):
+    '''Syntax
+    dataset = CategoricalDataSource(fnames.txt.train, etc/falcon_feats.desc, festival/falcon_feats) 
+
+    '''
+
+    def __init__(self, fnames_file, desc_file, feats_dir):
+      self.fnames_file = fnames_file
+      self.feats_dir = feats_dir
+      self.desc_file = desc_file
+      self.filenames_array = get_fnames(self.fnames_file)
+      self.dict_featmetas, self.dict_featnames = populate_featdict(self.desc_file)
+
+    def __getitem__(self, idx):
+        fname = self.filenames_array[idx]
+        f = open(self.feats_dir + '/' + fname + '.feats')
+        phones = []
+        for line in f:
+           line = line.split('\n')[0]
+           feats = line.split('|')
+           if len(feats) > 1:
+              print("Cannot handle multiple feats for now")
+              sys.exit()
+           phones.append(line)
+        print("Length of phones: ", len(phones))
+        return phones
+
+    def __len__(self):
+        return len(self.filenames_array)
+
+def get_featmetainfo(desc_file, feat_name):
+
+    f = open(desc_file)
+    for line in f:
+        line = line.split('\n')[0]
+        feat = line.split('|')[0]
+        if feat_name == feat:
+           feat_length, feat_type = line.split('|')[1], line.split('|')[2]
+           return feat_length,feat_type 
+
+def populate_featarray(fname, feats_dir, feats_dict):
+    feats_array = []
+    f = open(fname)
+    for line in f:
+        line = line.split('\n')[0]
+        feats  = line.split()
+        for feat in feats:
+            feats_array.append(feats_dict[feat])
+    feats_array = np.array(feats_array)
+    return feats_array
+
+class CategoricalDataSource(Dataset):
+    '''Syntax
+    dataset = CategoricalDataSource(fnames.txt.train, etc/falcon_feats.desc, feat_name, feats_dir)
+
+    '''
+
+    def __init__(self, fnames_file, desc_file, feat_name, feats_dir, feats_dict = None):
+      self.fnames_file = fnames_file
+      self.feat_name = feat_name
+      self.desc_file = desc_file
+      self.filenames_array = get_fnames(self.fnames_file)
+      self.feat_length, self.feat_type = get_featmetainfo(self.desc_file, feat_name)
+      self.feats_dir = feats_dir
+      self.feats_dict = defaultdict(lambda: len(self.feats_dict)) if feats_dict is None else feats_dict
+
+    def __getitem__(self, idx):
+
+        assert self.feat_type == 'categorical'
+        fname = self.filenames_array[idx]
+        fname = self.feats_dir + '/' + fname + '.feats'
+        feats_array = populate_featarray(fname, self.feats_dir, self.feats_dict) 
+        return feats_array
+
+    def __len__(self):
+        return len(self.filenames_array)
+
+
+def collate_fn_1d(batch):
+    """Create batch"""
+
+    input_lengths = [len(x) for x in batch]
+    max_input_len = np.max(input_lengths) + 1
+
+    a = np.array([_pad(x, max_input_len) for x in batch], dtype=np.int)
+    x_batch = torch.LongTensor(a)
+
+    return x_batch
+
+
+class CombinedDataset(Dataset):
+   
+    def __init__(self, list):
+        self.list = list
+        assert len(list[0]) == len(list[1])
+
+    def combine_datasets(self):
+        num_sets = len(self.list)
+        
+    def __len__(self):
+       return len(self.list[0])
+
+    def __getitem__(self, idx):
+       return [k[idx] for k in self.list]
+
+
+def collate_fn_combined(batch):
+    num_sets = len(batch[0])
+    batches = []
+    print("The number of sets", num_sets)
+    for n in range(num_sets):
+        dim = len(batch[0][n].shape)
+        print("Processing set ", n, "Dimensions are ", dim)
+        batch1 = get_padded_1d(batch[:][n])
+        batches.append(torch.tensor(batch1))
+    return batches
 
 class TextDataSource(DataSource):
 

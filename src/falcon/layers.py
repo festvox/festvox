@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import random
 import math
 
+print_flag = 0
 
 class SequenceWise(nn.Module):
     def __init__(self, module):
@@ -96,7 +97,7 @@ class Conv1dplusplus(nn.Conv1d):
             if dilation > 1:
                 input = input[:, 0::dilation, :].contiguous()
         if print_flag:
-           print("Shape of input and the weight: ", input.shape, weight.shape)
+           print("   Layer: Shape of input and the weight: ", input.shape, weight.shape)
         output = F.linear(input.view(bsz, -1), weight, self.bias)
         return output.view(bsz, 1, -1)
 
@@ -119,4 +120,16 @@ class Conv1dplusplus(nn.Conv1d):
             assert weight.size() == (self.out_channels, kw, self.in_channels)
             self._linearized_weight = weight.view(self.out_channels, -1)
         return self._linearized_weight
+
+
+def ConvTranspose2d(in_channels, out_channels, kernel_size,
+                    weight_normalization=True, **kwargs):
+    freq_axis_kernel_size = kernel_size[0]
+    m = nn.ConvTranspose2d(in_channels, out_channels, kernel_size, **kwargs)
+    m.weight.data.fill_(1.0 / freq_axis_kernel_size)
+    m.bias.data.zero_()
+    if weight_normalization:
+        return nn.utils.weight_norm(m)
+    else:
+        return m
 

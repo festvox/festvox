@@ -1,6 +1,31 @@
 import tensorflow as tf
 
 
+hparams_wavenet = tf.contrib.training.HParams(
+
+    # Training:
+    adam_beta1=0.9,
+    adam_beta2=0.999,
+    adam_eps=1e-8,
+    amsgrad=False,
+    initial_learning_rate=1e-3,
+    # see lrschedule.py for available lr_schedule
+    lr_schedule="noam_learning_rate_decay",
+    lr_schedule_kwargs={},  # {"anneal_rate": 0.5, "anneal_interval": 50000},
+    nepochs=2000,
+    weight_decay=0.0,
+    clip_thresh=-1,
+    # max time steps can either be specified as sec or steps
+    # if both are None, then full audio samples are used in a batch
+    max_time_sec=None,
+    max_time_steps=8000,
+    # Hold moving averaged parameters and use them for evaluation
+    exponential_moving_average=True,
+    # averaged = decay * averaged + (1 - decay) * x
+    ema_decay=0.9999,
+
+)
+
 # Default hyperparameters:
 hparams = tf.contrib.training.HParams(
     # Comma-separated list of cleaners to run on text prior to training and eval. For non-English
