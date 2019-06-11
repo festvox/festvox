@@ -64,7 +64,6 @@ def update_phids(ph_ids, file):
 
 def make_charids(file):
     char_ids =  defaultdict(lambda: len(char_ids))
-    char_ids['UNK']
     f = open(file)
     for line in f:
         line = line.split('\n')[0].split('|')[-1]
@@ -76,7 +75,7 @@ def make_charids_tdd(file):
     char_ids =  defaultdict(lambda: len(char_ids))
     f = open(file)
     for line in f:
-        line = '< ' + ''.join(k for k in line.split('\n')[0].split()[1:]) + ' >'
+        line = ''.join(k for k in line.split('\n')[0].split()[1:])
         for char in line:
             _ = char_ids[char]
     return char_ids

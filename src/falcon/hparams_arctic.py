@@ -59,7 +59,7 @@ hparams = tf.contrib.training.HParams(
     adam_beta2=0.999,
     initial_learning_rate=0.002,
     decay_learning_rate=True,
-    nepochs=10000,
+    nepochs=1000,
     weight_decay=0.0,
     clip_thresh=1.0,
 
