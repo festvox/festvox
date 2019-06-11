@@ -316,6 +316,32 @@ class CategoricalDataSource(Dataset):
         return len(self.filenames_array)
 
 
+class FloatDataSource(Dataset):
+    '''Syntax
+    dataset = CategoricalDataSource(fnames.txt.train, etc/falcon_feats.desc, feat_name, feats_dir)
+
+    '''
+
+    def __init__(self, fnames_file, desc_file, feat_name, feats_dir, feats_dict = None):
+      self.fnames_file = fnames_file
+      self.feat_name = feat_name
+      self.desc_file = desc_file
+      self.filenames_array = get_fnames(self.fnames_file)
+      self.feat_length, self.feat_type = get_featmetainfo(self.desc_file, feat_name)
+      self.feats_dir = feats_dir
+      self.feats_dict = defaultdict(lambda: len(self.feats_dict)) if feats_dict is None else feats_dict
+
+    def __getitem__(self, idx):
+
+        fname = self.filenames_array[idx]
+        fname = self.feats_dir + '/' + fname + '.feats.npy'
+        feats_array = np.load(fname)
+        return feats_array
+
+    def __len__(self):
+        return len(self.filenames_array)
+
+
 def collate_fn_1d(batch):
     """Create batch"""
 
@@ -327,6 +353,21 @@ def collate_fn_1d(batch):
 
     return x_batch
 
+
+def collate_fn_float(batch):
+    """Create batch"""
+
+    # Check dimensions and send to collate_fn_1d if 1d. Need to worry about long tensor but we will ignore this for now
+    if len(batch[0].shape) < 2:
+        return collate_fn_1d(batch)
+
+    input_lengths = [x.shape[0] for x in batch]
+    max_input_len = np.max(input_lengths) + 1
+
+    a = np.array([_pad_2d(x, max_input_len) for x in batch], dtype=np.int)
+    x_batch = torch.FloatTensor(a)
+
+    return x_batch
 
 class CombinedDataset(Dataset):
    
