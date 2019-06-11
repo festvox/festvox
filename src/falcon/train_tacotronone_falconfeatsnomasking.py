@@ -41,7 +41,6 @@ import torch.backends.cudnn as cudnn
 from torch.utils import data as data_utils
 import numpy as np
 
-from nnmnkwii.datasets import FileSourceDataset, FileDataSource
 from os.path import join, expanduser
 
 import librosa.display
@@ -167,12 +166,15 @@ if __name__ == "__main__":
     #sys.exit()
 
     # Input dataset definitions
-    X = FileSourceDataset(TextDataSource(DATA_ROOT, charids, 'txt.done.data.tacotron.train'))
-    Mel = FileSourceDataset(MelSpecDataSource(DATA_ROOT, 'txt.done.data.tacotron.train'))
-    Y = FileSourceDataset(LinearSpecDataSource(DATA_ROOT, 'txt.done.data.tacotron.train'))
+    #X = FileSourceDataset(TextDataSource(DATA_ROOT, charids, 'txt.done.data.tacotron.train'))
+    #Mel = FileSourceDataset(MelSpecDataSource(DATA_ROOT, 'txt.done.data.tacotron.train'))
+    #Y = FileSourceDataset(LinearSpecDataSource(DATA_ROOT, 'txt.done.data.tacotron.train'))
     feats_name = 'chars'
     X = CategoricalDataSource('fnames.train', 'etc/falcon_feats.desc', feats_name, 'festival/falcon_' + feats_name, charids)
-
+    feats_name = 'lspec'
+    Y = FloatDataSource('fnames.train', 'etc/falcon_feats.desc', feats_name, 'festival/falcon_' + feats_name)
+    feats_name = 'mspec'
+    Mel = FloatDataSource('fnames.train', 'etc/falcon_feats.desc', feats_name, 'festival/falcon_' + feats_name)
 
     # Dataset and Dataloader setup
     dataset = PyTorchDataset(X, Mel, Y)

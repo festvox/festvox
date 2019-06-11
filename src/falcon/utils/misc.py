@@ -1,4 +1,4 @@
-from nnmnkwii.datasets import FileSourceDataset, FileDataSource
+#from nnmnkwii.datasets import FileSourceDataset, FileDataSource
 from os.path import join, expanduser
 from collections import defaultdict
 import numpy as np
