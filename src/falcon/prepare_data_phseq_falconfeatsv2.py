@@ -12,6 +12,9 @@ python3.5 $FALCONDIR/prepare_data_phseq_falconfeatsv2.py ehmm/etc/txt.phseq.data
 
 '''
 
+### Flags
+generate_feats_flag = 0
+
 tdd_file  = sys.argv[1]
 vox_dir = sys.argv[2]
 wav_dir = vox_dir + '/wav'
@@ -25,9 +28,13 @@ assure_path_exists(lspec_dir)
 assure_path_exists(feats_dir)
 assure_path_exists(phones_dir)
 
-data_file = vox_dir + '/etc/txt.done.data.tacotron.phseq'
-g = open(data_file , 'w')
-g.close()
+if generate_feats_flag:
+  data_file = vox_dir + '/etc/txt.done.data.tacotron.phseq'
+  g = open(data_file , 'w')
+  g.close()
+
+
+
 
 desc_file = vox_dir + '/etc/falcon_feats.desc'
 g = open(desc_file , 'w')
@@ -45,30 +52,29 @@ for line in f:
     fname = line.split()[0]
     phones = ' '.join(k for k in line.split()[1:])
 
-    wav_fname = wav_dir + '/' + fname + '.wav'
+    if generate_feats_flag:
+       wav_fname = wav_dir + '/' + fname + '.wav'
+       wav = audio.load_wav(wav_fname)
+       max_samples = _max_out_length * 5 / 1000 * 16000
+       spectrogram = audio.spectrogram(wav).astype(np.float32)
+       n_frames = spectrogram.shape[1]
+       mel_spectrogram = audio.melspectrogram(wav).astype(np.float32)
+       lspec_fname = lspec_dir + '/' + fname + '_lspec.npy'
+       mspec_fname = mspec_dir + '/' + fname + '_mspec.npy'
+       np.save(lspec_fname, spectrogram.T, allow_pickle=False)
+       np.save(mspec_fname, mel_spectrogram.T, allow_pickle=False)
 
-    wav = audio.load_wav(wav_fname)
-    max_samples = _max_out_length * 5 / 1000 * 16000
-    spectrogram = audio.spectrogram(wav).astype(np.float32)
-    n_frames = spectrogram.shape[1]
-    mel_spectrogram = audio.melspectrogram(wav).astype(np.float32)
-    lspec_fname = lspec_dir + '/' + fname + '_lspec.npy'
-    mspec_fname = mspec_dir + '/' + fname + '_mspec.npy'
+       g = open(data_file, 'a')
+       g.write(lspec_fname + '|' + mspec_fname + '|' + str(n_frames) + '| ' + phones  + '\n')
+       g.close()
+
+       g = open(feats_dir + '/' + fname + '.feats', 'w')
+       for phone in phones.split():
+          g.write(phone + '\n')
+       g.close()
 
     if ctr % 100 == 1:
        print("Processed ", ctr, "lines")
-
-    np.save(lspec_fname, spectrogram.T, allow_pickle=False)
-    np.save(mspec_fname, mel_spectrogram.T, allow_pickle=False)
-
-    g = open(data_file, 'a')
-    g.write(lspec_fname + '|' + mspec_fname + '|' + str(n_frames) + '| ' + phones  + '\n')
-    g.close()
-
-    g = open(feats_dir + '/' + fname + '.feats', 'w')
-    for phone in phones.split():
-        g.write(phone + '\n')
-    g.close()
 
     g = open(phones_dir + '/' + fname + '.feats', 'w')
     ph = ' '.join(k for k in phones.split())

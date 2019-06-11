@@ -4,20 +4,17 @@ from collections import defaultdict
 import numpy as np
 import torch
 from .audio import *
-import sys,os
-
-from torch.utils.data import Dataset
-from torch.utils.data import DataLoader
+import sys
 
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 
-def assure_path_exists(path):
-    if not os.path.exists(path):
-        os.makedirs(path)
-        print("Made the directory ", path) 
+
+# Default DATA_ROOT
+DATA_ROOT = join(expanduser("~"), "tacotron", "training")
+
 
 def plot_alignment(alignment, path, info=None):
   fig, ax = plt.subplots()
@@ -35,15 +32,6 @@ def plot_alignment(alignment, path, info=None):
   plt.tight_layout()
   plt.savefig(path, format='png')
   plt.close()
-
-def make_phids_phseq(file):
-    ph_ids =  defaultdict(lambda: len(ph_ids))
-    f = open(file)
-    for line in f:
-        line = line.split('\n')[0].split()[1:]
-        for ph in line:
-            _ = ph_ids[ph]
-    return ph_ids
 
 def make_phids(file):
     ph_ids =  defaultdict(lambda: len(ph_ids))
@@ -78,12 +66,6 @@ def update_charids(char_ids, file):
         for char in line:
             _ = char_ids[char]
     return char_ids    
-
-def get_padded_1d(seq):
-    lengths = [len(x) for x in seq]
-    max_len = np.max(lengths)
-    return _pad(seq, max_len)
- 
 
 def _pad(seq, max_len):
     #print("Shape of seq: ", seq.shape, " and the max length: ", max_len)     
@@ -180,189 +162,30 @@ class FalconDataSource(object):
         raise NotImplementedError
 
 class FeatDataSource(FalconDataSource):
-
+    
     def __init__(self, tdd_file, data_dir):
         self.tdd_file = tdd_file
 
     def collect_files(self):
-        pass
+        pass 
 
-def get_fnames(fnames_file):
-    filenames_array = []
-    f = open(fnames_file)
-    for line in f:
-      line = line.split('\n')[0]
-      filenames_array.append(line)
-    return filenames_array
-
-def populate_featdict(desc_file):
-    f = open(desc_file)
-    dict = {}
-    dict_featnames = {}
-    idx = 0
-    for line in f:
-       line = line.split('\n')[0] 
-       name, length, type = line.split('|')[0], line.split('|')[1], line.split('|')[2]
-       dict[name + '_length'] = length
-       dict[name + '_type'] = type
-       dict_featnames[idx] = name
-       idx += 1
-    return dict, dict_featnames
-
-
-class CombinedDataSource(Dataset):
-  
-  def __init__(self, list):
-      self.list = list
-      self.num_sets = len(list)
-      
-  def __len__(self):
-      assert len(self.list[0]) == len(self.list[1])
-      return len(self.list[0])
-    
-  def __getitem__(self, idx):
-      return [k[idx] for k in self.list]
-
-  def get_nsets(self):
-      return self.num_sets
-  
-
-class CategoricalDataSource_v1(Dataset):
-    '''Syntax
-    dataset = CategoricalDataSource(fnames.txt.train, etc/falcon_feats.desc, festival/falcon_feats) 
-
-    '''
-
-    def __init__(self, fnames_file, desc_file, feats_dir):
-      self.fnames_file = fnames_file
-      self.feats_dir = feats_dir
-      self.desc_file = desc_file
-      self.filenames_array = get_fnames(self.fnames_file)
-      self.dict_featmetas, self.dict_featnames = populate_featdict(self.desc_file)
-
-    def __getitem__(self, idx):
-        fname = self.filenames_array[idx]
-        f = open(self.feats_dir + '/' + fname + '.feats')
-        phones = []
-        for line in f:
-           line = line.split('\n')[0]
-           feats = line.split('|')
-           if len(feats) > 1:
-              print("Cannot handle multiple feats for now")
-              sys.exit()
-           phones.append(line)
-        print("Length of phones: ", len(phones))
-        return phones
-
-    def __len__(self):
-        return len(self.filenames_array)
-
-def get_featmetainfo(desc_file, feat_name):
-
-    f = open(desc_file)
-    for line in f:
-        line = line.split('\n')[0]
-        feat = line.split('|')[0]
-        if feat_name == feat:
-           feat_length, feat_type = line.split('|')[1], line.split('|')[2]
-           return feat_length,feat_type 
-
-def populate_featarray(fname, feats_dir, feats_dict):
-    feats_array = []
-    f = open(fname)
-    for line in f:
-        line = line.split('\n')[0]
-        feats  = line.split()
-        for feat in feats:
-            feats_array.append(feats_dict[feat])
-    feats_array = np.array(feats_array)
-    return feats_array
-
-class CategoricalDataSource(Dataset):
-    '''Syntax
-    dataset = CategoricalDataSource(fnames.txt.train, etc/falcon_feats.desc, feat_name, feats_dir)
-
-    '''
-
-    def __init__(self, fnames_file, desc_file, feat_name, feats_dir, feats_dict = None):
-      self.fnames_file = fnames_file
-      self.feat_name = feat_name
-      self.desc_file = desc_file
-      self.filenames_array = get_fnames(self.fnames_file)
-      self.feat_length, self.feat_type = get_featmetainfo(self.desc_file, feat_name)
-      self.feats_dir = feats_dir
-      self.feats_dict = defaultdict(lambda: len(self.feats_dict)) if feats_dict is None else feats_dict
-
-    def __getitem__(self, idx):
-
-        assert self.feat_type == 'categorical'
-        fname = self.filenames_array[idx]
-        fname = self.feats_dir + '/' + fname + '.feats'
-        feats_array = populate_featarray(fname, self.feats_dir, self.feats_dict) 
-        return feats_array
-
-    def __len__(self):
-        return len(self.filenames_array)
-
-
-def collate_fn_1d(batch):
-    """Create batch"""
-
-    input_lengths = [len(x) for x in batch]
-    max_input_len = np.max(input_lengths) + 1
-
-    a = np.array([_pad(x, max_input_len) for x in batch], dtype=np.int)
-    x_batch = torch.LongTensor(a)
-
-    return x_batch
-
-
-class CombinedDataset(Dataset):
-   
-    def __init__(self, list):
-        self.list = list
-        assert len(list[0]) == len(list[1])
-
-    def combine_datasets(self):
-        num_sets = len(self.list)
-        
-    def __len__(self):
-       return len(self.list[0])
-
-    def __getitem__(self, idx):
-       return [k[idx] for k in self.list]
-
-
-def collate_fn_combined(batch):
-    num_sets = len(batch[0])
-    batches = []
-    print("The number of sets", num_sets)
-    for n in range(num_sets):
-        dim = len(batch[0][n].shape)
-        print("Processing set ", n, "Dimensions are ", dim)
-        batch1 = get_padded_1d(batch[:][n])
-        batches.append(torch.tensor(batch1))
-    return batches
 
 class TextDataSource(DataSource):
 
-    def __init__(self, data_dir, charids, tdd_file):
+    def __init__(self, data_dir, charids):
+        self.charids = defaultdict(lambda: len(self.charids))
         self.charids = charids
         self.data_dir = data_dir
-        self.tdd_file = tdd_file
 
     def collect_files(self):
-        meta = join(self.data_dir, self.tdd_file)
+        meta = join(self.data_dir, "txt.done.data.tacotron")
         with open(meta, "rb") as f:
             lines = f.readlines()
         lines = list(map(lambda l: l.decode("utf-8").split("|")[-1], lines))
         return lines
 
     def collect_features(self, text):
-        #print("I got this as text: ", text)
-        #print(self.charids)
-        #sys.exit()
-        text_ids = ' '.join(str(self.charids[k]) for k in text.strip()).split()
+        text_ids = ' '.join(str(self.charids[k]) for k in text).split()
         return np.asarray(text_ids,
                           dtype=np.int32)
 
@@ -415,13 +238,12 @@ class ToneDataSource(DataSource):
         return self.charids
 
 class _NPYDataSource(DataSource):
-    def __init__(self, data_dir, col, tdd_file):
+    def __init__(self, data_dir, col):
         self.col = col
         self.data_dir = data_dir
-        self.tdd_file = tdd_file
 
     def collect_files(self):
-        meta = join(self.data_dir, self.tdd_file)
+        meta = join(self.data_dir, "txt.done.data.tacotron")
         with open(meta, "rb") as f:
             lines = f.readlines()
         lines = list(map(lambda l: l.decode("utf-8").split("|")[self.col], lines))
@@ -434,13 +256,13 @@ class _NPYDataSource(DataSource):
 
 
 class MelSpecDataSource(_NPYDataSource):
-    def __init__(self, data_dir, tdd_file):
-        super(MelSpecDataSource, self).__init__(data_dir, 1, tdd_file)
+    def __init__(self, data_dir):
+        super(MelSpecDataSource, self).__init__(data_dir, 1)
 
 
 class LinearSpecDataSource(_NPYDataSource):
-    def __init__(self, data_dir, tdd_file):
-        super(LinearSpecDataSource, self).__init__(data_dir, 0, tdd_file)
+    def __init__(self, data_dir):
+        super(LinearSpecDataSource, self).__init__(data_dir, 0)
 
 
 class PyTorchDataset(object):
