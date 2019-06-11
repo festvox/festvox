@@ -47,3 +47,7 @@ python3.5 $FALCONDIR/train_tacotronone.py --data-root data/dataprep_tacotron1 --
 
 ### Test Baseline Model
 python3.5 $FALCONDIR/synthesize_tacotronone.py checkpoints/checkpoint_step70000.pth data/dataprep_tacotron1/test.txt test/tacotronone
+
+
+### Train Falcon features model
+python3.5 $FALCONDIR/train_tacotronone_falconfeatsnomasking.py --data-root ./etc --checkpoint-dir checkpoints_unittest #> log_categoricalfeatureloading 2>&1&
