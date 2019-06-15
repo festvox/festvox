@@ -119,7 +119,8 @@ if __name__ == "__main__":
                     textcheck.append('UNK')
             text = [charids[l] for l in textcheck]
             print("{}: {} ({} chars, {} words)".format(idx, text, len(text), len(words)))
-            sys.exit()
+            print(text, textcheck, fname)
+            #sys.exit()
 
             waveform, alignment, _ = tts(model, text)
             dst_wav_path = join(dst_dir, "{}{}.wav".format(fname, file_name_suffix))

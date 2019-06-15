@@ -68,7 +68,7 @@ class Decoder_TacotronOne(nn.Module):
               attention masking.
         """
         B = encoder_outputs.size(0)
-
+      
         processed_memory = self.memory_layer(encoder_outputs)
         if memory_lengths is not None:
             mask = get_mask_from_lengths(processed_memory, memory_lengths)
@@ -111,6 +111,12 @@ class Decoder_TacotronOne(nn.Module):
             if t > 0:
                 current_input = outputs[-1] if greedy else inputs[t - 1]
             # Prenet
+            ####### Sai Krishna Rallabandi 15 June 2019 #####################
+            #print("Shape of input to the decoder prenet: ", current_input.shape)
+            if len(current_input.shape) < 3:
+               current_input = current_input.unsqueeze(1)
+            #################################################################
+ 
             current_input = self.prenet(current_input)
 
             # Attention RNN
@@ -188,6 +194,7 @@ class TacotronOne(nn.Module):
             memory_lengths = input_lengths
         else:
             memory_lengths = None
+ 
         # (B, T', mel_dim*r)
         mel_outputs, alignments = self.decoder(
             encoder_outputs, targets, memory_lengths=memory_lengths)
@@ -216,7 +223,7 @@ class TacotronOne(nn.Module):
         inputs = self.embedding(inputs)
         # (B, T', in_dim)
         encoder_outputs = self.encoder(inputs, input_lengths)
-
+        #print("Shape of encoder outputs: ", encoder_outputs.shape)
         memory_lengths = None
 
         mel_outputs, alignments = self.decoder(
@@ -475,3 +482,27 @@ class Wavenet_Barebones(nn.Module):
        outputs = torch.stack(outputs)
        samples = torch.stack(samples)
        return outputs
+
+
+
+class Encoder_TacotronOneSeqwise(Encoder_TacotronOne):
+    def __init__(self, in_dim):
+        super(Encoder_TacotronOneSeqwise, self).__init__(in_dim)
+        self.prenet = Prenet_seqwise(in_dim, sizes=[256, 128])
+
+
+class Decoder_TacotronOneSeqwise(Decoder_TacotronOne):
+    def __init__(self, in_dim, r):
+        super(Decoder_TacotronOneSeqwise, self).__init__(in_dim, r)
+        self.prenet = Prenet_seqwise(in_dim * r, sizes=[256, 128])
+
+
+class TacotronOneSeqwise(TacotronOne):
+
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False):
+        super(TacotronOneSeqwise, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False)
+        #self.encoder = Encoder_TacotronOneSeqwise(embedding_dim)
+        self.decoder = Decoder_TacotronOneSeqwise(mel_dim, r)
+

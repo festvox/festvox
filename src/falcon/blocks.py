@@ -65,6 +65,11 @@ class AttentionWrapper(nn.Module):
             mask = get_mask_from_lengths(memory, memory_lengths)
 
         # Concat input query and previous attention context
+        ######### Sai Krishna 15 June 2019 #####################
+        if len(query.shape) > 2: 
+              query = query.squeeze(1)
+        #print("Shapes of query and attention: ", query.shape, attention.shape)
+        ##########################################################
         cell_input = torch.cat((query, attention), -1)
 
         # Feed it to RNN
@@ -102,6 +107,22 @@ class Prenet(nn.Module):
 
     def forward(self, inputs):
         for linear in self.layers:
+            inputs = self.dropout(self.relu(linear(inputs)))
+        return inputs
+
+class Prenet_seqwise(nn.Module):
+    def __init__(self, in_dim, sizes=[256, 128]):
+        super(Prenet_seqwise, self).__init__()
+        in_sizes = [in_dim] + sizes[:-1]
+        self.layers = nn.ModuleList(
+            [SequenceWise(nn.Linear(in_size, out_size))
+             for (in_size, out_size) in zip(in_sizes, sizes)])
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(0.5)
+
+    def forward(self, inputs):
+        for linear in self.layers:
+            #print("Shape of inputs: ", inputs.shape)
             inputs = self.dropout(self.relu(linear(inputs)))
         return inputs
 

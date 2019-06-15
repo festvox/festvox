@@ -70,7 +70,7 @@ def make_charids(file):
         line = line.split('\n')[0].split('|')[-1]
         for char in line:
             _ = char_ids[char]
-    return char_ids    
+    return char_ids
 
 def make_charids_tdd(file):
     char_ids =  defaultdict(lambda: len(char_ids))
@@ -80,7 +80,6 @@ def make_charids_tdd(file):
         for char in line:
             _ = char_ids[char]
     return char_ids
-
 
 def update_charids(char_ids, file):
     f = open(file)
@@ -289,6 +288,17 @@ def populate_featarray(fname, feats_dir, feats_dict):
     feats_array = np.array(feats_array)
     return feats_array
 
+def populate_textarray(fname, feats_dir, feats_dict):
+    feats_array = []
+    f = open(fname)
+    for line in f:
+        line = line.split('\n')[0]
+        feats  = line
+        for feat in feats:
+            feats_array.append(feats_dict[feat])
+    feats_array = np.array(feats_array)
+    return feats_array
+
 class CategoricalDataSource(Dataset):
     '''Syntax
     dataset = CategoricalDataSource(fnames.txt.train, etc/falcon_feats.desc, feat_name, feats_dir)
@@ -309,6 +319,8 @@ class CategoricalDataSource(Dataset):
         assert self.feat_type == 'categorical'
         fname = self.filenames_array[idx]
         fname = self.feats_dir + '/' + fname + '.feats'
+        if self.feat_name == 'text':
+            return populate_textarray(fname, self.feats_dir, self.feats_dict)
         feats_array = populate_featarray(fname, self.feats_dir, self.feats_dict) 
         return feats_array
 

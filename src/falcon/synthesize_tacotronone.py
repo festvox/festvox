@@ -16,6 +16,10 @@ import sys
 import os
 import re
 os.environ["CUDA_VISIBLE_DEVICES"]='1'
+### This is not supposed to be hardcoded #####
+FALCON_DIR = os.environ.get('FALCONDIR')
+sys.path.append(FALCON_DIR)
+
 from os.path import dirname, join
 from utils import audio
 from utils.plot import plot_alignment
@@ -26,6 +30,7 @@ import numpy as np
 import nltk
 
 from models import TacotronOne as Tacotron
+from models import TacotronOneSeqwise as Tacotron
 
 from hparams_arctic import hparams
 
@@ -44,7 +49,7 @@ def tts(model, text):
         model = model.cuda()
     # TODO: Turning off dropout of decoder's prenet causes serious performance
     # regression, not sure why.
-    # model.decoder.eval()
+    model.decoder.eval()
     model.encoder.eval()
     model.postnet.eval()
 
@@ -78,7 +83,8 @@ if __name__ == "__main__":
 
     checkpoint = torch.load(checkpoint_path)
     checkpoints_dir = os.path.dirname(checkpoint_path)
-    with open(checkpoints_dir + '/ids.json') as  f:
+
+    with open('etc/ids.json') as  f:
        charids = json.load(f)
 
     model = Tacotron(n_vocab=len(charids)+1,
@@ -91,10 +97,12 @@ if __name__ == "__main__":
                      )
     checkpoint = torch.load(checkpoint_path)
     checkpoints_dir = os.path.dirname(checkpoint_path)
-    with open(checkpoints_dir + '/ids.json') as  f:
+    #with open(checkpoints_dir + '/ids.json') as  f:
+    #   charids = json.load(f)
+    with open('etc/ids.json') as  f:
        charids = json.load(f)
     charids = dict(charids)
-
+    ids2chars = {v:k for (k,v) in charids.items()}
     model.load_state_dict(checkpoint["state_dict"])
     model.decoder.max_decoder_steps = max_decoder_steps
 
@@ -110,9 +118,12 @@ if __name__ == "__main__":
             step = os.path.basename(checkpoint_path).split('.')[0].split('_')[-1]
             fname += '_' + step
             print(text, fname)
-            text = '< ' + text + ' >' 
+            #text = '< ' +  ' '.join(k for k in text) + ' >'
+            text = '< ' +  text + ' >' 
             text = [charids[l] for l in text]
-            print("{}: {} ({} chars, {} words)".format(idx, text, len(text), len(words)))
+            print("{}: {} ({} chars, {} words)".format(idx, text, ''.join(ids2chars[k] for k in text), len(text), len(words)))
+            #sys.exit()
+
             waveform, alignment, _ = tts(model, text)
             dst_wav_path = join(dst_dir, "{}{}.wav".format(fname, file_name_suffix))
             dst_alignment_path = join(dst_dir, "{}_alignment.png".format(fname))
