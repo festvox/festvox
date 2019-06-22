@@ -162,6 +162,130 @@ class Decoder_TacotronOne(nn.Module):
         return outputs, alignments
 
 
+    def forward_multispeaker(self, encoder_outputs, spk_batch, inputs=None, memory_lengths=None):
+        """
+        Decoder forward step.
+        If decoder inputs are not given (e.g., at testing time), as noted in
+        Tacotron paper, greedy decoding is adapted.
+        Args:
+            encoder_outputs: Encoder outputs. (B, T_encoder, dim)
+            inputs: Decoder inputs. i.e., mel-spectrogram. If None (at eval-time),
+              decoder outputs are used as decoder inputs.
+            memory_lengths: Encoder output (memory) lengths. If not None, used for
+              attention masking.
+        """
+        B = encoder_outputs.size(0)
+        #print("Shape of encoders and spk: ", encoder_outputs.shape, spk_batch.shape) 
+        assert B == spk_batch.shape[0]
+
+        spk_embedding = self.spk_embedding(spk_batch)
+        spk_embedding = self.spk_linear(spk_embedding)
+
+        processed_memory = self.memory_layer(encoder_outputs)
+        if memory_lengths is not None:
+            mask = get_mask_from_lengths(processed_memory, memory_lengths)
+        else:
+            mask = None
+
+        # Run greedy decoding if inputs is None
+        greedy = inputs is None
+
+        if inputs is not None:
+            # Grouping multiple frames if necessary
+            if inputs.size(-1) == self.in_dim:
+                inputs = inputs.view(B, inputs.size(1) // self.r, -1)
+            assert inputs.size(-1) == self.in_dim * self.r
+            T_decoder = inputs.size(1)
+
+        # go frames
+        initial_input = Variable(
+            encoder_outputs.data.new(B, self.in_dim * self.r).zero_())
+        
+
+        # Init decoder states
+        attention_rnn_hidden = Variable(
+            encoder_outputs.data.new(B, 256).zero_())
+        decoder_rnn_hiddens = [Variable(
+            encoder_outputs.data.new(B, 256).zero_())
+            for _ in range(len(self.decoder_rnns))]
+        current_attention = Variable(
+            encoder_outputs.data.new(B, 256).zero_())
+
+        # Time first (T_decoder, B, in_dim)
+        if inputs is not None:
+            inputs = inputs.transpose(0, 1)
+
+        outputs = []
+        alignments = []
+
+        t = 0
+        current_input = initial_input
+        #print("Shape of initial_input and the speaker embedding: ", initial_input.shape, spk_embedding.shape)
+        #### Cat the speaker embedding #########
+        initial_input = torch.cat([initial_input, spk_embedding], dim = 1)
+        current_input = torch.tanh(self.cond2inp(initial_input))
+        ########################################
+
+        while True:
+            if t > 0:
+                current_input = outputs[-1] if greedy else inputs[t - 1]
+                current_input = torch.cat([current_input, spk_embedding], dim = 1)        
+                current_input = torch.tanh(self.cond2inp(current_input))
+            # Prenet
+            ####### Sai Krishna Rallabandi 15 June 2019 #####################
+            #print("Shape of input to the decoder prenet: ", current_input.shape)
+            if len(current_input.shape) < 3:
+               current_input = current_input.unsqueeze(1)
+            #################################################################
+ 
+            current_input = self.prenet(current_input)
+
+            # Attention RNN
+            attention_rnn_hidden, current_attention, alignment = self.attention_rnn(
+                current_input, current_attention, attention_rnn_hidden,
+                encoder_outputs, processed_memory=processed_memory, mask=mask)
+
+            # Concat RNN output and attention context vector
+            decoder_input = self.project_to_decoder_in(
+                torch.cat((attention_rnn_hidden, current_attention), -1))
+
+            # Pass through the decoder RNNs
+            for idx in range(len(self.decoder_rnns)):
+                decoder_rnn_hiddens[idx] = self.decoder_rnns[idx](
+                    decoder_input, decoder_rnn_hiddens[idx])
+                # Residual connectinon
+                decoder_input = decoder_rnn_hiddens[idx] + decoder_input
+
+            #print("Shape of decoder input and spk_embeding: ", decoder_input.shape, spk_embedding.shape)
+            decoder_output = torch.cat([decoder_input, spk_embedding], dim = -1)
+            output = self.proj_to_mel(decoder_output)
+
+            outputs += [output]
+            alignments += [alignment]
+
+            t += 1
+
+            if greedy:
+                if t > 1 and is_end_of_frames(output):
+                    break
+                elif t > self.max_decoder_steps:
+                    print("Warning! doesn't seems to be converged")
+                    break
+            else:
+                if t >= T_decoder:
+                    break
+
+        assert greedy or len(outputs) == T_decoder
+
+        # Back to batch first
+        alignments = torch.stack(alignments).transpose(0, 1)
+        outputs = torch.stack(outputs).transpose(0, 1).contiguous()
+
+        return outputs, alignments, spk_embedding
+
+
+
+
 def is_end_of_frames(output, eps=0.2):
     return (output.data <= eps).all()
 
@@ -228,6 +352,27 @@ class TacotronOne(nn.Module):
 
         mel_outputs, alignments = self.decoder(
             encoder_outputs, targets, memory_lengths=memory_lengths)
+
+        mel_outputs = mel_outputs.view(B, -1, self.mel_dim)
+
+        linear_outputs = self.postnet(mel_outputs)
+        linear_outputs = self.last_linear(linear_outputs)
+
+        return mel_outputs, linear_outputs, alignments
+
+
+
+    def forward_nomasking_multispeaker(self, inputs, spk, targets=None, input_lengths=None):
+        B = inputs.size(0)
+
+        inputs = self.embedding(inputs)
+        # (B, T', in_dim)
+        encoder_outputs = self.encoder(inputs, input_lengths)
+        #print("Shape of encoder outputs: ", encoder_outputs.shape)
+        memory_lengths = None
+
+        mel_outputs, alignments = self.decoder.forward_multispeaker(
+            encoder_outputs, spk, targets, memory_lengths=memory_lengths)
 
         mel_outputs = mel_outputs.view(B, -1, self.mel_dim)
 
@@ -497,6 +642,16 @@ class Decoder_TacotronOneSeqwise(Decoder_TacotronOne):
         self.prenet = Prenet_seqwise(in_dim * r, sizes=[256, 128])
 
 
+class Decoder_TacotronOneMultispeaker(Decoder_TacotronOneSeqwise):
+    def __init__(self, in_dim, r, num_spk):
+        super(Decoder_TacotronOneMultispeaker, self).__init__(in_dim, r)
+        self.spkemb_dim = 128
+        self.spk_embedding = nn.Embedding(num_spk, self.spkemb_dim)
+        self.spk_linear = nn.Linear(self.spkemb_dim, self.spkemb_dim)
+        self.cond2inp = nn.Linear(in_dim * r + self.spkemb_dim  , in_dim * r)
+        self.proj_to_mel = nn.Linear(256 + self.spkemb_dim, in_dim * r)
+
+
 class TacotronOneSeqwise(TacotronOne):
 
     def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
@@ -505,4 +660,38 @@ class TacotronOneSeqwise(TacotronOne):
                  r=5, padding_idx=None, use_memory_mask=False)
         #self.encoder = Encoder_TacotronOneSeqwise(embedding_dim)
         self.decoder = Decoder_TacotronOneSeqwise(mel_dim, r)
+
+
+class TacotronOneMultispeaker(TacotronOneSeqwise):
+
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, num_spk = 5,  padding_idx=None, use_memory_mask=False):
+        super(TacotronOneMultispeaker, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False)
+        self.decoder = Decoder_TacotronOneMultispeaker(mel_dim, r, num_spk)
+        self.last_linear = nn.Linear(mel_dim * 2 + self.decoder.spkemb_dim, linear_dim)
+       
+
+    def forward_nomasking_multispeaker(self, inputs, spk, targets=None, input_lengths=None):
+        B = inputs.size(0)
+
+        inputs = self.embedding(inputs)
+        encoder_outputs = self.encoder(inputs, input_lengths)
+        memory_lengths = None
+
+        mel_outputs, alignments, spk_embedding = self.decoder.forward_multispeaker(
+            encoder_outputs, spk, targets, memory_lengths=memory_lengths)
+
+        mel_outputs = mel_outputs.view(B, -1, self.mel_dim)
+
+        linear_outputs = self.postnet(mel_outputs)
+        #spk_embedding = spk_embedding.repeat(1, linear_outputs.shape[1]).view(spk_embedding.shape[0], linear_outputs.shape[1], spk_embedding.shape[1])
+        spk_embedding = spk_embedding.unsqueeze(-1) if spk_embedding.dim() == 2 else g
+        spk_embedding = spk_embedding.expand(B, -1, linear_outputs.shape[1]).transpose(1,2).contiguous()
+        #print(spk_embedding.shape, linear_outputs.shape)
+        assert spk_embedding.shape[1] == linear_outputs.shape[1]
+        linear_outputs = torch.cat([linear_outputs, spk_embedding], dim = -1)
+        linear_outputs = self.last_linear(linear_outputs)
+
+        return mel_outputs, linear_outputs, alignments
 

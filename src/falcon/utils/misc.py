@@ -1,4 +1,3 @@
-#from nnmnkwii.datasets import FileSourceDataset, FileDataSource
 from os.path import join, expanduser
 from collections import defaultdict
 import numpy as np
@@ -123,8 +122,8 @@ def save_states(global_step, mel_outputs, linear_outputs, attn, y,
     print("Save intermediate states at step {}".format(global_step))
 
     # idx = np.random.randint(0, len(input_lengths))
-    idx = min(1, len(input_lengths) - 1)
-    input_length = input_lengths[idx]
+    idx = 0
+    #input_length = input_lengths[idx]
 
     # Alignment
     path = join(checkpoint_dir, "step{}_alignment.png".format(
@@ -299,6 +298,42 @@ def populate_textarray(fname, feats_dir, feats_dict):
     feats_array = np.array(feats_array)
     return feats_array
 
+
+class FileNameDataSource(Dataset):
+
+    def __init__(self, fnames_file):
+       self.fnames_file = fnames_file
+       f = open(self.fnames_file)
+       self.fnames_array = []
+       for line in f:
+          line = line.split('\n')[0]
+          self.fnames_array.append(line)
+
+    def __getitem__(self, idx):
+       return self.fnames_array[idx]
+
+    def __len__(self):
+       return len(self.fnames_array)
+
+
+class FileNameDataSource(Dataset):
+
+    def __init__(self, fnames_file):
+       self.fnames_file = fnames_file
+       f = open(self.fnames_file)
+       self.fnames_array = []
+       for line in f:
+          line = line.split('\n')[0]
+          self.fnames_array.append(line)
+
+    def __getitem__(self, idx):
+       return self.fnames_array[idx]
+
+    def __len__(self):
+       return len(self.fnames_array)
+
+
+
 class CategoricalDataSource(Dataset):
     '''Syntax
     dataset = CategoricalDataSource(fnames.txt.train, etc/falcon_feats.desc, feat_name, feats_dir)
@@ -328,6 +363,62 @@ class CategoricalDataSource(Dataset):
         return len(self.filenames_array)
 
 
+class CategoricalDataSource_fnames(Dataset):
+    '''Syntax
+    dataset = CategoricalDataSource(fnames.txt.train, etc/falcon_feats.desc, feat_name, feats_dir)
+
+    '''
+
+    def __init__(self, fnames, desc_file, feat_name, feats_dir, feats_dict = None):
+      self.fnames = fnames
+      self.feat_name = feat_name
+      self.desc_file = desc_file
+      self.feat_length, self.feat_type = get_featmetainfo(self.desc_file, feat_name)
+      self.feats_dir = feats_dir
+      self.feats_dict = defaultdict(lambda: len(self.feats_dict)) if feats_dict is None else feats_dict
+
+    def __getitem__(self, idx):
+
+        assert self.feat_type == 'categorical'
+        fname = self.fnames[idx]
+        fname = self.feats_dir + '/' + fname + '.feats'
+        if self.feat_name == 'text':
+            return populate_textarray(fname, self.feats_dir, self.feats_dict)
+
+    def __len__(self):
+        return len(self.fnames)
+
+class CategoricalDataSource_fnames_multispeaker(Dataset):
+    '''Syntax
+    dataset = CategoricalDataSource(fnames.txt.train, etc/falcon_feats.desc, feat_name, feats_dir)
+
+    '''
+
+    def __init__(self, fnames, desc_file, feat_name, feats_dir, feats_dict = None, spk_dict = None):
+      self.fnames = fnames
+      self.feat_name = feat_name
+      self.desc_file = desc_file
+      self.feat_length, self.feat_type = get_featmetainfo(self.desc_file, feat_name)
+      self.feats_dir = feats_dir
+      self.feats_dict = defaultdict(lambda: len(self.feats_dict)) if feats_dict is None else feats_dict
+      self.spk_dict = defaultdict(lambda: len(self.spk_dict)) if spk_dict is None else spk_dict
+
+    def __getitem__(self, idx):
+
+        assert self.feat_type == 'categorical'
+        fname = self.fnames[idx]
+        spk = fname.split('_')[0]
+        spk = self.spk_dict[spk]
+        fname = self.feats_dir + '/' + fname + '.feats'
+        if self.feat_name == 'text':
+            return populate_textarray(fname, self.feats_dir, self.feats_dict), spk
+
+    def __len__(self):
+        return len(self.fnames)
+
+    def get_spkdict(self):
+        return self.spk_dict
+
 class FloatDataSource(Dataset):
     '''Syntax
     dataset = CategoricalDataSource(fnames.txt.train, etc/falcon_feats.desc, feat_name, feats_dir)
@@ -352,6 +443,31 @@ class FloatDataSource(Dataset):
 
     def __len__(self):
         return len(self.filenames_array)
+
+
+class FloatDataSource_fnames(Dataset):
+    '''Syntax
+    dataset = CategoricalDataSource(fnames.txt.train, etc/falcon_feats.desc, feat_name, feats_dir)
+
+    '''
+
+    def __init__(self, fnames, desc_file, feat_name, feats_dir, feats_dict = None):
+      self.fnames = fnames
+      self.feat_name = feat_name
+      self.desc_file = desc_file
+      self.feat_length, self.feat_type = get_featmetainfo(self.desc_file, feat_name)
+      self.feats_dir = feats_dir
+      self.feats_dict = defaultdict(lambda: len(self.feats_dict)) if feats_dict is None else feats_dict
+
+    def __getitem__(self, idx):
+
+        fname = self.fnames[idx]
+        fname = self.feats_dir + '/' + fname + '.feats.npy'
+        feats_array = np.load(fname)
+        return feats_array
+
+    def __len__(self):
+        return len(self.fnames)
 
 
 def collate_fn_1d(batch):
@@ -519,6 +635,52 @@ class PyTorchDataset(object):
     def __len__(self):
         return len(self.X)
 
+class PyTorchDataset_XY(object):
+    def __init__(self, X,  Y):
+        self.X = X
+        self.Y = Y
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.Y[idx]
+
+    def __len__(self):
+        return len(self.X)
+
+class PyTorchDataset_XYspk(object):
+    def __init__(self, X,  Y):
+        self.X = X
+        self.Y = Y
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.Y[idx]
+
+    def __len__(self):
+        return len(self.X)
+
+class PyTorchDataset_XMelY(object):
+    def __init__(self, X, Mel,  Y):
+        self.X = X
+        self.Mel = Mel
+        self.Y = Y
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.Mel[idx], self.Y[idx]
+
+    def __len__(self):
+        return len(self.X)
+
+class PyTorchDataset_XspkMelY(object):
+    def __init__(self, X, Mel,  Y):
+        self.X = X
+        self.Mel = Mel
+        self.Y = Y
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.Mel[idx], self.Y[idx]
+
+    def __len__(self):
+        return len(self.X)
+
 class PyTorchDataset_tones(object):
     def __init__(self, X, Mel, Y, tones):
         self.X = X
@@ -566,6 +728,80 @@ def collate_fn(batch):
     return x_batch, input_lengths, mel_batch, y_batch
 
 
+def collate_fn_xy(batch):
+    """Create batch"""
+    r = 5
+    input_lengths = [len(x[0]) for x in batch]
+    max_input_len = np.max(input_lengths) + 1
+    # Add single zeros frame at least, so plus 1
+    max_target_len = np.max([len(x[1]) for x in batch]) + 1
+    if max_target_len % r != 0:
+        max_target_len += r - max_target_len % r
+        assert max_target_len % r == 0
+
+    a = np.array([_pad(x[0], max_input_len) for x in batch], dtype=np.int)
+    x_batch = torch.LongTensor(a)
+
+    b = np.array([_pad_2d(x[1], max_target_len) for x in batch],
+                 dtype=np.float32)
+    y_batch = torch.FloatTensor(b)
+
+    return x_batch,  y_batch
+
+
+def collate_fn_xyspk(batch):
+    """Create batch"""
+    #print(batch[0])
+    #sys.exit()
+    r = 5
+    input_lengths = [len(x[0]) for (x,y) in batch]
+    max_input_len = np.max(input_lengths) + 1
+    # Add single zeros frame at least, so plus 1
+    max_target_len = np.max([len(y) for (x,y) in batch]) + 1
+    if max_target_len % r != 0:
+        max_target_len += r - max_target_len % r
+        assert max_target_len % r == 0
+
+    a = np.array([_pad(x[0], max_input_len) for (x,y) in batch], dtype=np.int)
+    x_batch = torch.LongTensor(a)
+
+    b = np.array([_pad_2d(y, max_target_len) for (x,y) in batch],
+                 dtype=np.float32)
+    y_batch = torch.FloatTensor(b)
+
+    spk_batch = np.array([x[1] for (x,y) in batch])
+    return x_batch,  spk_batch, y_batch
+
+
+def collate_fn_xspkmely(batch):
+    """Create batch"""
+    #print(batch[0])
+    #sys.exit()
+    r = 5
+    input_lengths = [len(x[0]) for (x, mel, y) in batch]
+    max_input_len = np.max(input_lengths) + 1
+    # Add single zeros frame at least, so plus 1
+    max_target_len = np.max([len(y) for (x,mel,y) in batch]) + 1
+    if max_target_len % r != 0:
+        max_target_len += r - max_target_len % r
+        assert max_target_len % r == 0
+
+    a = np.array([_pad(x[0], max_input_len) for (x,mel, y) in batch], dtype=np.int)
+    x_batch = torch.LongTensor(a)
+
+    b = np.array([_pad_2d(y, max_target_len) for (x,mel, y) in batch],
+                 dtype=np.float32)
+    y_batch = torch.FloatTensor(b)
+
+    c = np.array([_pad_2d(mel, max_target_len) for (x,mel, y) in batch],
+                 dtype=np.float32)
+    mel_batch = torch.FloatTensor(c)
+    input_lengths = torch.LongTensor(input_lengths)
+
+    spk_batch = np.array([x[1] for (x,mel, y) in batch])
+    spk_batch = torch.LongTensor(spk_batch)
+
+    return x_batch, spk_batch, input_lengths, mel_batch, y_batch
 
 def collate_fn_tones(batch):
     """Create batch"""
@@ -612,3 +848,70 @@ def collate_fn_tones(batch):
     return x_batch, xtone_batch, input_lengths, mel_batch, y_batch
 
 
+
+class DataParallelFix(torch.nn.DataParallel):
+    """
+    Temporary workaround for https://github.com/pytorch/pytorch/issues/15716.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self._replicas = None
+        self._outputs = None
+
+    def forward(self, *inputs, **kwargs):
+        if not self.device_ids:
+            return self.module(*inputs, **kwargs)
+
+        for t in chain(self.module.parameters(), self.module.buffers()):
+            if t.device != self.src_device_obj:
+                raise RuntimeError(
+                    "module must have its parameters and buffers "
+                    "on device {} (device_ids[0]) but found one of "
+                    "them on device: {}".format(self.src_device_obj,
+                                                t.device))
+
+        inputs, kwargs = self.scatter(inputs, kwargs, self.device_ids)
+        if len(self.device_ids) == 1:
+            return self.module(*inputs[0], **kwargs[0])
+
+        self._replicas = self.replicate(self.module,
+                                  self.device_ids[:len(inputs)])
+        self._outputs = self.parallel_apply(self._replicas, inputs, kwargs)
+
+        return self.gather(self._outputs, self.output_device)
+
+class DataParallelFix(torch.nn.DataParallel):
+
+    """
+    Temporary workaround for https://github.com/pytorch/pytorch/issues/15716.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self._replicas = None
+        self._outputs = None
+
+    def forward(self, *inputs, **kwargs):
+        if not self.device_ids:
+            return self.module(*inputs, **kwargs)
+
+        for t in chain(self.module.parameters(), self.module.buffers()):
+            if t.device != self.src_device_obj:
+                raise RuntimeError(
+                    "module must have its parameters and buffers "
+                    "on device {} (device_ids[0]) but found one of "
+                    "them on device: {}".format(self.src_device_obj,
+                                                t.device))
+
+        inputs, kwargs = self.scatter(inputs, kwargs, self.device_ids)
+        if len(self.device_ids) == 1:
+            return self.module(*inputs[0], **kwargs[0])
+
+        self._replicas = self.replicate(self.module,
+                                  self.device_ids[:len(inputs)])
+        self._outputs = self.parallel_apply(self._replicas, inputs, kwargs)
+
+        return self.gather(self._outputs, self.output_device)

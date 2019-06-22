@@ -61,4 +61,4 @@ with open(idsdict_file, 'w') as outfile:
   json.dump(ids_dict, outfile)
 
 
-print(ids_dict)
+#print(ids_dict)
