@@ -298,6 +298,61 @@ def populate_textarray(fname, feats_dir, feats_dict):
     feats_array = np.array(feats_array)
     return feats_array
 
+def populate_indiantextarray(fname, feats_dir, feats_dict):
+    feats_array = []
+    f = open(fname)
+    for line in f:
+        line = line.split('\n')[0]
+        feats  = line.split(',')
+        for feat in feats:
+            feats_array.append(feat)
+    feats_array = np.array(feats_array)
+    return feats_array
+
+# Get the closest item in array
+def get_closest(arr, val):
+   #print("Array is ", arr)
+   arr = np.array(arr)
+   dist_array = abs(arr - val)
+   #print("Dists array is ", dist_array)
+   closest_idx = np.argmin(dist_array)
+   return closest_idx
+
+def populate_subtextarray(fname, feats_dir, char_ids, wordfiles_dir):
+    dur = 4.0
+    f = open(wordfiles_dir + '/' + fname, mode ='r' , encoding ='utf-8')
+    words_array = ['<']
+    starts_array = [0.0]
+    ends_array = []
+    for line in f:
+      content = line.split('\n')[0].split()
+      word = content[0]
+      start = float(content[1])
+      end = float(content[2].strip("'"))
+      words_array.append(word)
+      starts_array.append(start)
+      ends_array.append(end)
+    idx = np.random.rand()
+    words_array.append('>')
+    ends_array.append(ends_array[-1])
+    if float(end) <  dur:
+       #print("End of file is ", end, " and the duration is ", dur)
+       #print(ends_array)
+       #print(words_array)
+       #sys.exit()
+       dur = end
+    idx_point = (float(end) - dur) * idx
+    assert idx_point > -0.9
+    closest_start_idx = get_closest(starts_array, idx_point)
+    closest_end_idx  = get_closest(ends_array, idx_point + dur)
+    cnt = ','.join(k if k != '0' else '' for k in words_array[closest_start_idx:closest_end_idx+1])
+    char_ints = ','.join(str(char_ids[k]) for k in cnt)
+    closest_start_time = starts_array[closest_start_idx]
+    closest_end_time = ends_array[closest_end_idx]
+
+    return (char_ints, closest_start_time, closest_end_time)
+
+
 
 class FileNameDataSource(Dataset):
 
@@ -342,9 +397,11 @@ class CategoricalDataSource(Dataset):
 
     def __init__(self, fnames_file, desc_file, feat_name, feats_dir, feats_dict = None):
       self.fnames_file = fnames_file
+      print("Fnames file is ", self.fnames_file)
       self.feat_name = feat_name
       self.desc_file = desc_file
       self.filenames_array = get_fnames(self.fnames_file)
+      print("Feat name is ", feat_name)
       self.feat_length, self.feat_type = get_featmetainfo(self.desc_file, feat_name)
       self.feats_dir = feats_dir
       self.feats_dict = defaultdict(lambda: len(self.feats_dict)) if feats_dict is None else feats_dict
@@ -356,11 +413,30 @@ class CategoricalDataSource(Dataset):
         fname = self.feats_dir + '/' + fname + '.feats'
         if self.feat_name == 'text':
             return populate_textarray(fname, self.feats_dir, self.feats_dict)
+        elif self.feat_name == 'indiantext':
+            return populate_indiantextarray(fname, self.feats_dir, self.feats_dict)
         feats_array = populate_featarray(fname, self.feats_dir, self.feats_dict) 
         return feats_array
 
     def __len__(self):
         return len(self.filenames_array)
+
+
+class SubTextDataSource(CategoricalDataSource):
+
+    def __init__(self, fnames_file, desc_file, feat_name, feats_dir, feats_dict = None, dur_dir = None):
+        super(SubTextDataSource, self).__init__(fnames_file, desc_file, feat_name, feats_dir, feats_dict)
+
+        self.dur_dir = dur_dir
+     
+    def __getitem__(self, idx):
+
+        assert self.feat_type == 'categorical'
+        fname = self.filenames_array[idx]
+        fname = fname + '.dur'
+        if self.feat_name == 'subtext':
+            return populate_subtextarray(fname, self.feats_dir, self.feats_dict, self.dur_dir)
+
 
 
 class CategoricalDataSource_fnames(Dataset):
@@ -726,6 +802,50 @@ def collate_fn(batch):
                  dtype=np.float32)
     y_batch = torch.FloatTensor(c)
     return x_batch, input_lengths, mel_batch, y_batch
+
+# We get (x_array, start-time, end_time), y, mel
+def collate_fn_subtext(batch):
+    """Create batch"""
+    r = 5
+
+    x_array = [x for (x,_,_) in batch]
+    chars = [x.strip().split(',') for (x,_,_) in x_array]
+    starts = [int( 1000 * x / 12.5)  for (_,x,_) in x_array]
+    ends =  [int( 1000 * x / 12.5) for (_,_,x) in x_array]
+    mels =  [x for (_, x,_) in batch]
+    linears = [x for (_,_,x) in batch]
+    assert len(mels) == len(ends)
+    mels = [mel[start:end] for (mel, start, end) in list(zip(mels,starts,ends))]
+    linears = [linear[start:end] for (linear, start, end) in list(zip(linears,starts,ends))]
+    
+    input_lengths = [len(c) for c in chars]
+    mel_lengths = [len(mel) for mel in mels]
+    #print("Mel lengths: ", mel_lengths, np.all(mel_lengths), chars)
+    if np.all(mel_lengths) is False:
+       print("Check this ", mel_lengths)
+       sys.exit()
+ 
+
+    max_input_len = np.max(input_lengths) + 1
+    # Add single zeros frame at least, so plus 1
+    max_target_len = np.max([len(x) for x in mels]) + 1
+    if max_target_len % r != 0:
+        max_target_len += r - max_target_len % r
+        assert max_target_len % r == 0
+    #print("max target length is ", max_target_len)
+    a = np.array([_pad(c, max_input_len) for c in chars], dtype=np.int)
+    x_batch = torch.LongTensor(a)
+
+    input_lengths = torch.LongTensor(input_lengths)
+    b = np.array([_pad_2d(mel, max_target_len) for mel in mels],
+                 dtype=np.float32)
+    mel_batch = torch.FloatTensor(b)
+
+    c = np.array([_pad_2d(linear, max_target_len) for linear in linears],
+                 dtype=np.float32)
+    y_batch = torch.FloatTensor(c)
+    return x_batch, input_lengths, mel_batch, y_batch
+
 
 
 def collate_fn_xy(batch):

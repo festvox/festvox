@@ -15,7 +15,7 @@ from docopt import docopt
 import sys
 import os
 import re
-os.environ["CUDA_VISIBLE_DEVICES"]='1'
+os.environ["CUDA_VISIBLE_DEVICES"]='0'
 from os.path import dirname, join
 from utils import audio
 from utils.plot import plot_alignment
@@ -44,7 +44,7 @@ def tts(model, text):
         model = model.cuda()
     # TODO: Turning off dropout of decoder's prenet causes serious performance
     # regression, not sure why.
-    # model.decoder.eval()
+    #model.decoder.eval()
     model.encoder.eval()
     model.postnet.eval()
 
@@ -56,7 +56,7 @@ def tts(model, text):
 
     # Greedy decoding
     mel_outputs, linear_outputs, alignments = model(sequence)
-
+    print("Shape of mel outputs: ", mel_outputs.shape)
     linear_output = linear_outputs[0].cpu().data.numpy()
     spectrogram = audio.denormalize(linear_output)
     alignment = alignments[0].cpu().data.numpy()
@@ -99,28 +99,31 @@ if __name__ == "__main__":
     model.decoder.max_decoder_steps = max_decoder_steps
 
     os.makedirs(dst_dir, exist_ok=True)
-
-    with open(text_list_file_path, "rb") as f:
+    #f = open(tdd_file, encoding='utf-8')
+    with open(text_list_file_path,  encoding='utf-8') as f:
         lines = f.readlines()
         for idx, line in enumerate(lines):
-            fname = line.decode("utf-8").split()[0]
-            text =  ' '.join(charids[k] for k in line.split()[1:])
+            fname = line.split()[0]
+            content = ' '.join(k for k in line.split()[1:])
+            text = content
+            print(text)
+            #text =  ' '.join(charids[k] for k in content)
+            #text_ints = ','.join(str(ids_dict[k.lower()]) for k in text)
             #text = re.sub(r'[^\w\s]','', ''.join(k for k in text)) 
             #words = nltk.word_tokenize(text)
             step = os.path.basename(checkpoint_path).split('.')[0].split('_')[-1]
             fname += '_' + step
-            print(text, fname)
-            text = '< ' + text + ' >' 
-            textcheck = []  
+            #print(text_ints, fname)
+            text = '<' + text + ' >' 
+            textcheck = [] 
             for c in text:
                 if c in charids.keys():
                     textcheck.append(c)
                 else:
                     textcheck.append('UNK')
             text = [charids[l] for l in textcheck]
-            print(text, textcheck, fname)
-            sys.exit()
-
+            print(text,  fname)
+            #sys.exit()
             waveform, alignment, _ = tts(model, text)
             dst_wav_path = join(dst_dir, "{}{}.wav".format(fname, file_name_suffix))
             dst_alignment_path = join(dst_dir, "{}_alignment.png".format(fname))

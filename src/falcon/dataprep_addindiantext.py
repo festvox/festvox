@@ -14,7 +14,7 @@ python3.5 $FALCONDIR/dataprep_addtext.py etc/tdd .
 
 tdd_file  = sys.argv[1]
 vox_dir = sys.argv[2]
-feats_dir = vox_dir + '/festival/falcon_text'
+feats_dir = vox_dir + '/festival/falcon_indiantext'
 assure_path_exists(feats_dir)
 desc_file = vox_dir + '/etc/falcon_feats.desc'
 idsdict_file = vox_dir + '/etc/ids.json'
@@ -59,7 +59,7 @@ for line in f:
 
 
 g = open(desc_file, 'a')
-g.write('text|single|categorical' + '\n')
+g.write('indiantext|single|categorical' + '\n')
 g.close()
 
 with open(idsdict_file, 'w') as outfile:
