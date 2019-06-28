@@ -318,6 +318,42 @@ def get_closest(arr, val):
    closest_idx = np.argmin(dist_array)
    return closest_idx
 
+def populate_subtextarray_phones(fname, feats_dir, char_ids, phonefiles_dir):
+    dur = 4.0
+    f = open(phonefiles_dir + '/' + fname, mode ='r' , encoding ='utf-8')
+    phones_array = ['<']
+    starts_array = [0.0]
+    ends_array = []
+    for line in f:
+      content = line.split('\n')[0].split()
+      phone = content[-4]
+      start = float(content[-3])
+      end = float(content[-2])
+      phones_array.append(phone)
+      starts_array.append(start)
+      ends_array.append(end)
+    idx = np.random.rand()
+    phones_array.append('>')
+    ends_array.append(ends_array[-1])
+    if float(end) <  dur:
+       #print("End of file is ", end, " and the duration is ", dur)
+       #print(ends_array)
+       #print(words_array)
+       #sys.exit()
+       dur = end
+    idx_point = (float(end) - dur) * idx
+    assert idx_point > -0.9
+    closest_start_idx = get_closest(starts_array, idx_point)
+    closest_end_idx  = get_closest(ends_array, idx_point + dur)
+    cnt = ' '.join(k if k != '0' else '' for k in phones_array[closest_start_idx:closest_end_idx+1]) 
+    #print(cnt)
+    char_ints = ','.join(str(char_ids[k]) for k in cnt.split())
+    closest_start_time = starts_array[closest_start_idx]
+    closest_end_time = ends_array[closest_end_idx]
+
+    return (char_ints, closest_start_time, closest_end_time)
+
+
 def populate_subtextarray(fname, feats_dir, char_ids, wordfiles_dir):
     dur = 4.0
     f = open(wordfiles_dir + '/' + fname, mode ='r' , encoding ='utf-8')
@@ -345,7 +381,7 @@ def populate_subtextarray(fname, feats_dir, char_ids, wordfiles_dir):
     assert idx_point > -0.9
     closest_start_idx = get_closest(starts_array, idx_point)
     closest_end_idx  = get_closest(ends_array, idx_point + dur)
-    cnt = ','.join(k if k != '0' else '' for k in words_array[closest_start_idx:closest_end_idx+1])
+    cnt = ' '.join(k if k != '0' else '' for k in words_array[closest_start_idx:closest_end_idx+1])
     char_ints = ','.join(str(char_ids[k]) for k in cnt)
     closest_start_time = starts_array[closest_start_idx]
     closest_end_time = ends_array[closest_end_idx]
@@ -434,8 +470,12 @@ class SubTextDataSource(CategoricalDataSource):
         assert self.feat_type == 'categorical'
         fname = self.filenames_array[idx]
         fname = fname + '.dur'
+        #print(self.feat_name)
         if self.feat_name == 'subtext':
             return populate_subtextarray(fname, self.feats_dir, self.feats_dict, self.dur_dir)
+
+        elif self.feat_name == 'subtext_phones':
+            return populate_subtextarray_phones(fname, self.feats_dir, self.feats_dict, self.dur_dir)
 
 
 
@@ -807,7 +847,7 @@ def collate_fn(batch):
 def collate_fn_subtext(batch):
     """Create batch"""
     r = 5
-
+    #print("I am here")
     x_array = [x for (x,_,_) in batch]
     chars = [x.strip().split(',') for (x,_,_) in x_array]
     starts = [int( 1000 * x / 12.5)  for (_,x,_) in x_array]

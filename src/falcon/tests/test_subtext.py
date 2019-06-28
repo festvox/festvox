@@ -17,6 +17,7 @@ import json
 charids_file = 'etc/ids.json'
 with open(charids_file) as f:
    char_ids = json.load(f)
+ids2chars = {v:k for (k,v) in char_ids.items()}
 
 feats_name = 'subtext'
 duration_dir = 'dur_words'
@@ -30,10 +31,14 @@ Mel_train = FloatDataSource('fnames.train', 'etc/falcon_feats.desc', feats_name,
 
 dataset = PyTorchDataset(X, Mel_train, Y_train)
 data_loader = data_utils.DataLoader(
-        dataset, batch_size=4,
-        num_workers=4, shuffle=True,
+        dataset, batch_size=1,
+        num_workers=4, shuffle=False,
         collate_fn=collate_fn_subtext, pin_memory=hparams.pin_memory)
 
 
-for (x,l,m,linear) in data_loader:
-    print("Here ", x[0], m.shape)
+for (x,l,m,l) in data_loader:
+    x = x.squeeze(0).numpy()
+    print(x.shape)
+    print("Here ", ''.join(str(ids2chars[k]) for k in x), m.shape)
+
+
