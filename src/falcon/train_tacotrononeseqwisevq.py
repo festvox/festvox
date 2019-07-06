@@ -164,6 +164,8 @@ if __name__ == "__main__":
     checkpoint_path = args["--checkpoint-path"]
     log_path = args["--log-event-path"]
     data_root = args["--data-root"]
+    preset = args["--preset"]
+
     if data_root:
         DATA_ROOT = data_root
 
