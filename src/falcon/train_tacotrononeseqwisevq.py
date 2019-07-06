@@ -4,6 +4,7 @@ usage: train.py [options]
 
 options:
     --data-root=<dir>         Directory contains preprocessed features.
+    --preset=<json>              Path of preset parameters (json).
     --checkpoint-dir=<dir>    Directory where to save model checkpoints [default: checkpoints].
     --checkpoint-path=<name>  Restore model from checkpoint path if given.
     --hparams=<parmas>        Hyper parameters [default: ].
@@ -168,6 +169,10 @@ if __name__ == "__main__":
 
     # Override hyper parameters
     hparams.parse(args["--hparams"])
+    # Override hyper parameters
+    if preset is not None:
+        with open(preset) as f:
+            hparams.parse_json(f.read())
 
     os.makedirs(checkpoint_dir, exist_ok=True)
 
