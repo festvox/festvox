@@ -44,7 +44,7 @@ def tts(model, text):
         model = model.cuda()
     # TODO: Turning off dropout of decoder's prenet causes serious performance
     # regression, not sure why.
-    model.decoder.eval()
+    #model.decoder.eval()
     model.encoder.eval()
     model.postnet.eval()
 
@@ -123,8 +123,8 @@ if __name__ == "__main__":
                     textcheck.append('UNK')
             text = [charids[l] for l in textcheck]
             print(text,  fname)
-            print(charids)
-            #sys.exit()
+            #print(charids)
+            sys.exit()
             waveform, alignment, _ = tts(model, text)
             dst_wav_path = join(dst_dir, "{}{}.wav".format(fname, file_name_suffix))
             dst_alignment_path = join(dst_dir, "{}_alignment.png".format(fname))

@@ -318,8 +318,46 @@ def get_closest(arr, val):
    closest_idx = np.argmin(dist_array)
    return closest_idx
 
-def populate_subtextarray_phones(fname, feats_dir, char_ids, phonefiles_dir):
+def populate_subtextarray_english(fname, feats_dir, char_ids, wordfiles_dir):
     dur = 4.0
+    f = open(wordfiles_dir + '/' + fname, mode ='r', encoding ='utf-8')
+    words_array = ['<']
+    starts_array = [0.0]
+    ends_array = []
+    for line in f:
+      content = line.split('\n')[0].strip().split()
+      word = content[0].lower().replace("'","")
+      #print(word)
+      start = float(content[1])
+      end = float(content[2])
+      words_array.append(word)
+      starts_array.append(start)
+      ends_array.append(end)
+    idx = np.random.rand()
+    words_array.append('>')
+    ends_array.append(ends_array[-1])
+    if float(end) <  dur:
+       #print("End of file is ", end, " and the duration is ", dur)
+       #print(ends_array)
+       #print(words_array)
+       #sys.exit()
+       dur = end
+    idx_point = (float(end) - dur) * idx
+    assert idx_point > -0.9
+    closest_start_idx = get_closest(starts_array, idx_point)
+    closest_end_idx  = get_closest(ends_array, idx_point + dur)
+    cnt = ' '.join(k if k != '0' else '' for k in words_array[closest_start_idx:closest_end_idx+1])
+    char_ints = ','.join(str(char_ids[k]) for k in cnt)
+    closest_start_time = starts_array[closest_start_idx]
+    closest_end_time = ends_array[closest_end_idx]
+    #print(starts_array)
+    ##print(ends_array)
+    #print(cnt)
+    #print('\n')
+    return (char_ints, closest_start_time, closest_end_time)
+
+def populate_subtextarray_phones(fname, feats_dir, char_ids, phonefiles_dir):
+    dur = 700.0
     f = open(phonefiles_dir + '/' + fname, mode ='r' , encoding ='utf-8')
     phones_array = ['<']
     starts_array = [0.0]
@@ -476,6 +514,23 @@ class SubTextDataSource(CategoricalDataSource):
 
         elif self.feat_name == 'subtext_phones':
             return populate_subtextarray_phones(fname, self.feats_dir, self.feats_dict, self.dur_dir)
+
+
+class SubTextDataSourceEnglish(CategoricalDataSource):
+
+    def __init__(self, fnames_file, desc_file, feat_name, feats_dir, feats_dict = None, dur_dir = None):
+        super(SubTextDataSourceEnglish, self).__init__(fnames_file, desc_file, feat_name, feats_dir, feats_dict)
+
+        self.dur_dir = dur_dir
+     
+    def __getitem__(self, idx):
+
+        assert self.feat_type == 'categorical'
+        fname = self.filenames_array[idx]
+        fname = fname + '.dur'
+        if self.feat_name == 'subtext':
+            return populate_subtextarray_english(fname, self.feats_dir, self.feats_dict, self.dur_dir)
+
 
 
 

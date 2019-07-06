@@ -54,7 +54,7 @@ hparams = tf.contrib.training.HParams(
     num_workers=2,
 
     # Training:
-    batch_size=8,
+    batch_size=32,
     adam_beta1=0.9,
     adam_beta2=0.999,
     initial_learning_rate=0.002,
@@ -64,7 +64,7 @@ hparams = tf.contrib.training.HParams(
     clip_thresh=1.0,
 
     # Save
-    checkpoint_interval=5000,
+    checkpoint_interval=1000,
 
     # Eval:
     max_iters=200,

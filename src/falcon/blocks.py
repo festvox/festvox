@@ -351,3 +351,92 @@ class UpsampleNetwork_r9y9(nn.Module):
             return c
 
 
+class quantizer_kotha(nn.Module):
+    """
+        Input: (B, T, n_channels, vec_len) numeric tensor n_channels == 1 usually
+        Output: (B, T, n_channels, vec_len) numeric tensor
+    """
+    def __init__(self, n_channels, n_classes, vec_len, normalize=False):
+        super().__init__()
+        if normalize:
+            target_scale = 0.06
+            self.embedding_scale = target_scale
+            self.normalize_scale = target_scale
+        else:
+            self.embedding_scale = 1e-3
+            self.normalize_scale = None
+        self.embedding0 = nn.Parameter(torch.randn(n_channels, n_classes, vec_len, requires_grad=True) * self.embedding_scale)
+        self.offset = torch.arange(n_channels).cuda() * n_classes
+        # self.offset: (n_channels) long tensor
+        self.n_classes = n_classes
+        self.after_update()
+
+    def forward(self, x0):
+
+        if torch.isnan(x0).any():
+           print("Something went wrong here with x0")
+           sys.exit()
+
+
+        if self.normalize_scale:
+            target_norm = self.normalize_scale * math.sqrt(x0.size(3))
+            x = target_norm * x0 / x0.norm(dim=3, keepdim=True)
+            embedding = target_norm * self.embedding0 / self.embedding0.norm(dim=2, keepdim=True)
+        else:
+            x = x0
+            embedding = self.embedding0
+
+        if torch.isnan(torch.Tensor([target_norm])).any():
+           print("Something went wrong here with target norm")
+           sys.exit()
+
+
+        x1 = x.reshape(x.size(0) * x.size(1), x.size(2), 1, x.size(3))
+        #print("Shape of x and x1: ", x.shape, x1.shape)
+
+        # Perform chunking to avoid overflowing GPU RAM.
+        index_chunks = []
+        for x1_chunk in x1.split(512, dim=0):
+            index_chunks.append((x1_chunk - embedding).norm(dim=3).argmin(dim=2))
+        index = torch.cat(index_chunks, dim=0)
+        entropy = 0
+        index1 = (index + self.offset).view(index.size(0) * index.size(1))
+        #print("Shape of x1_chunk and embedding: ", x1_chunk.shape, embedding.shape)
+        #print("Shape of index1: ", index1.shape)
+
+        # index1: (N*samples*n_channels) long tensor
+        output_flat = embedding.view(-1, embedding.size(2)).index_select(dim=0, index=index1)
+        # output_flat: (N*samples*n_channels, vec_len) numeric tensor
+        #print("Shapes of output_flat and x: ", output_flat.shape, x.shape)
+        output = output_flat.view(x.size())
+
+        out0 = (output - x).detach() + x
+        out1 = (x.detach() - output).float().norm(dim=3).pow(2)
+        out2 = (x - output.detach()).float().norm(dim=3).pow(2) + (x - x0).float().norm(dim=3).pow(2)
+        #logger.log(f'std[embedding0] = {self.embedding0.view(-1, embedding.size(2)).index_select(dim=0, index=index1).std()}')
+        #print("Shape of out0: ", out0.shape)
+
+        return (out0.squeeze(2), out1, out2, entropy)
+
+    def after_update(self):
+        if self.normalize_scale:
+            with torch.no_grad():
+                target_norm = self.embedding_scale * math.sqrt(self.embedding0.size(2))
+                self.embedding0.mul_(target_norm / self.embedding0.norm(dim=2, keepdim=True))
+
+
+    def get_quantizedindices(self, x0):
+
+        x = x0
+        embedding = self.embedding0
+        x1 = x.reshape(x.size(0) * x.size(1), x.size(2), 1, x.size(3))
+        index_chunks = []
+        for x1_chunk in x1.split(512, dim=0):
+            index_chunks.append((x1_chunk - embedding).norm(dim=3).argmin(dim=2))
+        index = torch.cat(index_chunks, dim=0)
+        entropy = 0
+        print("Predicted quantized Indices are: ", (index.squeeze(1) + self.offset).cpu().numpy())
+        print('\n')
+
+
+

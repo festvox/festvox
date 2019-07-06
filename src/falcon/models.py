@@ -695,3 +695,45 @@ class TacotronOneMultispeaker(TacotronOneSeqwise):
 
         return mel_outputs, linear_outputs, alignments
 
+
+class TacotronOneSeqwiseVQ(TacotronOneSeqwise):
+
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False):
+        super(TacotronOneSeqwiseVQ, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False)
+        self.num_classes = 60
+        self.quantizer = quantizer_kotha(1, self.num_classes, 256, normalize=True)
+
+    def forward_nomasking(self, inputs, targets=None, input_lengths=None):
+        B = inputs.size(0)
+
+        inputs = self.embedding(inputs)
+        inputs_quantized = inputs.unsqueeze(2)
+        inputs_quantized, vq_pen, encoder_pen, entropy = self.quantizer(inputs_quantized)
+        inputs = inputs_quantized.squeeze(2)
+
+        # (B, T', in_dim)
+        encoder_outputs = self.encoder(inputs, input_lengths)
+        #print("Shape of encoder outputs: ", encoder_outputs.shape)
+        memory_lengths = None
+
+        mel_outputs, alignments = self.decoder(
+            encoder_outputs, targets, memory_lengths=memory_lengths)
+
+        mel_outputs = mel_outputs.view(B, -1, self.mel_dim)
+
+        linear_outputs = self.postnet(mel_outputs)
+        linear_outputs = self.last_linear(linear_outputs)
+
+        return mel_outputs, linear_outputs, alignments,  vq_pen.mean(), encoder_pen.mean(), entropy
+
+    def get_indices(self, inputs):
+
+        B = inputs.size(0)
+
+        inputs = self.embedding(inputs)
+
+        return self.quantizer.get_quantizedindices(inputs.unsqueeze(2))
+
+
