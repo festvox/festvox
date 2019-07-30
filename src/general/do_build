@@ -149,6 +149,7 @@ then
    exit 0
 fi
 
+
 if [ "$1" = "build_prompts_waves" ]
 then
   $ESTDIR/../festival/bin/festival --heap $HEAPSIZE -b festvox/build_clunits.scm '(build_prompts_waves "'$PROMPTFILE'")'
@@ -162,6 +163,14 @@ then
    ./bin/prompt_them $PROMPTFILE
    exit 0
 fi
+
+
+if [ "$1" = "get_phseq" ]
+then
+   $FESTVOXDIR/src/ehmm/bin/do_ehmm $1 $2
+   exit 0
+fi
+
 
 if [ "$1" = "label" ]
 then
