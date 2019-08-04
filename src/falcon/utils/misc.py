@@ -298,6 +298,20 @@ def populate_textarray(fname, feats_dir, feats_dict):
     feats_array = np.array(feats_array)
     return feats_array
 
+def populate_phonesarray(fname, feats_dir, feats_dict):
+    #print("Fname: ", fname)
+    #print("Feats dir: ", feats_dir)
+    feats_array = []
+    f = open(fname)
+    for line in f:
+        line = line.split('\n')[0]
+        feats  = line.split()[1:]
+        for feat in feats:
+            feats_array.append(feats_dict[feat])
+    feats_array = np.array(feats_array)
+    return feats_array
+
+
 def populate_indiantextarray(fname, feats_dir, feats_dict):
     feats_array = []
     f = open(fname)
@@ -608,12 +622,53 @@ class FloatDataSource(Dataset):
     def __getitem__(self, idx):
 
         fname = self.filenames_array[idx]
-        fname = self.feats_dir + '/' + fname + '.feats.npy'
+        fname = self.feats_dir + '/' + fname.strip() + '.feats.npy'
         feats_array = np.load(fname)
         return feats_array
 
     def __len__(self):
         return len(self.filenames_array)
+
+
+
+class CategoricalDataSource_fnames_tones(Dataset):
+    '''Syntax
+    dataset = CategoricalDataSource(fnames.txt.train, etc/falcon_feats.desc, feat_name, feats_dir)
+
+    '''
+
+    def __init__(self, fnames, desc_file, feat_name, feats_dir, feats_dict = None):
+      self.fnames = fnames
+      self.feat_name = feat_name
+      self.desc_file = desc_file
+      self.feat_length, self.feat_type = get_featmetainfo(self.desc_file, feat_name)
+      self.feats_dir = feats_dir
+      self.feats_dict = defaultdict(lambda: len(self.feats_dict)) if feats_dict is None else feats_dict
+
+    def __getitem__(self, idx):
+
+        assert self.feat_type == 'categorical'
+        fname = self.fnames[idx]
+        fname = self.feats_dir + '/' + fname.strip() + '.feats'
+        if self.feat_name == 'text':
+            return populate_textarray(fname, self.feats_dir, self.feats_dict)
+        elif self.feat_name == 'textNtones':
+             return populate_textNtonesarray(fname, self.feats_dir, self.feats_dict)
+        elif self.feat_name == 'phones':
+             return populate_phonesarray(fname, self.feats_dir, self.feats_dict)
+        elif self.feat_name == 'textNqf0s':
+             #print("I think fname is ", fname, self.fnames)
+             return populate_textNtonesarray(fname, self.feats_dir, self.feats_dict)
+        elif self.feat_name == 'phonesNqf0s':
+             #print("I think fname is ", fname, self.fnames)
+             return populate_phonesNqF0sarray(fname, self.feats_dir, self.feats_dict)
+
+
+    def __len__(self):
+        return len(self.fnames)
+
+    def get_featsdict(self):
+        return self.feats_dict
 
 
 class FloatDataSource_fnames(Dataset):
