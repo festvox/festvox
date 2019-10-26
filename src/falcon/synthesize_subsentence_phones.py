@@ -94,6 +94,7 @@ if __name__ == "__main__":
     with open(checkpoints_dir + '/ids_phones.json') as  f:
        charids = json.load(f)
     charids = dict(charids)
+    print(charids)
 
     model.load_state_dict(checkpoint["state_dict"])
     model.decoder.max_decoder_steps = max_decoder_steps
@@ -123,8 +124,7 @@ if __name__ == "__main__":
                     textcheck.append('UNK')
             text = [charids[l] for l in textcheck]
             print(text,  fname)
-            #print(charids)
-            sys.exit()
+            print(textcheck)
             waveform, alignment, _ = tts(model, text)
             dst_wav_path = join(dst_dir, "{}{}.wav".format(fname, file_name_suffix))
             dst_alignment_path = join(dst_dir, "{}_alignment.png".format(fname))
