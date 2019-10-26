@@ -1,5 +1,7 @@
 """Trainining script for Tacotron speech synthesis model.
+
 usage: train.py [options]
+
 options:
     --data-root=<dir>         Directory contains preprocessed features.
     --preset=<json>              Path of preset parameters (json).
@@ -13,7 +15,7 @@ from docopt import docopt
 from collections import defaultdict
 import os
 import re
-os.environ["CUDA_VISIBLE_DEVICES"]='1'
+#os.environ["CUDA_VISIBLE_DEVICES"]='1'
 # Use text & audio modules from existing Tacotron implementation.
 import sys
 from os.path import dirname, join
@@ -136,7 +138,7 @@ def train(model, train_loader, val_loader, optimizer,
         averaged_loss = running_loss / (len(train_loader))
         log_value("loss (per epoch)", averaged_loss, global_epoch)
         print("Loss: {}".format(running_loss / (len(train_loader))))
-        #sys.exit()
+        sys.exit()
 
         global_epoch += 1
 
@@ -240,3 +242,4 @@ if __name__ == "__main__":
 
     print("Finished")
     sys.exit(0)
+
