@@ -1,6 +1,7 @@
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from .audio import *
 
 
 def plot_alignment(alignment, path, info=None):
@@ -18,3 +19,17 @@ def plot_alignment(alignment, path, info=None):
   plt.ylabel('Encoder timestep')
   plt.tight_layout()
   plt.savefig(path, format='png')
+
+def save_alignment(path, attn, global_step):
+    plot_alignment(attn.T, path, info="tacotron, step={}".format(global_step))
+
+
+def save_spectrogram(path, linear_output):
+    spectrogram = denormalize(linear_output)
+    plt.figure(figsize=(16, 10))
+    plt.imshow(spectrogram.T, aspect="auto", origin="lower")
+    plt.colorbar()
+    plt.tight_layout()
+    plt.savefig(path, format="png")
+    plt.close()
+

@@ -307,41 +307,15 @@ class TacotronOne(nn.Module):
         self.postnet = CBHG(mel_dim, K=8, projections=[256, mel_dim])
         self.last_linear = nn.Linear(mel_dim * 2, linear_dim)
 
-    def forward(self, inputs, targets=None, input_lengths=None):
-        B = inputs.size(0)
-
-        inputs = self.embedding(inputs)
-        # (B, T', in_dim)
-        encoder_outputs = self.encoder(inputs, input_lengths)
-
-        if self.use_memory_mask:
-            memory_lengths = input_lengths
-        else:
-            memory_lengths = None
- 
-        # (B, T', mel_dim*r)
-        mel_outputs, alignments = self.decoder(
-            encoder_outputs, targets, memory_lengths=memory_lengths)
-
-        # Post net processing below
-
-        # Reshape
-        # (B, T, mel_dim)
-        mel_outputs = mel_outputs.view(B, -1, self.mel_dim)
-
-        linear_outputs = self.postnet(mel_outputs)
-        linear_outputs = self.last_linear(linear_outputs)
-
-        return mel_outputs, linear_outputs, alignments
-
-    '''Fix for end prediction
-    Section 4 in "TACOTRON: TOWARDS END-TO-END SPEECH SYNTHESIS" https://arxiv.org/pdf/1703.10135.pdf
-      "It’s a common practice to train sequence models with a loss mask, which masks loss on zero-padded frames.
-      However, we found that models trained this way don’t know when to stop emitting outputs, causing
+    '''
+    Section 4 in 'TACOTRON: TOWARDS END-TO-END SPEECH SYNTHESIS' https://arxiv.org/pdf/1703.10135.pdf
+      Its a common practice to train sequence models with a loss mask, which masks loss on zero-padded frames.
+      However, we found that models trained this way dont know when to stop emitting outputs, causing
       repeated sounds towards the end. One simple trick to get around this problem is to also reconstruct
-      the zero-padded frames."
-    ''' 
-    def forward_nomasking(self, inputs, targets=None, input_lengths=None):
+      the zero-padded frames.
+    '''
+    def forward(self, inputs, targets=None, input_lengths=None):
+
         B = inputs.size(0)
 
         inputs = self.embedding(inputs)
