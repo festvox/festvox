@@ -37,7 +37,7 @@ def _pad_2d(x, max_len):
                mode="constant", constant_values=0)
     return x
 
-def save_checkpoint(model, optimizer, step, checkpoint_dir, epoch):
+def save_checkpoint(model, optimizer, step, checkpoint_dir, epoch, spk_flag=None):
     checkpoint_path = join(
         checkpoint_dir, "checkpoint_step{}.pth".format(step))
     torch.save({
@@ -47,6 +47,11 @@ def save_checkpoint(model, optimizer, step, checkpoint_dir, epoch):
         "global_epoch": epoch,
     }, checkpoint_path)
     print("Saved checkpoint:", checkpoint_path)
+
+    # Speaker Embedding
+    if spk_flag:
+       visualize_speaker_embeddings(model, checkpoint_dir, step) # + '/step' + str(step) + '_speaker_embedding.png')
+
 
 def save_states(global_step, mel_outputs, linear_outputs, attn, y,
                 input_lengths, checkpoint_dir=None):
@@ -59,6 +64,7 @@ def save_states(global_step, mel_outputs, linear_outputs, attn, y,
     # Alignment
     path = join(checkpoint_dir, "step{}_alignment.png".format(
         global_step))
+
     # alignment = attn[idx].cpu().data.numpy()[:, :input_length]
     alignment = attn[idx].cpu().data.numpy()
     save_alignment(path, alignment, global_step)
@@ -80,6 +86,13 @@ def save_states(global_step, mel_outputs, linear_outputs, attn, y,
         global_step))
     linear_output = y[idx].cpu().data.numpy()
     save_spectrogram(path, linear_output)
+
+    # Target audio signal
+    signal = inv_spectrogram(linear_output.T)
+    path = join(checkpoint_dir, "step{}_target.wav".format(
+        global_step))
+    save_wav(signal, path)
+
 
 
 def learning_rate_decay(init_lr, global_step):
@@ -145,8 +158,6 @@ def populate_textarray(fname, feats_dir, feats_dict):
     return feats_array
 
 def populate_phonesarray(fname, feats_dir, feats_dict):
-    #print("Fname: ", fname)
-    #print("Feats dir: ", feats_dir)
     feats_array = []
     f = open(fname)
     for line in f:
@@ -200,8 +211,9 @@ class CategoricalDataSource(Dataset):
             return populate_textarray(fname, self.feats_dir, self.feats_dict)
         elif self.feat_name == 'indiantext':
             return populate_indiantextarray(fname, self.feats_dir, self.feats_dict)
-        feats_array = populate_featarray(fname, self.feats_dir, self.feats_dict) 
-        return feats_array
+        else:
+            print("Unknown feature type: ", self.feat_name)
+            sys.exit()
 
     def __len__(self):
         return len(self.filenames_array)
@@ -306,3 +318,5 @@ def data_parallel_workaround(model, input):
     outputs = torch.nn.parallel.parallel_apply(replicas, inputs)
     y_hat = torch.nn.parallel.gather(outputs, output_device)
     return y_hat, outputs, replicas
+
+
