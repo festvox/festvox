@@ -17,3 +17,7 @@ cat ${VOXDIR}/ehmm/etc/txt.phseq.data | awk '{print $1}' > ${VOXDIR}/fnames
 python3.5 $FALCONDIR/utils/dataprep_addlspec.py ${VOXDIR}/fnames ${VOXDIR}
 python3.5 $FALCONDIR/utils/dataprep_addmspec.py ${VOXDIR}/fnames ${VOXDIR}
 
+${VOXDIR}/bin/traintest ${VOXDIR}/fnames 
+cp ${VOXDIR}/fnames.test ${VOXDIR}/fnames.val
+
+python3.5 local/train_phones.py --checkpoint-dir exp/taco_one_phseq --log-event-path exp/taco_one_phseq/exp
