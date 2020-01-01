@@ -66,7 +66,7 @@ class AttentionWrapper(nn.Module):
 
         # Concat input query and previous attention context
         ######### Sai Krishna 15 June 2019 #####################
-        if len(query.shape) > 2: 
+        if len(query.shape) > 2:
               query = query.squeeze(1)
         #print("Shapes of query and attention: ", query.shape, attention.shape)
         ##########################################################
