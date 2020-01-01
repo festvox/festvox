@@ -169,7 +169,7 @@ then
    do
       fname=$i
       echo Aligning $i >/dev/tty
-      $FESTVOXDIR/src/general/phonealign -otrack test/$EXPERMIENT/$i.mcep -itrack ccoefs/$fname.mcep -ilabel lab/$fname.lab -olabel test/$EXPERIMENT/$fname.lab -verbose -withcosts
+      $FESTVOXDIR/src/general/phonealign -otrack test/$EXPERIMENT/$i.mcep -itrack ccoefs/$fname.mcep -ilabel lab/$fname.lab -olabel test/$EXPERIMENT/$fname.lab -verbose -withcosts
    done 2>&1 | 
    tee ttt.costs |
    grep "^cost" | awk '{print $3}' |
