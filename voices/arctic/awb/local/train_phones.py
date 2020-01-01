@@ -4,6 +4,7 @@ usage: train.py [options]
 
 options:
     --preset=<json>           Path of preset parameters (json).
+    --exp-dir=<dir>           Experiment directory
     --checkpoint-dir=<dir>    Directory where to save model checkpoints [default: checkpoints].
     --checkpoint-path=<name>  Restore model from checkpoint path if given.
     --hparams=<parmas>        Hyper parameters [default: ].
@@ -125,7 +126,7 @@ def train(model, train_loader, val_loader, optimizer,
 
             # Update
             loss.backward(retain_graph=False)
-            grad_norm = torch.nn.utils.clip_grad_norm(
+            grad_norm = torch.nn.utils.clip_grad_norm_(
                  model.parameters(), clip_thresh)
             optimizer.step()
 
@@ -143,7 +144,6 @@ def train(model, train_loader, val_loader, optimizer,
         log_value("loss (per epoch)", averaged_loss, global_epoch)
         h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
         h.close()
-        sys.exit()
 
         global_epoch += 1
 
@@ -151,9 +151,10 @@ def train(model, train_loader, val_loader, optimizer,
 if __name__ == "__main__":
     args = docopt(__doc__)
     print("Command line args:\n", args)
-    checkpoint_dir = args["--checkpoint-dir"]
+    exp_dir = args["--exp-dir"] 
+    checkpoint_dir = args["--exp-dir"] + '/checkpoints'
     checkpoint_path = args["--checkpoint-path"]
-    log_path = args["--log-event-path"]
+    log_path = args["--exp-dir"] + '/tracking'
     preset = args["--preset"]
     hparams.parse(args["--hparams"])
 
@@ -162,6 +163,7 @@ if __name__ == "__main__":
         with open(preset) as f:
             hparams.parse_json(f.read())
 
+    os.makedirs(exp_dir, exist_ok=True)
     os.makedirs(checkpoint_dir, exist_ok=True)
     os.makedirs(log_path, exist_ok=True)
     logfile_name = log_path + '/logfile'
