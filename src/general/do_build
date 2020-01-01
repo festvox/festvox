@@ -167,7 +167,8 @@ fi
 
 if [ "$1" = "get_phseq" ]
 then
-   $FESTVOXDIR/src/ehmm/bin/do_ehmm $1 $2
+   $FESTVOXDIR/src/ehmm/bin/do_ehmm setup
+   $FESTVOXDIR/src/ehmm/bin/do_ehmm phseq
    exit 0
 fi
 
