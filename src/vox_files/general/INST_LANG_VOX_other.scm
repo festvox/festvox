@@ -40,7 +40,7 @@
 
 (define (INST_LANG_VOX::select_other)
   "(INST_LANG_VOX::select_other)
-Set up the anything esle for the voice."
+Set up the anything else for the voice."
   ;; something else
 
 )
