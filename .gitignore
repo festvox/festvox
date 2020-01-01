@@ -1,4 +1,4 @@
 voices/*/*/vox
 log_run
 voices/*/*/exp
-.swp
+*.swp
