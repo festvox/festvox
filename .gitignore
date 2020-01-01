@@ -3,3 +3,4 @@ log_run
 voices/*/*/exp
 *.swp
 *.pyc
+*.o
