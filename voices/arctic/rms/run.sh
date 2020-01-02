@@ -23,4 +23,4 @@ python3.5 $FALCONDIR/utils/dataprep_addmspec.py ${VOXDIR}/fnames ${VOXDIR}
 ${VOXDIR}/bin/traintest ${VOXDIR}/fnames 
 cp ${VOXDIR}/fnames.test ${VOXDIR}/fnames.val
 
-python3.5 local/train_phones.py --exp-dir exp/taco_one_phseq --preset conf/tacotron.conf
+python3.5 local/train_phones.py --exp-dir exp/taco_one_phseq --conf conf/tacotron.conf
