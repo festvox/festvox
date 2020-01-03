@@ -1,12 +1,14 @@
 VOXDIR=vox
 spk=awb
 
+source path.sh
+
 mkdir -p ${VOXDIR}
 cd ${VOXDIR}
 $FESTVOXDIR/src/clustergen/setup_cg cmu us ${spk} || exit 1
 
-cp ${data_dir}/arctic/cmu_us_${spk}_arctic/etc/txt.done.data etc/
-./bin/get_wavs ${data_dir}/arctic/cmu_us_${spk}_arctic/wav/*
+cp ${data_dir}/arctic/cmu_us_${spk}_arctic/etc/txt.done.data etc/ || exit 1
+./bin/get_wavs ${data_dir}/arctic/cmu_us_${spk}_arctic/wav/* || exit 1
 
 ./bin/do_build build_prompts || exit 1
 ./bin/do_build get_phseq || exit 1

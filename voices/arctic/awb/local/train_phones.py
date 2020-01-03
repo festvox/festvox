@@ -3,7 +3,7 @@
 usage: train.py [options]
 
 options:
-    --preset=<json>           Path of preset parameters (json).
+    --conf=<json>           Path of configuration file (json).
     --exp-dir=<dir>           Experiment directory
     --checkpoint-dir=<dir>    Directory where to save model checkpoints [default: checkpoints].
     --checkpoint-path=<name>  Restore model from checkpoint path if given.
@@ -151,16 +151,16 @@ def train(model, train_loader, val_loader, optimizer,
 if __name__ == "__main__":
     args = docopt(__doc__)
     print("Command line args:\n", args)
-    exp_dir = args["--exp-dir"] 
+    exp_dir = args["--exp-dir"]
     checkpoint_dir = args["--exp-dir"] + '/checkpoints'
     checkpoint_path = args["--checkpoint-path"]
     log_path = args["--exp-dir"] + '/tracking'
-    preset = args["--preset"]
+    conf = args["--conf"]
     hparams.parse(args["--hparams"])
 
     # Override hyper parameters
-    if preset is not None:
-        with open(preset) as f:
+    if conf is not None:
+        with open(conf) as f:
             hparams.parse_json(f.read())
 
     os.makedirs(exp_dir, exist_ok=True)
