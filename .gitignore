@@ -4,3 +4,4 @@ voices/*/*/exp
 *.swp
 *.pyc
 *.o
+log_*
