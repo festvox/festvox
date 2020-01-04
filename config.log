@@ -271,7 +271,7 @@ configure: failed program was:
 configure:4168: result: no
 configure:4299: checking for library containing pthread_create
 configure:4340: gcc -o conftest -g -O2 -Wall   conftest.c  >&5
-/tmp/ccQ13ghQ.o: In function `main':
+/tmp/ccLNDFnS.o: In function `main':
 /home/srallaba/projects/text2speech/repos/festvox/conftest.c:29: undefined reference to `pthread_create'
 collect2: error: ld returned 1 exit status
 configure:4347: $? = 1
