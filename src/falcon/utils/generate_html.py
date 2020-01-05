@@ -8,6 +8,7 @@ Options:
     --shuffle                Flag to shuffle the filenames [default: None].
     --link=<l>               Link to append to the path of audio file
     --exp-name=<exp>         Title of experiment [default: samples]
+    --add-exp=<e>            Location of additional experiment to compare
     -h, --help               Show help message.
 
 """
@@ -19,7 +20,7 @@ import random
 
 
 
-def write_html(fnames, original_dir, samples_dir, exp_name, out_file, link=None):
+def write_html(fnames, original_dir, samples_dir, exp_name, out_file, link=None, additional_exp=None):
    
    print("Writing html")
 
@@ -36,7 +37,7 @@ def write_html(fnames, original_dir, samples_dir, exp_name, out_file, link=None)
 
    div = ET.Element('div')
    desc = ET.Element('h3')
-   desc.text = exp_name + ' (Original vs Samples)' 
+   desc.text = exp_name  
    div.append(desc)
    body.append(div)
 
@@ -68,6 +69,15 @@ def write_html(fnames, original_dir, samples_dir, exp_name, out_file, link=None)
        audio.append(source)
        div.append(audio)
 
+       # Additional Experiment
+       if additional_exp:
+         audio = ET.Element('audio', attrib={'controls': 'controls'})
+         path = os.path.basename(additional_exp)
+         if link:
+           path = link + path
+         source = ET.Element('source', src = path + '/' + fname + '.wav')
+         audio.append(source)
+         div.append(audio)
 
 
        body.append(div)
@@ -87,6 +97,7 @@ shuffle = args['--shuffle']
 link = args['--link']
 exp_name = args['--exp-name']
 out_file = args['<output_file>']
+additional_exp = args['--add-exp']
 
 with open(fnames_file) as f:
     fnames = f.readlines()
@@ -96,5 +107,5 @@ if shuffle:
    random.shuffle(fnames)
 fnames = fnames[0:max_files]
 
-write_html(fnames, original_dir, samples_dir, exp_name, out_file, link)
+write_html(fnames, original_dir, samples_dir, exp_name, out_file, link, additional_exp)
 
