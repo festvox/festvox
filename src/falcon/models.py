@@ -63,3 +63,20 @@ class TacotronOne(nn.Module):
 
 
 
+
+class TacotronOneSeqwise(TacotronOne):
+
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False):
+        super(TacotronOneSeqwise, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False)
+        self.decoder = Decoder_TacotronOneSeqwise(mel_dim, r)
+
+class TacotronOneFinalFrame(TacotronOneSeqwise):
+
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False):
+        super(TacotronOneFinalFrame, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False)
+        self.decoder = Decoder_TacotronOneFinalFrame(mel_dim, r)
+

@@ -632,6 +632,115 @@ def is_end_of_frames(output, eps=0.2):
     return (output.data <= eps).all()
 
 
+class Decoder_TacotronOneSeqwise(Decoder_TacotronOne):
+    def __init__(self, in_dim, r):
+        super(Decoder_TacotronOneSeqwise, self).__init__(in_dim, r)
+        self.prenet = Prenet_seqwise(in_dim * r, sizes=[256, 128])
+
+class Decoder_TacotronOneFinalFrame(Decoder_TacotronOneSeqwise):
+    def __init__(self, in_dim, r):
+        super(Decoder_TacotronOneFinalFrame, self).__init__(in_dim, r)
+        self.prenet = Prenet_seqwise(in_dim, sizes=[256, 128])
+        self.in_dim = in_dim
+
+    def forward(self, encoder_outputs, inputs=None, memory_lengths=None):
+
+        B = encoder_outputs.size(0)
+      
+        processed_memory = self.memory_layer(encoder_outputs)
+        if memory_lengths is not None:
+            mask = get_mask_from_lengths(processed_memory, memory_lengths)
+        else:
+            mask = None
+
+        # Run greedy decoding if inputs is None
+        greedy = inputs is None
+
+        if inputs is not None:
+            # Grouping multiple frames if necessary
+            if inputs.size(-1) == self.in_dim:
+                inputs = inputs.view(B, inputs.size(1) // self.r, -1)
+            assert inputs.size(-1) == self.in_dim * self.r
+            T_decoder = inputs.size(1)
+
+        # go frames
+        initial_input = Variable(
+            encoder_outputs.data.new(B, self.in_dim).zero_())
+
+        # Init decoder states
+        attention_rnn_hidden = Variable(
+            encoder_outputs.data.new(B, 256).zero_())
+        decoder_rnn_hiddens = [Variable(
+            encoder_outputs.data.new(B, 256).zero_())
+            for _ in range(len(self.decoder_rnns))]
+        current_attention = Variable(
+            encoder_outputs.data.new(B, 256).zero_())
+
+        # Time first (T_decoder, B, in_dim)
+        if inputs is not None:
+            inputs = inputs.transpose(0, 1)
+
+        outputs = []
+        alignments = []
+
+        t = 0
+        current_input = initial_input
+        while True:
+            if t > 0:
+                current_input = outputs[-1] if greedy else inputs[t - 1]
+                current_input = current_input[:,-self.in_dim:]
+            # Prenet
+            ####### Sai Krishna Rallabandi 15 June 2019 #####################
+            #print("Shape of input to the decoder prenet: ", current_input.shape)
+            if len(current_input.shape) < 3:
+               current_input = current_input.unsqueeze(1)
+            #################################################################
+ 
+            current_input = self.prenet(current_input)
+
+            # Attention RNN
+            attention_rnn_hidden, current_attention, alignment = self.attention_rnn(
+                current_input, current_attention, attention_rnn_hidden,
+                encoder_outputs, processed_memory=processed_memory, mask=mask)
+
+            # Concat RNN output and attention context vector
+            decoder_input = self.project_to_decoder_in(
+                torch.cat((attention_rnn_hidden, current_attention), -1))
+
+            # Pass through the decoder RNNs
+            for idx in range(len(self.decoder_rnns)):
+                decoder_rnn_hiddens[idx] = self.decoder_rnns[idx](
+                    decoder_input, decoder_rnn_hiddens[idx])
+                # Residual connectinon
+                decoder_input = decoder_rnn_hiddens[idx] + decoder_input
+
+            output = decoder_input
+            output = self.proj_to_mel(output)
+
+            outputs += [output]
+            alignments += [alignment]
+
+            t += 1
+
+            if greedy:
+                if t > 1 and is_end_of_frames(output):
+                    break
+                elif t > self.max_decoder_steps:
+                    print("Warning! doesn't seems to be converged")
+                    break
+            else:
+                if t >= T_decoder:
+                    break
+
+        assert greedy or len(outputs) == T_decoder
+
+        # Back to batch first
+        alignments = torch.stack(alignments).transpose(0, 1)
+        outputs = torch.stack(outputs).transpose(0, 1).contiguous()
+
+        return outputs, alignments
+
+
 class GatedCombinationConv(nn.Module):
 
     def __init__(self, in_channels, out_channels, global_cond_channels):
