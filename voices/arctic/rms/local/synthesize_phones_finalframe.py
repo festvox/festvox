@@ -109,7 +109,7 @@ if __name__ == "__main__":
         for idx, line in enumerate(lines):
             fname = line.decode("utf-8").split()[0]
             #fname += '_' + os.path.basename(checkpoint_path).split('.')[0].split('_')[-1]
-            text = ' '.join(k for k in line.decode("utf-8").split()[1:][:-1])
+            text = ' '.join(k for k in line.decode("utf-8").split()[1:])
             print(text, fname)
             #sys.exit()
             text = [phids[l] for l in text.split()]
