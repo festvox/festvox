@@ -11,6 +11,7 @@ from layers import *
 
 print_flag = 0
 
+# Type: Acquisition_CodeBorrowed Source: https://github.com/r9y9/tacotron_pytorch/blob/62db7217c10da3edb34f67b185cc0e2b04cdf77e/tacotron_pytorch/attention.py#L7
 class BahdanauAttention(nn.Module):
     def __init__(self, dim):
         super(BahdanauAttention, self).__init__()
@@ -36,7 +37,7 @@ class BahdanauAttention(nn.Module):
         # (batch, max_time)
         return alignment.squeeze(-1)
 
-
+# Type: Acquisition_CodeBorrowed Source: https://github.com/r9y9/tacotron_pytorch/blob/62db7217c10da3edb34f67b185cc0e2b04cdf77e/tacotron_pytorch/attention.py#L33
 def get_mask_from_lengths(memory, memory_lengths):
     """Get mask tensor from list of length
     Args:
@@ -48,7 +49,7 @@ def get_mask_from_lengths(memory, memory_lengths):
         mask[idx][:l] = 1
     return ~mask
 
-
+# Type: Acquisition_CodeBorrowed Source: https://github.com/r9y9/tacotron_pytorch/blob/62db7217c10da3edb34f67b185cc0e2b04cdf77e/tacotron_pytorch/attention.py#L46 
 class AttentionWrapper(nn.Module):
     def __init__(self, rnn_cell, attention_mechanism,
                  score_mask_value=-float("inf")):
@@ -95,6 +96,7 @@ class AttentionWrapper(nn.Module):
 
         return cell_output, attention, alignment
 
+# Type: Acquisition_CodeBorrowed Source:https://github.com/r9y9/tacotron_pytorch/blob/62db7217c10da3edb34f67b185cc0e2b04cdf77e/tacotron_pytorch/tacotron.py#L12
 class Prenet(nn.Module):
     def __init__(self, in_dim, sizes=[256, 128]):
         super(Prenet, self).__init__()
@@ -110,6 +112,7 @@ class Prenet(nn.Module):
             inputs = self.dropout(self.relu(linear(inputs)))
         return inputs
 
+# Type: Indigenous
 class Prenet_seqwise(nn.Module):
     def __init__(self, in_dim, sizes=[256, 128]):
         super(Prenet_seqwise, self).__init__()
@@ -126,6 +129,7 @@ class Prenet_seqwise(nn.Module):
             inputs = self.dropout(self.relu(linear(inputs)))
         return inputs
 
+# Type: Indigenous
 class Prenet_tones(nn.Module):
     def __init__(self, in_dim, sizes=[256, 128]):
         super(Prenet, self).__init__()
@@ -141,7 +145,7 @@ class Prenet_tones(nn.Module):
             inputs = self.dropout(self.relu(linear(inputs)))
         return inputs
 
-
+# Type: Acquisition_CodeBorrowed Source: https://github.com/r9y9/tacotron_pytorch/blob/62db7217c10da3edb34f67b185cc0e2b04cdf77e/tacotron_pytorch/tacotron.py#L28
 class BatchNormConv1d(nn.Module):
     def __init__(self, in_dim, out_dim, kernel_size, stride, padding,
                  activation=None):
@@ -159,7 +163,7 @@ class BatchNormConv1d(nn.Module):
             x = self.activation(x)
         return self.bn(x)
 
-
+# Type: Acquisition_CodeBorrowed Source: https://github.com/r9y9/tacotron_pytorch/blob/62db7217c10da3edb34f67b185cc0e2b04cdf77e/tacotron_pytorch/tacotron.py#L45
 class Highway(nn.Module):
     def __init__(self, in_size, out_size):
         super(Highway, self).__init__()
@@ -175,13 +179,8 @@ class Highway(nn.Module):
         T = self.sigmoid(self.T(inputs))
         return H * T + inputs * (1.0 - T)
 
-
+# Type: Acquisition_CodeBorrowed Source: https://github.com/r9y9/tacotron_pytorch/blob/62db7217c10da3edb34f67b185cc0e2b04cdf77e/tacotron_pytorch/tacotron.py#L61
 class CBHG(nn.Module):
-    """CBHG module: a recurrent neural network composed of:
-        - 1-d convolution banks
-        - Highway networks + residual connections
-        - Bidirectional gated recurrent units
-    """
 
     def __init__(self, in_dim, K=16, projections=[128, 128]):
         super(CBHG, self).__init__()
@@ -253,7 +252,7 @@ class CBHG(nn.Module):
 
         return outputs
 
-
+# Type: Indigenous
 class LSTMsBlock(nn.Module):
     """Replacement for the CBHG module
         - 3 bidirectional lstm layers
@@ -284,8 +283,7 @@ class LSTMsBlock(nn.Module):
         outputs = self.final_linear(outputs) 
         return outputs
 
-
-
+# Type: Acquisition_CodeBorrowed Source: https://github.com/r9y9/wavenet_vocoder
 class residualconvmodule(nn.Module):
 
     def __init__(self,  in_channels, out_channels, kernel_size, stride, padding, dilation):
@@ -353,7 +351,7 @@ class residualconvmodule(nn.Module):
 
         return x
 
-
+# Type: Acquisition_CodeBorrowed Source: https://github.com/r9y9/wavenet_vocoder
 class UpsampleNetwork_r9y9(nn.Module):
 
      def __init__(self, feat_dims, upsample_scales):
@@ -382,7 +380,7 @@ class UpsampleNetwork_r9y9(nn.Module):
             c = c.squeeze(1) 
             return c
 
-
+# Type: Acquisition_CodeBorrowed Source: https://github.com/mkotha/WaveRNN/blob/a06e6b867592654d123fd6c57c755d02db3bf7ec/layers/vector_quant.py#L7
 class quantizer_kotha(nn.Module):
     """
         Input: (B, T, n_channels, vec_len) numeric tensor n_channels == 1 usually
@@ -511,8 +509,7 @@ class quantizer_kotha(nn.Module):
         print('\n')
 
 
-
-
+# Type: Acquisition_CodeBorrowed Source: https://github.com/r9y9/tacotron_pytorch/blob/62db7217c10da3edb34f67b185cc0e2b04cdf77e/tacotron_pytorch/tacotron.py#L139
 class Encoder_TacotronOne(nn.Module):
     def __init__(self, in_dim):
         super(Encoder_TacotronOne, self).__init__()
@@ -523,6 +520,7 @@ class Encoder_TacotronOne(nn.Module):
         inputs = self.prenet(inputs)
         return self.cbhg(inputs, input_lengths)
 
+# Type: Indigenous
 class Encoder_TacotronOne_Tones(nn.Module):
     def __init__(self, in_dim):
         super(Encoder_TacotronOne, self).__init__()
@@ -533,6 +531,7 @@ class Encoder_TacotronOne_Tones(nn.Module):
         inputs = self.prenet(inputs, tones)
         return self.cbhg(inputs, input_lengths)
 
+# Type: Indigenous
 class Encoder_TacotronOne_LSTMsBlock(nn.Module):
     def __init__(self, in_dim):
         super(Encoder_TacotronOne_LSTMsBlock, self).__init__()
@@ -544,9 +543,7 @@ class Encoder_TacotronOne_LSTMsBlock(nn.Module):
         inputs = self.prenet(inputs)
         return self.recurrent_block(inputs, input_lengths)
 
-   
-
-
+# Type: Acquisition_CodeBorrowed Source: https://github.com/r9y9/tacotron_pytorch/blob/62db7217c10da3edb34f67b185cc0e2b04cdf77e/tacotron_pytorch/tacotron.py#L150
 class Decoder_TacotronOne(nn.Module):
     def __init__(self, in_dim, r):
         super(Decoder_TacotronOne, self).__init__()
@@ -673,15 +670,17 @@ class Decoder_TacotronOne(nn.Module):
 
         return outputs, alignments
 
+# Type: Acquisition_CodeBorrowed Source: https://github.com/r9y9/tacotron_pytorch/blob/62db7217c10da3edb34f67b185cc0e2b04cdf77e/tacotron_pytorch/tacotron.py#L273
 def is_end_of_frames(output, eps=0.2):
     return (output.data <= eps).all()
 
-
+# Type: Indigenous
 class Decoder_TacotronOneSeqwise(Decoder_TacotronOne):
     def __init__(self, in_dim, r):
         super(Decoder_TacotronOneSeqwise, self).__init__(in_dim, r)
         self.prenet = Prenet_seqwise(in_dim * r, sizes=[256, 128])
 
+# Type: Indigenous
 class Decoder_TacotronOneFinalFrame(Decoder_TacotronOneSeqwise):
     def __init__(self, in_dim, r):
         super(Decoder_TacotronOneFinalFrame, self).__init__(in_dim, r)
@@ -785,7 +784,7 @@ class Decoder_TacotronOneFinalFrame(Decoder_TacotronOneSeqwise):
 
         return outputs, alignments
 
-
+# Type: Acquisition_CodeBorrowed Source: https://github.com/r9y9/wavenet_vocoder
 class GatedCombinationConv(nn.Module):
 
     def __init__(self, in_channels, out_channels, global_cond_channels):
@@ -808,8 +807,7 @@ class GatedCombinationConv(nn.Module):
         a, b = (x1 + x2).split(self.out_channels, dim=2)
         return torch.sigmoid(a) * torch.tanh(b)
 
-
-
+# Type: Indigenous
 def reparameterize(self, mu, sigma):
 
     std = torch.exp(0.5*sigma)

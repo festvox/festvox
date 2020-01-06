@@ -7,9 +7,7 @@ from scipy import signal
 from hyperparameters import hparams
 from scipy.io import wavfile
 
-'''Excerpts from
-https://github.com/r9y9/tacotron/blob/0987cedd0d6a6909749c594ca978ac4e11ae79ae/util/audio.py
-'''
+#This file is basically a clone from https://github.com/r9y9/tacotron/blob/0987cedd0d6a6909749c594ca978ac4e11ae79ae/util/audio.py
 
 def load_wav(path):
   return librosa.core.load(path, sr=hparams.sample_rate)[0]
