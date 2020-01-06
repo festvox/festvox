@@ -254,6 +254,38 @@ class CBHG(nn.Module):
         return outputs
 
 
+class LSTMsBlock(nn.Module):
+    """Replacement for the CBHG module
+        - 3 bidirectional lstm layers
+    """
+
+    def __init__(self, in_dim):
+        super(LSTMsBlock, self).__init__()
+        self.in_dim = in_dim
+        self.lstm_i = nn.LSTM(self.in_dim, self.in_dim, bidirectional=True, batch_first=True)
+        self.lstm_h = nn.LSTM(self.in_dim*2, self.in_dim, bidirectional=True, batch_first=True)
+        self.lstm_o = nn.LSTM(self.in_dim*2, 256, bidirectional=True, batch_first=True)
+        self.final_linear = SequenceWise(nn.Linear(512, 256))
+
+    def forward(self, x, input_lengths):
+
+        if input_lengths is not None:
+            x = nn.utils.rnn.pack_padded_sequence(
+                x, input_lengths, batch_first=True)
+
+        x, hidden = self.lstm_i(x)
+        x, hidden = self.lstm_h(x)
+        outputs, hidden = self.lstm_o(x)
+
+        if input_lengths is not None:
+            outputs, _ = nn.utils.rnn.pad_packed_sequence(
+                outputs, batch_first=True)
+
+        outputs = self.final_linear(outputs) 
+        return outputs
+
+
+
 class residualconvmodule(nn.Module):
 
     def __init__(self,  in_channels, out_channels, kernel_size, stride, padding, dilation):
@@ -500,6 +532,19 @@ class Encoder_TacotronOne_Tones(nn.Module):
     def forward(self, inputs, tones, input_lengths=None):
         inputs = self.prenet(inputs, tones)
         return self.cbhg(inputs, input_lengths)
+
+class Encoder_TacotronOne_LSTMsBlock(nn.Module):
+    def __init__(self, in_dim):
+        super(Encoder_TacotronOne_LSTMsBlock, self).__init__()
+
+        self.prenet = Prenet(in_dim, sizes=[256, 128])
+        self.recurrent_block = LSTMsBlock(128)
+
+    def forward(self, inputs, input_lengths=None):
+        inputs = self.prenet(inputs)
+        return self.recurrent_block(inputs, input_lengths)
+
+   
 
 
 class Decoder_TacotronOne(nn.Module):

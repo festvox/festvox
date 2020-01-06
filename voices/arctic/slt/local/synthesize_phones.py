@@ -28,7 +28,7 @@ import numpy as np
 import nltk
 
 #from util import *
-from models import TacotronOneFinalFrame as Tacotron
+from model import TacotronOneSeqwise as Tacotron
 
 from hyperparameters import hparams
 
@@ -46,7 +46,7 @@ def tts(model, text):
         model = model.cuda()
     # TODO: Turning off dropout of decoder's prenet causes serious performance
     # regression, not sure why.
-    #model.decoder.eval()
+    # model.decoder.eval()
     model.encoder.eval()
     model.postnet.eval()
 

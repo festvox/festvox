@@ -14,7 +14,7 @@ from layers  import *
 
 print_flag = 0
 
-
+# Type: Acquisition_CodeBorrowed Source: https://github.com/r9y9/tacotron_pytorch/blob/62db7217c10da3edb34f67b185cc0e2b04cdf77e/tacotron_pytorch/tacotron.py#L277
 class TacotronOne(nn.Module):
     def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
                  r=5, padding_idx=None, use_memory_mask=False):
@@ -61,9 +61,7 @@ class TacotronOne(nn.Module):
 
         return mel_outputs, linear_outputs, alignments
 
-
-
-
+# Type: Indigenous
 class TacotronOneSeqwise(TacotronOne):
 
     def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
@@ -72,6 +70,7 @@ class TacotronOneSeqwise(TacotronOne):
                  r=5, padding_idx=None, use_memory_mask=False)
         self.decoder = Decoder_TacotronOneSeqwise(mel_dim, r)
 
+# Type: Indigenous
 class TacotronOneFinalFrame(TacotronOneSeqwise):
 
     def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
@@ -79,4 +78,14 @@ class TacotronOneFinalFrame(TacotronOneSeqwise):
         super(TacotronOneFinalFrame, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
                  r=5, padding_idx=None, use_memory_mask=False)
         self.decoder = Decoder_TacotronOneFinalFrame(mel_dim, r)
+
+# Type: Indigenous
+# Note: Only the CBHG in the encoder is replaced
+class TacotronOneLSTMsBlock(TacotronOneSeqwise):
+
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False):
+        super(TacotronOneLSTMsBlock, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False)
+        self.encoder = Encoder_TacotronOne_LSTMsBlock(embedding_dim)
 
