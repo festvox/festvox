@@ -21,5 +21,5 @@ Wavenet is a model built on top of ResidualDilatedCausalConv1d
 [Final Frame Expt](https://github.com/festvox/festvox/blob/master/voices/arctic/rms/local/train_phones_finalframe.py): Prediction of frame at time t+1 is dependent on only the final predicted frame at time t. [Checkout the samples](http://tts.speech.cs.cmu.edu/rsk/projects/falcon/exp/final_frame.html)
 
 [LSTMsBlock Expt](https://github.com/festvox/festvox/blob/master/voices/arctic/rms/local/train_phones_lstmsblock.py) Replacing CBHGs in Encoder with 3 LSTMs based on [Tacotron 2](https://ai.googleblog.com/2017/12/tacotron-2-generating-human-like-speech.html). Checkout the samples: 
-     (1) [replacing the CBHG in Encoder by LSTMBlock](http://tts.speech.cs.cmu.edu/rsk/projects/falcon/exp/lstms_encoder/tts_phseq_lstmsencoder_rms.html) 
+     (1) [replacing CBHG by LSTMsBlock in Encoder only while PostNet still has CBHG](http://tts.speech.cs.cmu.edu/rsk/projects/falcon/exp/lstms_encoder/tts_phseq_lstmsencoder_rms.html) 
       (2) [replacing CBHG by LSTMsBlock in both Encoder and PostNet](http://tts.speech.cs.cmu.edu/rsk/projects/falcon/exp/lstmsblock_encoderNpostnet/lstmsblockencoderNpostnet_rms.html)
