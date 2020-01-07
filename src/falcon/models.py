@@ -89,3 +89,56 @@ class TacotronOneLSTMsBlock(TacotronOneSeqwise):
                  r=5, padding_idx=None, use_memory_mask=False)
         self.encoder = Encoder_TacotronOne_LSTMsBlock(embedding_dim)
 
+# Type: Indigenous
+# Note: CBHG in the encoder and postnet are replaced
+class TacotronOneLSTMsBlockPostNet(TacotronOneSeqwise):
+
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False):
+        super(TacotronOneLSTMsBlockPostNet, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False)
+
+        self.encoder = Encoder_TacotronOne_LSTMsBlock(embedding_dim)
+        self.postnet = LSTMsBlock(mel_dim, mel_dim*2)
+
+# Type: Indigenous
+# Note: Vector Quantization in latent space
+class TacotronOneVQ(TacotronOneSeqwise):
+
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False):
+        super(TacotronOneVQ, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False)
+
+        self.num_channels = 1
+        self.num_classes = 200
+        self.vec_len = 256
+        self.normalize = False
+        self.quantizer = quantizer_kotha(self.num_channels, self.num_classes, self.vec_len, self.normalize)
+
+
+    def forward(self, inputs, targets=None, input_lengths=None):
+
+        B = inputs.size(0)
+
+        inputs = self.embedding(inputs)
+        encoder_outputs = self.encoder(inputs, input_lengths)
+
+        # Latent Vector Quantization 
+        latent_outputs, vq_penalty, encoder_penalty, entropy = self.quantizer(encoder_outputs.unsqueeze(2))
+        latent_outputs = latent_outputs.squeeze(2)
+
+        if self.use_memory_mask:
+            memory_lengths = input_lengths
+        else:
+            memory_lengths = None
+
+        mel_outputs, alignments = self.decoder(
+            latent_outputs, targets, memory_lengths=memory_lengths)
+
+        mel_outputs = mel_outputs.view(B, -1, self.mel_dim)
+
+        linear_outputs = self.postnet(mel_outputs)
+        linear_outputs = self.last_linear(linear_outputs)
+
+        return mel_outputs, linear_outputs, alignments, vq_penalty.mean(), encoder_penalty.mean(), entropy

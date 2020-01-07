@@ -3,8 +3,8 @@
 usage: train.py [options]
 
 options:
-    --conf=<json>           Path of configuration file (json).
-    --gpu-id=0               ID of the GPU to use [default: 0]
+    --conf=<json>             Path of configuration file (json).
+    --gpu-id=<N>               ID of the GPU to use [default: 0]
     --exp-dir=<dir>           Experiment directory
     --checkpoint-dir=<dir>    Directory where to save model checkpoints [default: checkpoints].
     --checkpoint-path=<name>  Restore model from checkpoint path if given.
@@ -20,6 +20,7 @@ gpu_id = args['--gpu-id']
 print("Using GPU ", gpu_id)
 os.environ["CUDA_VISIBLE_DEVICES"]=gpu_id
 
+
 from collections import defaultdict
 
 ### This is not supposed to be hardcoded #####
@@ -31,7 +32,8 @@ from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 from util import *
-from models import TacotronOneLSTMsBlock as Tacotron
+from model import TacotronOneVQ as Tacotron
+
 
 import json
 
@@ -106,7 +108,7 @@ def train(model, train_loader, val_loader, optimizer,
                mel_outputs, linear_outputs, attn = outputs[0], outputs[1], outputs[2]
  
             else:
-                mel_outputs, linear_outputs, attn = model(x, mel, input_lengths=sorted_lengths)
+                mel_outputs, linear_outputs, attn, vq_penalty, encoder_penalty, entropy  = model(x, mel, input_lengths=sorted_lengths)
 
             # Loss
             mel_loss = criterion(mel_outputs, mel)
@@ -114,7 +116,9 @@ def train(model, train_loader, val_loader, optimizer,
             linear_loss = 0.5 * criterion(linear_outputs, y) \
                 + 0.5 * criterion(linear_outputs[:, :, :n_priority_freq],
                                   y[:, :, :n_priority_freq])
-            loss = mel_loss + linear_loss
+            encoder_weight = 0.01 * min(1, max(0.1, global_step / 1000 - 1))
+            loss = mel_loss + linear_loss + vq_penalty + encoder_weight * encoder_penalty
+            #print("Loss Value is ", loss.item(), mel_loss.item(), linear_loss.item(), vq_penalty, encoder_penalty, entropy)
 
             if global_step > 0 and global_step % hparams.save_states_interval == 0:
                 save_states(
@@ -131,9 +135,12 @@ def train(model, train_loader, val_loader, optimizer,
             grad_norm = torch.nn.utils.clip_grad_norm_(
                  model.parameters(), clip_thresh)
             optimizer.step()
+            model.quantizer.after_update()
 
             # Logs
+            log_value("entropy", float(entropy), global_step)
             log_value("loss", float(loss.item()), global_step)
+            log_value("Encoder Loss Weight", float(encoder_weight), global_step)
             log_value("mel loss", float(mel_loss.item()), global_step)
             log_value("linear loss", float(linear_loss.item()), global_step)
             log_value("gradient norm", grad_norm, global_step)
@@ -144,13 +151,14 @@ def train(model, train_loader, val_loader, optimizer,
 
         averaged_loss = running_loss / (len(train_loader))
         log_value("loss (per epoch)", averaged_loss, global_epoch)
-        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
+        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + " Entropy: " + str(entropy) + '\n')
         h.close()
 
         global_epoch += 1
 
 
 if __name__ == "__main__":
+
     exp_dir = args["--exp-dir"]
     checkpoint_dir = args["--exp-dir"] + '/checkpoints'
     checkpoint_path = args["--checkpoint-path"]

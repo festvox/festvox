@@ -258,15 +258,19 @@ class LSTMsBlock(nn.Module):
         - 3 bidirectional lstm layers
     """
 
-    def __init__(self, in_dim):
+    def __init__(self, in_dim, linear_dim=None):
         super(LSTMsBlock, self).__init__()
         self.in_dim = in_dim
         self.lstm_i = nn.LSTM(self.in_dim, self.in_dim, bidirectional=True, batch_first=True)
         self.lstm_h = nn.LSTM(self.in_dim*2, self.in_dim, bidirectional=True, batch_first=True)
         self.lstm_o = nn.LSTM(self.in_dim*2, 256, bidirectional=True, batch_first=True)
-        self.final_linear = SequenceWise(nn.Linear(512, 256))
+        if linear_dim:
+           self.linear_dim = linear_dim
+        else:
+            self.linear_dim = 256
+        self.final_linear = SequenceWise(nn.Linear(512, self.linear_dim))
 
-    def forward(self, x, input_lengths):
+    def forward(self, x, input_lengths=None):
 
         if input_lengths is not None:
             x = nn.utils.rnn.pack_padded_sequence(
@@ -280,7 +284,7 @@ class LSTMsBlock(nn.Module):
             outputs, _ = nn.utils.rnn.pad_packed_sequence(
                 outputs, batch_first=True)
 
-        outputs = self.final_linear(outputs) 
+        outputs = torch.tanh(self.final_linear(outputs))
         return outputs
 
 # Type: Acquisition_CodeBorrowed Source: https://github.com/r9y9/wavenet_vocoder

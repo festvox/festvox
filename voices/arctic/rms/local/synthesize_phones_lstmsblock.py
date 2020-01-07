@@ -28,7 +28,7 @@ import numpy as np
 import nltk
 
 #from util import *
-from model import TacotronOneSeqwise as Tacotron
+from models import TacotronOneLSTMsBlock as Tacotron
 
 from hyperparameters import hparams
 
