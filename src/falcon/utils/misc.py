@@ -38,6 +38,7 @@ def _pad_2d(x, max_len):
     return x
 
 def save_checkpoint(model, optimizer, step, checkpoint_dir, epoch, spk_flag=None):
+    step = str(step).zfill(7)
     checkpoint_path = join(
         checkpoint_dir, "checkpoint_step{}.pth".format(step))
     torch.save({
@@ -50,47 +51,41 @@ def save_checkpoint(model, optimizer, step, checkpoint_dir, epoch, spk_flag=None
 
     # Speaker Embedding
     if spk_flag:
-       visualize_speaker_embeddings(model, checkpoint_dir, step) # + '/step' + str(step) + '_speaker_embedding.png')
+       visualize_speaker_embeddings(model, checkpoint_dir, step)
 
 
 def save_states(global_step, mel_outputs, linear_outputs, attn, y,
                 input_lengths, checkpoint_dir=None):
-    print("Save intermediate states at step {}".format(global_step))
 
-    # idx = np.random.randint(0, len(input_lengths))
+    step = str(global_step).zfill(7)
+    print("Save intermediate states at step {}".format(step))
+
     idx = 0
-    #input_length = input_lengths[idx]
 
     # Alignment
-    path = join(checkpoint_dir, "step{}_alignment.png".format(
-        global_step))
+    path = join(checkpoint_dir, "step{}_alignment.png".format(step))
 
-    # alignment = attn[idx].cpu().data.numpy()[:, :input_length]
     alignment = attn[idx].cpu().data.numpy()
-    save_alignment(path, alignment, global_step)
+    save_alignment(path, alignment, step)
 
     # Predicted spectrogram
-    path = join(checkpoint_dir, "step{}_predicted_spectrogram.png".format(
-        global_step))
+    path = join(checkpoint_dir, "step{}_predicted_spectrogram.png".format(step))
     linear_output = linear_outputs[idx].cpu().data.numpy()
     save_spectrogram(path, linear_output)
 
     # Predicted audio signal
     signal = inv_spectrogram(linear_output.T)
-    path = join(checkpoint_dir, "step{}_predicted.wav".format(
-        global_step))
+    path = join(checkpoint_dir, "step{}_predicted.wav".format(step))
     save_wav(signal, path)
 
     # Target spectrogram
-    path = join(checkpoint_dir, "step{}_target_spectrogram.png".format(
-        global_step))
+    path = join(checkpoint_dir, "step{}_target_spectrogram.png".format(step))
     linear_output = y[idx].cpu().data.numpy()
     save_spectrogram(path, linear_output)
 
     # Target audio signal
     signal = inv_spectrogram(linear_output.T)
-    path = join(checkpoint_dir, "step{}_target.wav".format(
-        global_step))
+    path = join(checkpoint_dir, "step{}_target.wav".format(step))
     save_wav(signal, path)
 
 

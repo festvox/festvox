@@ -4,12 +4,13 @@ usage: train.py [options]
 
 options:
     --conf=<json>             Path of configuration file (json).
-    --gpu-id=<N>               ID of the GPU to use [default: 0]
+    --gpu-id=<N>              ID of the GPU to use [default: 0]
     --exp-dir=<dir>           Experiment directory
     --checkpoint-dir=<dir>    Directory where to save model checkpoints [default: checkpoints].
     --checkpoint-path=<name>  Restore model from checkpoint path if given.
     --hparams=<parmas>        Hyper parameters [default: ].
     --log-event-path=<dir>    Log Path [default: exp/log_tacotronOne]
+    --num-latentclasses=<C>   Number of latent classes [default: 200]
     -h, --help                Show this help message and exit
 """
 import os, sys
@@ -125,6 +126,7 @@ def train(model, train_loader, val_loader, optimizer,
                     global_step, mel_outputs, linear_outputs, attn, y,
                     None, checkpoint_dir)
                 visualize_phone_embeddings(model, checkpoint_dir, global_step)
+                visualize_latent_embeddings(model, checkpoint_dir, global_step)
 
             if global_step > 0 and global_step % checkpoint_interval == 0:
                 save_checkpoint(
@@ -135,7 +137,7 @@ def train(model, train_loader, val_loader, optimizer,
             grad_norm = torch.nn.utils.clip_grad_norm_(
                  model.parameters(), clip_thresh)
             optimizer.step()
-            model.quantizer.after_update()
+            #model.quantizer.after_update()
 
             # Logs
             log_value("entropy", float(entropy), global_step)
@@ -165,12 +167,18 @@ if __name__ == "__main__":
     log_path = args["--exp-dir"] + '/tracking'
     conf = args["--conf"]
     hparams.parse(args["--hparams"])
+    num_latent_classes = int(args["--num-latentclasses"])
+    print(hparams)
+
+    # Add hyperparameters
+    # add_hparam
 
     # Override hyper parameters
     if conf is not None:
         with open(conf) as f:
             hparams.parse_json(f.read())
 
+    print(hparams)
     os.makedirs(exp_dir, exist_ok=True)
     os.makedirs(checkpoint_dir, exist_ok=True)
     os.makedirs(log_path, exist_ok=True)
@@ -222,6 +230,7 @@ if __name__ == "__main__":
                      embedding_dim=256,
                      mel_dim=hparams.num_mels,
                      linear_dim=hparams.num_freq,
+                     num_latent_classes=num_latent_classes,
                      r=hparams.outputs_per_step,
                      padding_idx=hparams.padding_idx,
                      use_memory_mask=hparams.use_memory_mask,

@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+# This got broken in Tensorflow 2.0 (https://github.com/tensorflow/community/issues/148)
 
 # Default hyperparameters:
 hparams = tf.contrib.training.HParams(

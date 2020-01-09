@@ -74,3 +74,29 @@ def visualize_phone_embeddings(model, checkpoints_dir, step):
     plt.savefig(path, format="png")
     plt.close()
 
+### Misc
+def visualize_latent_embeddings(model, checkpoints_dir, step):
+    return
+    print("Computing TSNE")
+    latent_embedding = model.quantizer.embedding0.squeeze(0).detach().cpu().numpy()
+    num_classes = model.num_classes
+
+    ppl_array = [5, 10, 40, 100, 200]
+    for ppl in ppl_array:
+
+       embedding = TSNE(n_components=2, verbose=1, perplexity=ppl).fit_transform(latent_embedding)
+
+       y = embedding[:,0]
+       z = embedding[:,1]
+
+       fig, ax = plt.subplots()
+       ax.scatter(y, z)
+
+       for i  in range(num_classes):
+          ax.annotate(i, (y[i], z[i]))
+
+       path = checkpoints_dir + '/step' + str(step) + '_latent_embedding_perplexity_' + str(ppl) + '.png'
+       plt.tight_layout()
+       plt.savefig(path, format="png")
+       plt.close()
+

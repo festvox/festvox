@@ -30,7 +30,7 @@ cp ${VOXDIR}/fnames.test ${VOXDIR}/fnames.val
 cat ${VOXDIR}/fnames.train | while read fname; 
   do
       duration=`soxi -d ${VOXDIR}/wav/$fname.wav`
-      echo $line $duration 
+      echo $fname $duration 
   done | sort -k2 > ${VOXDIR}/etc/fnamesNdurations
 head -600 ${VOXDIR}/etc/fnamesNdurations > ${VOXDIR}/fnames.train
 

@@ -106,16 +106,17 @@ class TacotronOneLSTMsBlockPostNet(TacotronOneSeqwise):
 class TacotronOneVQ(TacotronOneSeqwise):
 
     def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
-                 r=5, padding_idx=None, use_memory_mask=False):
+                 r=5, num_latent_classes=200, padding_idx=None, use_memory_mask=False):
         super(TacotronOneVQ, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
                  r=5, padding_idx=None, use_memory_mask=False)
 
         self.num_channels = 1
-        self.num_classes = 200
+        self.num_classes = num_latent_classes
         self.vec_len = 256
         self.normalize = False
         self.quantizer = quantizer_kotha(self.num_channels, self.num_classes, self.vec_len, self.normalize)
 
+        self.decoder = Decoder_TacotronOneVQ(mel_dim, r)
 
     def forward(self, inputs, targets=None, input_lengths=None):
 
@@ -124,8 +125,8 @@ class TacotronOneVQ(TacotronOneSeqwise):
         inputs = self.embedding(inputs)
         encoder_outputs = self.encoder(inputs, input_lengths)
 
-        # Latent Vector Quantization 
-        latent_outputs, vq_penalty, encoder_penalty, entropy = self.quantizer(encoder_outputs.unsqueeze(2))
+        # Latent Vector Quantization
+        latent_outputs, vq_penalty, encoder_penalty, entropy = self.quantizer(encoder_outputs[:,-1,:].unsqueeze(1).unsqueeze(2))
         latent_outputs = latent_outputs.squeeze(2)
 
         if self.use_memory_mask:
@@ -134,7 +135,7 @@ class TacotronOneVQ(TacotronOneSeqwise):
             memory_lengths = None
 
         mel_outputs, alignments = self.decoder(
-            latent_outputs, targets, memory_lengths=memory_lengths)
+            encoder_outputs, latent_outputs, targets, memory_lengths=memory_lengths)
 
         mel_outputs = mel_outputs.view(B, -1, self.mel_dim)
 
