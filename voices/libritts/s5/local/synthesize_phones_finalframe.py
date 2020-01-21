@@ -28,7 +28,7 @@ import numpy as np
 import nltk
 
 #from util import *
-from model import TacotronOneSeqwise as Tacotron
+from models import TacotronOneFinalFrame as Tacotron
 
 from hyperparameters import hparams
 
@@ -45,8 +45,7 @@ def tts(model, text):
     if use_cuda:
         model = model.cuda()
 
-    model.encoder.eval()
-    model.postnet.eval()
+    model.eval()
 
     sequence = np.array(text)
     sequence = Variable(torch.from_numpy(sequence)).unsqueeze(0)

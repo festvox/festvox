@@ -35,6 +35,9 @@ class categorical_datasource(CategoricalDataSource):
         fname = self.feats_dir + '/' + fname.strip() + '.feats'
         if self.feat_name == 'phones':
             return populate_phonesarray(fname, self.feats_dir, self.feats_dict)
+        elif self.feat_name == 'phonesnossil':
+            return populate_phonesarray(fname, self.feats_dir, self.feats_dict)
+
         else:
             print("Unknown feature type: ", self.feat_name)
             sys.exit()

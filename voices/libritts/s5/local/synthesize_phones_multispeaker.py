@@ -28,7 +28,7 @@ import numpy as np
 import nltk
 
 #from util import *
-from model import TacotronOneSeqwise as Tacotron
+from model import TacotronOneSeqwiseMultispeaker as Tacotron
 
 from hyperparameters import hparams
 
@@ -39,7 +39,9 @@ import json
 
 use_cuda = torch.cuda.is_available()
 
-def tts(model, text):
+
+
+def tts(model, text, spk):
     """Convert text to speech waveform given a Tacotron model.
     """
     if use_cuda:
@@ -49,16 +51,23 @@ def tts(model, text):
     model.postnet.eval()
 
     sequence = np.array(text)
+    spk = np.array([spk])
+    #sequence = np.array(text_to_sequence(text, [hparams.cleaners]))
     sequence = Variable(torch.from_numpy(sequence)).unsqueeze(0)
+    spk = Variable(torch.from_numpy(spk))
+
     if use_cuda:
         sequence = sequence.cuda()
+        spk = spk.cuda()
 
-    mel_outputs, linear_outputs, alignments = model(sequence)
+    # Greedy decoding
+    mel_outputs, linear_outputs, alignments = model(sequence, spk)
 
     linear_output = linear_outputs[0].cpu().data.numpy()
     spectrogram = audio.denormalize(linear_output)
     alignment = alignments[0].cpu().data.numpy()
 
+    # Predicted audio signal
     waveform = audio.inv_spectrogram(linear_output.T)
 
     return waveform, alignment, spectrogram
@@ -80,6 +89,10 @@ if __name__ == "__main__":
     with open(checkpoints_dir + '/ids_phones.json') as  f:
        phids = json.load(f)
 
+    with open(checkpoints_dir + '/spk_ids') as  f:
+       speakers_dict = json.load(f)
+
+
     model = Tacotron(n_vocab=len(phids)+1,
                      embedding_dim=256,
                      mel_dim=hparams.num_mels,
@@ -87,6 +100,7 @@ if __name__ == "__main__":
                      r=hparams.outputs_per_step,
                      padding_idx=hparams.padding_idx,
                      use_memory_mask=hparams.use_memory_mask,
+                     num_spk=len(speakers_dict.keys())
                      )
     checkpoint = torch.load(checkpoint_path)
     checkpoints_dir = os.path.dirname(checkpoint_path)
@@ -97,21 +111,50 @@ if __name__ == "__main__":
     model.load_state_dict(checkpoint["state_dict"])
     model.decoder.max_decoder_steps = max_decoder_steps
 
+
+    ids2speakers = {v:k for (k,v) in speakers_dict.items()}
+    speakers = list(speakers_dict.keys())
+    print(ids2speakers)
+
     os.makedirs(dst_dir, exist_ok=True)
 
     with open(text_list_file_path, "rb") as f:
         lines = f.readlines()
         for idx, line in enumerate(lines):
+
             fname = line.decode("utf-8").split()[0]
-            #fname += '_' + os.path.basename(checkpoint_path).split('.')[0].split('_')[-1]
+            fname = fname.split('_')
+            fname_original = '_'.join(k for k in fname[1:])
+            print(fname, fname_original)
+            cmd = 'cp ' + 'vox/wav/' + '_'.join(k for k in fname) + '.wav ' + dst_dir + '/' + fname_original + '_original.wav'
+            os.system(cmd)
+
             text = ' '.join(k for k in line.decode("utf-8").split()[1:])
             text = '< ' + text + ' >'
-            print(text, fname)
-            #sys.exit()
             text = [phids[l] for l in text.split()]
-            waveform, alignment, _ = tts(model, text)
-            dst_wav_path = join(dst_dir, "{}{}.wav".format(fname, file_name_suffix))
-            dst_alignment_path = join(dst_dir, "{}_alignment.png".format(fname))
+
+            # Generating from original speaker
+            spk = speakers_dict[fname[0]]
+            waveform, alignment, _ = tts(model, text, spk)
+            fname_generated = '_'.join(k for k in fname[1:])
+            fname_generated = fname_generated + '_generated'
+            dst_wav_path = join(dst_dir, "{}{}.wav".format(fname_generated, file_name_suffix))
+            dst_alignment_path = join(dst_dir, "{}_alignment.png".format(fname_generated))
+            plot_alignment(alignment.T, dst_alignment_path,
+                           info="tacotron, {}".format(checkpoint_path))
+            audio.save_wav(waveform, dst_wav_path)
+
+            # Generating from a different speaker
+            spk = np.random.randint(len(speakers))
+            #fname = fname.split('_')
+            #fname[0] = ids2speakers[spk]
+            fname_transferred = '_'.join(k for k in fname[1:])
+            fname_transferred = fname_transferred + '_transferred'
+            print("I picked a random number as ", spk, " the corresponding speaker from the dictionary is ", ids2speakers[spk], " the filename I am storing is ", fname_transferred)
+            print(text, fname_transferred)
+            waveform, alignment, _ = tts(model, text, spk)
+            dst_wav_path = join(dst_dir, "{}{}.wav".format(fname_transferred, file_name_suffix))
+            dst_alignment_path = join(dst_dir, "{}_alignment.png".format(fname_transferred))
             plot_alignment(alignment.T, dst_alignment_path,
                            info="tacotron, {}".format(checkpoint_path))
             audio.save_wav(waveform, dst_wav_path)

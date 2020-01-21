@@ -77,8 +77,9 @@ if __name__ == "__main__":
 
     checkpoint = torch.load(checkpoint_path)
     checkpoints_dir = os.path.dirname(checkpoint_path)
-    with open(checkpoints_dir + '/ids_phones.json') as  f:
+    with open(checkpoints_dir + '/ids_phones_nossil.json') as  f:
        phids = json.load(f)
+    phids = dict(phids)
 
     model = Tacotron(n_vocab=len(phids)+1,
                      embedding_dim=256,
@@ -90,9 +91,6 @@ if __name__ == "__main__":
                      )
     checkpoint = torch.load(checkpoint_path)
     checkpoints_dir = os.path.dirname(checkpoint_path)
-    with open(checkpoints_dir + '/ids_phones.json') as  f:
-       phids = json.load(f)
-    phids = dict(phids)
 
     model.load_state_dict(checkpoint["state_dict"])
     model.decoder.max_decoder_steps = max_decoder_steps
@@ -106,6 +104,7 @@ if __name__ == "__main__":
             #fname += '_' + os.path.basename(checkpoint_path).split('.')[0].split('_')[-1]
             text = ' '.join(k for k in line.decode("utf-8").split()[1:])
             text = '< ' + text + ' >'
+            text = text.replace(' ssil ', ' ')
             print(text, fname)
             #sys.exit()
             text = [phids[l] for l in text.split()]

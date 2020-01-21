@@ -45,8 +45,7 @@ def tts(model, text):
     if use_cuda:
         model = model.cuda()
 
-    model.encoder.eval()
-    model.postnet.eval()
+    model.eval()
 
     sequence = np.array(text)
     sequence = Variable(torch.from_numpy(sequence)).unsqueeze(0)

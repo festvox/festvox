@@ -45,8 +45,7 @@ def tts(model, text):
     if use_cuda:
         model = model.cuda()
 
-    model.encoder.eval()
-    model.postnet.eval()
+    model.eval()
 
     sequence = np.array(text)
     sequence = Variable(torch.from_numpy(sequence)).unsqueeze(0)
@@ -106,6 +105,7 @@ if __name__ == "__main__":
             #fname += '_' + os.path.basename(checkpoint_path).split('.')[0].split('_')[-1]
             text = ' '.join(k for k in line.decode("utf-8").split()[1:])
             text = '< ' + text + ' >'
+            text = text.replace(' ssil ', ' ')
             print(text, fname)
             #sys.exit()
             text = [phids[l] for l in text.split()]
