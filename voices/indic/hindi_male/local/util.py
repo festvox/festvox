@@ -40,6 +40,24 @@ def populate_phonesNqF0sarray(fname, feats_dir, feats_dict):
     arr['qF0s'] = qF0s 
     return arr
 
+def populate_phonesNstressarray(fname, feats_dir, feats_dict):
+    if feats_dict is None:
+       print("Expected a feature dictionary")
+       sys.exit()
+    f = open(fname)
+    arr = {}
+    arr['fname'] = fname
+    for line in f:
+        line = line.split('\n')[0].split()
+        phones  = [feats_dict[phdur.split('_')[0]] for phdur in line]
+        stress  = [int(float(phdur.split('_')[1])) for phdur in line]
+
+    phones = np.array(phones)
+    stress = np.array(stress)
+    arr['phones'] = phones
+    arr['stress'] = stress 
+    return arr
+
 ### Data Source Stuff
 class categorical_datasource(CategoricalDataSource):
 
@@ -54,6 +72,8 @@ class categorical_datasource(CategoricalDataSource):
         if self.feat_name == 'phones':
             return populate_phonesarray(fname, self.feats_dir, self.feats_dict)
         elif self.feat_name == 'phonesNqF0s': 
+            return populate_phonesNqF0sarray(fname, self.feats_dir, self.feats_dict)
+        elif self.feat_name == 'phonesNstress': 
             return populate_phonesNqF0sarray(fname, self.feats_dir, self.feats_dict)
         else:
             print("Unknown feature type: ", self.feat_name)
