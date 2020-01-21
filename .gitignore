@@ -5,4 +5,3 @@ voices/*/*/exp
 *.pyc
 *.o
 log_*
-voices/ljspeech
