@@ -40,6 +40,24 @@ def populate_phonesNqF0sarray(fname, feats_dir, feats_dict):
     arr['qF0s'] = qF0s 
     return arr
 
+def populate_phonesNstressarray(fname, feats_dir, feats_dict):
+    if feats_dict is None:
+       print("Expected a feature dictionary")
+       sys.exit()
+    f = open(fname)
+    arr = {}
+    arr['fname'] = fname
+    for line in f:
+        line = line.split('\n')[0].split()
+        phones  = [feats_dict[phdur.split('_')[0]] for phdur in line]
+        stress  = [int(float(phdur.split('_')[1])) for phdur in line]
+
+    phones = np.array(phones)
+    stress = np.array(stress)
+    arr['phones'] = phones
+    arr['stress'] = stress 
+    return arr
+
 ### Data Source Stuff
 class categorical_datasource(CategoricalDataSource):
 
@@ -56,6 +74,8 @@ class categorical_datasource(CategoricalDataSource):
         elif self.feat_name == 'phonesnossil':
             return populate_phonesarray(fname, self.feats_dir, self.feats_dict)
         elif self.feat_name == 'phonesNqF0s':
+            return populate_phonesNqF0sarray(fname, self.feats_dir, self.feats_dict)
+        elif self.feat_name == 'phonesNstress': 
             return populate_phonesNqF0sarray(fname, self.feats_dir, self.feats_dict)
         else:
             print("Unknown feature type: ", self.feat_name)
@@ -145,6 +165,8 @@ def visualize_phone_embeddings(model, checkpoints_dir, step):
     plt.savefig(path, format="png")
     plt.close()
 
+    visualize_gst_embeddings(model, checkpoints_dir, step)
+
 def visualize_qF0_embeddings(model, checkpoints_dir, step):
 
     print("Computing TSNE")
@@ -166,5 +188,31 @@ def visualize_qF0_embeddings(model, checkpoints_dir, step):
     plt.tight_layout()
     plt.savefig(path, format="png")
     plt.close()
+
+   
+
+
+def visualize_gst_embeddings(model, checkpoints_dir, step):
+
+    print("Computing TSNE")
+    gst_embedding = model.style_embedding
+    gst_embedding = gst_embedding.cpu().detach().numpy()
+    gst_embedded = TSNE(n_components=2, verbose=1, perplexity=40, n_iter=300).fit_transform(gst_embedding)
+    num_classes =  model.num_styletokens
+
+    y = gst_embedding[:,0]
+    z = gst_embedding[:,1]
+
+    fig, ax = plt.subplots()
+    ax.scatter(y, z)
+
+    for i in range(num_classes):
+        ax.annotate(i, (y[i], z[i]))
+
+    path = checkpoints_dir + '/step' + str(step) + '_embedding_gst.png'
+    plt.tight_layout()
+    plt.savefig(path, format="png")
+    plt.close()
+
 
 

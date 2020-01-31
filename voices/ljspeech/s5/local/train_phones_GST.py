@@ -32,7 +32,7 @@ from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 from util import *
-from model import TacotronOneSeqwise as Tacotron
+from model import TacotronOneGST as Tacotron
 
 
 import json
@@ -108,7 +108,7 @@ def train(model, train_loader, val_loader, optimizer,
                mel_outputs, linear_outputs, attn = outputs[0], outputs[1], outputs[2]
  
             else:
-                mel_outputs, linear_outputs, attn = model(x, mel, input_lengths=sorted_lengths)
+                mel_outputs, linear_outputs, attn = model.forward_gst(x, mel, input_lengths=sorted_lengths)
 
             # Loss
             mel_loss = criterion(mel_outputs, mel)

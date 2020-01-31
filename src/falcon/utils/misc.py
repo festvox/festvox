@@ -232,8 +232,13 @@ class FloatDataSource(Dataset):
     def __getitem__(self, idx):
 
         fname = self.filenames_array[idx]
-        fname = self.feats_dir + '/' + fname.strip() + '.feats.npy'
-        feats_array = np.load(fname)
+        #print("Feature name is ", self.feat_name) 
+        if self.feat_name == 'f0':
+            fname = self.feats_dir + '/' + fname.strip() + '.feats'
+            feats_array = np.loadtxt(fname)
+        else:
+            fname = self.feats_dir + '/' + fname.strip() + '.feats.npy'
+            feats_array = np.load(fname)
         return feats_array
 
     def __len__(self):

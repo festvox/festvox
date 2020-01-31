@@ -8,7 +8,7 @@ from utils import audio
 from utils.plot import plot_alignment
 
 
-### Text Processign Stuff
+### Text Processing Stuff
 def populate_phonesarray(fname, feats_dir, feats_dict):
     if feats_dict is None:
        print("Expected a feature dictionary") 
@@ -47,6 +47,20 @@ class float_datasource(FloatDataSource):
         super(float_datasource, self).__init__(fnames_file, desc_file, feat_name, feats_dir, feats_dict)
 
 
+class lF0dataset(PyTorchDataset):
+
+    def __init__(self, X, Mel, Y, f0):
+       super(lF0dataset, self).__init__(X, Mel, Y)
+
+       self.f0 = f0
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.Mel[idx], self.Y[idx], self.f0[idx]
+
+    def __len__(self):
+        return len(self.X)
+
+
 
 #### Visualization Stuff
 
@@ -75,4 +89,48 @@ def visualize_phone_embeddings(model, checkpoints_dir, step):
     plt.tight_layout()
     plt.savefig(path, format="png")
     plt.close()
+
+
+def _pad(seq, max_len):
+    #print("Shape of seq: ", seq.shape, " and the max length: ", max_len)     
+    assert len(seq) < max_len
+    return np.pad(seq, (0, max_len - len(seq)),
+                  mode='constant', constant_values=0)
+
+
+def _pad_2d(x, max_len):
+    x = np.pad(x, [(0, max_len - len(x)), (0, 0)],
+               mode="constant", constant_values=0)
+    return x
+
+
+def collate_fn_logF0(batch):
+    """Create batch"""
+    r = hparams.outputs_per_step
+    input_lengths = [len(x[0]) for x in batch]
+    max_input_len = np.max(input_lengths) + 1
+    # Add single zeros frame at least, so plus 1
+    max_target_len = np.max([len(x[1]) for x in batch]) + 1
+    if max_target_len % r != 0:
+        max_target_len += r - max_target_len % r
+        assert max_target_len % r == 0
+
+    a = np.array([_pad(x[0], max_input_len) for x in batch], dtype=np.int)
+    x_batch = torch.LongTensor(a)
+
+    input_lengths = torch.LongTensor(input_lengths)
+
+    b = np.array([_pad_2d(x[1], max_target_len) for x in batch],
+                 dtype=np.float32)
+    mel_batch = torch.FloatTensor(b)
+
+    c = np.array([_pad_2d(x[2], max_target_len) for x in batch],
+                 dtype=np.float32)
+    y_batch = torch.FloatTensor(c)
+
+    d = np.array([_pad(x[3], max_target_len) for x in batch],
+                 dtype=np.float32)
+    lF0_batch = torch.FloatTensor(d)
+
+    return x_batch, input_lengths, mel_batch, y_batch, lF0_batch
 

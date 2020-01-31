@@ -32,7 +32,7 @@ from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 from util import *
-from model import TacotronOneSeqwise as Tacotron
+from model import TacotronOnelogF0 as Tacotron
 
 
 import json
@@ -76,12 +76,13 @@ def train(model, train_loader, val_loader, optimizer,
     linear_dim = model.linear_dim
 
     criterion = nn.L1Loss()
+    criterion_f0 = nn.MSELoss()
 
     global global_step, global_epoch
     while global_epoch < nepochs:
         h = open(logfile_name, 'a')
         running_loss = 0.
-        for step, (x, input_lengths, mel, y) in tqdm(enumerate(train_loader)):
+        for step, (x, input_lengths, mel, y, lF0) in tqdm(enumerate(train_loader)):
 
             # Decay learning rate
             current_lr = learning_rate_decay(init_lr, global_step)
@@ -95,12 +96,18 @@ def train(model, train_loader, val_loader, optimizer,
                 input_lengths.view(-1), dim=0, descending=True)
             sorted_lengths = sorted_lengths.long().numpy()
 
-            x, mel, y = x[indices], mel[indices], y[indices]
+            x, mel, y, lF0 = x[indices], mel[indices], y[indices], lF0[indices]
 
             # Feed data
-            x, mel, y = Variable(x), Variable(mel), Variable(y)
+            x, mel, y, lF0 = Variable(x), Variable(mel), Variable(y), Variable(lF0)
             if use_cuda:
-                x, mel, y = x.cuda(), mel.cuda(), y.cuda()
+                x, mel, y, lF0 = x.cuda(), mel.cuda(), y.cuda(), lF0.cuda()
+
+            #print("Shape of x: ", x.shape)
+            #print("Shape of mel: ", mel.shape)
+            #print("Shape of y: ", y.shape)
+            #print("Shape of lF0: ", lF0.shape)
+            #print("Sorted lengths: ", sorted_lengths)
 
             # Multi GPU Configuration
             if use_multigpu:
@@ -108,7 +115,7 @@ def train(model, train_loader, val_loader, optimizer,
                mel_outputs, linear_outputs, attn = outputs[0], outputs[1], outputs[2]
  
             else:
-                mel_outputs, linear_outputs, attn = model(x, mel, input_lengths=sorted_lengths)
+                mel_outputs, linear_outputs, lF0_outputs, attn = model.forward_lF0(x, mel, input_lengths=sorted_lengths)
 
             # Loss
             mel_loss = criterion(mel_outputs, mel)
@@ -116,7 +123,10 @@ def train(model, train_loader, val_loader, optimizer,
             linear_loss = 0.5 * criterion(linear_outputs, y) \
                 + 0.5 * criterion(linear_outputs[:, :, :n_priority_freq],
                                   y[:, :, :n_priority_freq])
-            loss = mel_loss + linear_loss
+            #print("Shape of lF0 and lF0_outputs: ", lF0.shape, lF0_outputs.shape)
+
+            lF0_loss = criterion_f0(lF0_outputs, lF0)
+            loss = mel_loss + linear_loss + lF0_loss
 
             if global_step > 0 and global_step % hparams.save_states_interval == 0:
                 save_states(
@@ -137,6 +147,7 @@ def train(model, train_loader, val_loader, optimizer,
             # Logs
             log_value("loss", float(loss.item()), global_step)
             log_value("mel loss", float(mel_loss.item()), global_step)
+            log_value("LF0 loss", float(lF0_loss.item()), global_step)
             log_value("linear loss", float(linear_loss.item()), global_step)
             log_value("gradient norm", grad_norm, global_step)
             log_value("learning rate", current_lr, global_step)
@@ -146,10 +157,8 @@ def train(model, train_loader, val_loader, optimizer,
 
         averaged_loss = running_loss / (len(train_loader))
         log_value("loss (per epoch)", averaged_loss, global_epoch)
-        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
+        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + " LF0 Loss: " + str(lF0_loss.item()) +'\n')
         h.close()
-        #sys.exit()
-
         global_epoch += 1
 
 
@@ -200,12 +209,16 @@ if __name__ == "__main__":
     Mel_train = float_datasource(vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
     Mel_val = FloatDataSource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
 
+    feats_name = 'f0'
+    lF0_train = float_datasource(vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
+
+
     # Dataset and Dataloader setup
-    trainset = PyTorchDataset(X_train, Mel_train, Y_train)
+    trainset = lF0dataset(X_train, Mel_train, Y_train, lF0_train)
     train_loader = data_utils.DataLoader(
         trainset, batch_size=hparams.batch_size,
         num_workers=hparams.num_workers, shuffle=True,
-        collate_fn=collate_fn, pin_memory=hparams.pin_memory)
+        collate_fn=collate_fn_logF0, pin_memory=hparams.pin_memory)
 
     valset = PyTorchDataset(X_val, Mel_val, Y_val)
     val_loader = data_utils.DataLoader(

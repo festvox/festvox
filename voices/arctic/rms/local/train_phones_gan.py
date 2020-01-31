@@ -32,6 +32,7 @@ from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 from util import *
+from blocks import *
 from model import TacotronOneSeqwise as Tacotron
 
 
@@ -66,16 +67,21 @@ fs = hparams.sample_rate
 
 
 
-def train(model, train_loader, val_loader, optimizer,
-          init_lr=0.002,
+def train(model, model_discriminator, train_loader, val_loader, optimizer,
+          optimizer_discriminator, init_lr=0.002,
           checkpoint_dir=None, checkpoint_interval=None, nepochs=None,
           clip_thresh=1.0):
     model.train()
+    model_discriminator.train()
+
     if use_cuda:
         model = model.cuda()
+        model_discriminator = model_discriminator.cuda()
+
     linear_dim = model.linear_dim
 
     criterion = nn.L1Loss()
+    criterion_discriminator = nn.CrossEntropyLoss()
 
     global global_step, global_epoch
     while global_epoch < nepochs:
@@ -88,7 +94,6 @@ def train(model, train_loader, val_loader, optimizer,
             for param_group in optimizer.param_groups:
                 param_group['lr'] = current_lr
 
-            optimizer.zero_grad()
 
             # Sort by length
             sorted_lengths, indices = torch.sort(
@@ -102,21 +107,43 @@ def train(model, train_loader, val_loader, optimizer,
             if use_cuda:
                 x, mel, y = x.cuda(), mel.cuda(), y.cuda()
 
-            # Multi GPU Configuration
-            if use_multigpu:
-               outputs,  r_, o_ = data_parallel_workaround(model, (x, mel))
-               mel_outputs, linear_outputs, attn = outputs[0], outputs[1], outputs[2]
- 
-            else:
-                mel_outputs, linear_outputs, attn = model(x, mel, input_lengths=sorted_lengths)
 
-            # Loss
+            # Update discriminator
+            mel_outputs, _, _ = model(x, mel, input_lengths=sorted_lengths)
+            labels_real = torch.ones(x.shape[0]).cuda().long()
+            labels_fake = torch.zeros(x.shape[0]).cuda().long()
+            outputs_real = model_discriminator(mel)
+            outputs_fake = model_discriminator(mel_outputs)
+
+            loss_discriminator_real = criterion_discriminator(outputs_real, labels_real)
+            loss_discriminator_fake = criterion_discriminator(outputs_fake, labels_fake)
+            loss_discriminator = loss_discriminator_fake + loss_discriminator_real
+
+            optimizer_discriminator.zero_grad()
+            loss_discriminator.backward()
+            grad_norm = torch.nn.utils.clip_grad_norm_(
+                 model_discriminator.parameters(), clip_thresh)
+            optimizer_discriminator.step()
+
+
+            # Update generator
+            optimizer.zero_grad()
+            mel_outputs, linear_outputs, attn = model(x, mel, input_lengths=sorted_lengths)
             mel_loss = criterion(mel_outputs, mel)
             n_priority_freq = int(3000 / (fs * 0.5) * linear_dim)
             linear_loss = 0.5 * criterion(linear_outputs, y) \
                 + 0.5 * criterion(linear_outputs[:, :, :n_priority_freq],
                                   y[:, :, :n_priority_freq])
-            loss = mel_loss + linear_loss
+            loss_generator = mel_loss + linear_loss
+            loss = loss_discriminator + loss_generator
+
+            loss_generator.backward()
+            grad_norm = torch.nn.utils.clip_grad_norm_(
+                 model.parameters(), clip_thresh)
+            optimizer.step()
+
+
+            # Tracking and logs
 
             if global_step > 0 and global_step % hparams.save_states_interval == 0:
                 save_states(
@@ -128,14 +155,11 @@ def train(model, train_loader, val_loader, optimizer,
                 save_checkpoint(
                     model, optimizer, global_step, checkpoint_dir, global_epoch)
 
-            # Update
-            loss.backward(retain_graph=False)
-            grad_norm = torch.nn.utils.clip_grad_norm_(
-                 model.parameters(), clip_thresh)
-            optimizer.step()
-
-            # Logs
             log_value("loss", float(loss.item()), global_step)
+            log_value("loss_discriminator", float(loss_discriminator.item()), global_step)
+            log_value("loss_generator", float(loss_generator.item()), global_step)
+            log_value("loss_discriminator_real", float(loss_discriminator.item()), global_step)
+            log_value("loss_discriminator_fake", float(loss_discriminator.item()), global_step)
             log_value("mel loss", float(mel_loss.item()), global_step)
             log_value("linear loss", float(linear_loss.item()), global_step)
             log_value("gradient norm", grad_norm, global_step)
@@ -147,8 +171,7 @@ def train(model, train_loader, val_loader, optimizer,
         averaged_loss = running_loss / (len(train_loader))
         log_value("loss (per epoch)", averaged_loss, global_epoch)
         h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
-        h.close()
-        #sys.exit()
+        h.close() 
 
         global_epoch += 1
 
@@ -222,10 +245,18 @@ if __name__ == "__main__":
                      padding_idx=hparams.padding_idx,
                      use_memory_mask=hparams.use_memory_mask,
                      )
+    model_discriminator = LSTMDiscriminator(hparams.num_mels, 256, 2) 
+
     model = model.cuda()
+    model_discriminator.cuda()
     #model = DataParallelFix(model)
 
     optimizer = optim.Adam(model.parameters(),
+                           lr=hparams.initial_learning_rate, betas=(
+                               hparams.adam_beta1, hparams.adam_beta2),
+                           weight_decay=hparams.weight_decay)
+
+    optimizer_discriminator = optim.Adam(model.parameters(),
                            lr=hparams.initial_learning_rate, betas=(
                                hparams.adam_beta1, hparams.adam_beta2),
                            weight_decay=hparams.weight_decay)
@@ -250,8 +281,8 @@ if __name__ == "__main__":
 
     # Train!
     try:
-        train(model, train_loader, val_loader, optimizer,
-              init_lr=hparams.initial_learning_rate,
+        train(model, model_discriminator, train_loader, val_loader, optimizer,
+              optimizer_discriminator, init_lr=hparams.initial_learning_rate,
               checkpoint_dir=checkpoint_dir,
               checkpoint_interval=hparams.checkpoint_interval,
               nepochs=hparams.nepochs,

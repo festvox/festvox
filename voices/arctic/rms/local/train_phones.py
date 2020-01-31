@@ -147,7 +147,8 @@ def train(model, train_loader, val_loader, optimizer,
         averaged_loss = running_loss / (len(train_loader))
         log_value("loss (per epoch)", averaged_loss, global_epoch)
         h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
-        h.close()
+        h.close() 
+        #sys.exit()
 
         global_epoch += 1
 

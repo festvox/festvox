@@ -132,3 +132,35 @@ class TacotronOneFinalFrame(TacotronOneSeqwise):
 
 
 
+class TacotronOnelogF0(TacotronOneSeqwise):
+
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False):
+        super(TacotronOnelogF0, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False)
+
+        self.mel2lF0 = SequenceWise(nn.Linear(mel_dim, 1))
+
+    def forward_lF0(self, inputs, targets=None, input_lengths=None):
+
+        B = inputs.size(0)
+
+        inputs = self.embedding(inputs)
+        encoder_outputs = self.encoder(inputs, input_lengths)
+
+        if self.use_memory_mask:
+            memory_lengths = input_lengths
+        else:
+            memory_lengths = None
+
+        mel_outputs, alignments = self.decoder(
+            encoder_outputs, targets, memory_lengths=memory_lengths)
+
+        mel_outputs = mel_outputs.view(B, -1, self.mel_dim)
+        lF0_outputs = torch.tanh(self.mel2lF0(mel_outputs))
+
+        linear_outputs = self.postnet(mel_outputs)
+        linear_outputs = self.last_linear(linear_outputs)
+
+        return mel_outputs, linear_outputs, lF0_outputs.squeeze(2), alignments
+

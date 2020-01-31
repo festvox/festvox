@@ -928,3 +928,27 @@ class Decoder_TacotronOneVQ(Decoder_TacotronOneSeqwise):
 
         return outputs, alignments
 
+# Type: Indigenous
+class LSTMDiscriminator(nn.Module):
+
+    def __init__(self, in_dim, hidden_dim, out_dim):
+        super().__init__()
+
+        self.in_dim = in_dim
+        self.hidden_dim = hidden_dim
+        self.out_dim = out_dim
+
+        self.lstm = nn.LSTM(self.in_dim, self.hidden_dim, bidirectional=True, batch_first=True)
+
+        self.output_linear = nn.Linear(self.hidden_dim*2, self.out_dim) # Note that this is not SequenceWise
+
+
+    def forward(self,x):
+
+        x, _ = self.lstm(x)
+        x = self.output_linear(x)
+        return x[:,-1,:]
+
+
+
+

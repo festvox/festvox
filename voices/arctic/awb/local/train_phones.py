@@ -199,6 +199,7 @@ if __name__ == "__main__":
     Mel_train = float_datasource(vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
     Mel_val = FloatDataSource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
 
+
     # Dataset and Dataloader setup
     trainset = PyTorchDataset(X_train, Mel_train, Y_train)
     train_loader = data_utils.DataLoader(
