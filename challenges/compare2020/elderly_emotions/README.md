@@ -3,4 +3,4 @@
 
 Official Baseline for Valence: 0.4 
 
-Our Baseline for Valence: 0.15 (current)
+[Our Baseline](https://github.com/festvox/festvox/blob/master/challenges/compare2020/elderly_emotions/local/train_valence_baseline.py) for Valence: 0.15 (current)
