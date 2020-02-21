@@ -27,11 +27,11 @@ from collections import defaultdict
 FALCON_DIR = os.environ.get('FALCONDIR')
 sys.path.append(FALCON_DIR)
 ##############################################
-from utils.misc import *
+from utils.misc import * # ha sab kuch import karlo
 from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
-from util import *
+from util import * # modify
 from model import TacotronOneSeqwise as Tacotron
 
 
@@ -49,7 +49,7 @@ import numpy as np
 from os.path import join, expanduser
 
 import tensorboard_logger
-from tensorboard_logger import *
+from tensorboard_logger import *  # import X and then from X import *. naice!!
 from hyperparameters import hparams, hparams_debug_string
 
 # Seriously??? vox_dir='vox'? kuch bhi
