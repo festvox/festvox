@@ -207,7 +207,8 @@ if __name__ == "__main__":
         trainset, batch_size=hparams.batch_size,
         num_workers=hparams.num_workers, shuffle=True,
         collate_fn=collate_fn, pin_memory=hparams.pin_memory)
-
+    
+    ## Ok champion, tell me where you are using this  
     valset = PyTorchDataset(X_val, Mel_val, Y_val)
     val_loader = data_utils.DataLoader(
         valset, batch_size=hparams.batch_size,
