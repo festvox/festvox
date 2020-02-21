@@ -242,8 +242,8 @@ if __name__ == "__main__":
             global_step = checkpoint["global_step"]
             global_epoch = checkpoint["global_epoch"]
         except:
-            # TODO
-            pass
+            print("Houston! We have got problems")
+            
 
     # Setup tensorboard logger
     tensorboard_logger.configure(log_path)
