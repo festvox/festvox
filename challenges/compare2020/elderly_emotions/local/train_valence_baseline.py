@@ -48,7 +48,7 @@ import numpy as np
 from os.path import join, expanduser
 
 import tensorboard_logger
-from tensorboard_logger import *
+from tensorboard_logger import * # import X and then from X import *. naice!!
 from hyperparameters import hparams, hparams_debug_string
 
 vox_dir ='vox'
