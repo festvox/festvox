@@ -1,4 +1,4 @@
-"""Trainining script for Tacotron speech synthesis model.
+"""Trainining script for Valence Baseline
 
 usage: train.py [options]
 
