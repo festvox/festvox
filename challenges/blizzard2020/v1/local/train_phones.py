@@ -1,4 +1,4 @@
-"""Trainining script for Tacotron speech synthesis model.
+"""Trainining script for Mandarin speech synthesis model.
 
 usage: train.py [options]
 
@@ -52,6 +52,7 @@ import tensorboard_logger
 from tensorboard_logger import *
 from hyperparameters import hparams, hparams_debug_string
 
+# Seriously??? vox_dir='vox'? kuch bhi
 vox_dir ='vox'
 
 global_step = 0
