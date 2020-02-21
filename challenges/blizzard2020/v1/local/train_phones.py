@@ -243,6 +243,7 @@ if __name__ == "__main__":
             global_epoch = checkpoint["global_epoch"]
         except:
             print("Houston! We have got problems")
+            sys.exit()
             
 
     # Setup tensorboard logger
