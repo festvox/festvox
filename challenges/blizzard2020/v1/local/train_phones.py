@@ -98,7 +98,7 @@ def train(model, train_loader, val_loader, optimizer,
 
             x, mel, y = x[indices], mel[indices], y[indices]
 
-            # Feed data
+            # Why are you doing this in multiple steps? Like writing more lines eh??
             x, mel, y = Variable(x), Variable(mel), Variable(y)
             if use_cuda:
                 x, mel, y = x.cuda(), mel.cuda(), y.cuda()
