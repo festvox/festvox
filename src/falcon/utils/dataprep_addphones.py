@@ -32,7 +32,7 @@ for line in f:
     if ctr % 100 == 1:
        print("Processed ", ctr, "lines")
 
-    fname = line.split()[0]
+    fname = str(line.split()[0])
     text = '< ' + ' '.join(k for k in line.split()[1:]) + ' >'
     print(text)
     text_ints = ' '.join(str(ids_dict[k]) for k in text.split())
