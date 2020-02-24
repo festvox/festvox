@@ -28,15 +28,26 @@ for line in f:
  if len(line) > 2:
     ctr += 1
     fname = line.split('\n')[0]
-
+    if ctr == 1:
+       continue
     if ctr % 100 == 1:
        print("Processed ", ctr, "lines")
 
     fname = line.split(',')[0].split('.wav')[0]
-    valence = line.split(',')[-2]
+    mask = line.split(',')[1].split('\n')[0]
+    print(mask)
+    if mask == 'clear':
+       mask = 0
+    elif mask == 'mask':
+       mask = 1
+    elif mask == '?':
+       mask='?'
+    else:
+       print("Something is wrong with ", mask)
+       sys,exit()
 
     g = open(feats_dir + '/' + fname + '.feats', 'w')
-    g.write(valence + '\n')
+    g.write(str(mask) + '\n')
     g.close()
 
 
