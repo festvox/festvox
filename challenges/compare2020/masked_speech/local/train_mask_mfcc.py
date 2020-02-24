@@ -32,7 +32,7 @@ from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 from util import *
-from model import ValenceSeq2Seq 
+from model import MaskSeq2Seq 
 
 import json
 
@@ -185,7 +185,7 @@ if __name__ == "__main__":
     h.close()
 
 
-    feats_name = 'valence'
+    feats_name = 'mask'
     X_train = categorical_datasource( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name)
     X_val = categorical_datasource(vox_dir + '/' +  'fnames.val', vox_dir + '/' +  'etc/falcon_feats.desc', feats_name,  vox_dir + '/' +  'festival/falcon_' + feats_name)
 
@@ -194,20 +194,20 @@ if __name__ == "__main__":
     Mel_val = float_datasource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
 
     # Dataset and Dataloader setup
-    trainset = ValenceDataset(X_train, Mel_train)
+    trainset = MaskDataset(X_train, Mel_train)
     train_loader = data_utils.DataLoader(
         trainset, batch_size=hparams.batch_size,
         num_workers=hparams.num_workers, shuffle=True,
         collate_fn=collate_fn_valence, pin_memory=hparams.pin_memory)
 
-    valset = ValenceDataset(X_val, Mel_val)
+    valset = MaskDataset(X_val, Mel_val)
     val_loader = data_utils.DataLoader(
         valset, batch_size=hparams.batch_size,
         num_workers=hparams.num_workers, shuffle=True,
         collate_fn=collate_fn_valence, pin_memory=hparams.pin_memory)
 
     # Model
-    model = ValenceSeq2Seq(39)
+    model = MaskSeq2Seq(39)
     model = model.cuda()
 
     optimizer = optim.Adam(model.parameters(),

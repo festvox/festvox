@@ -32,7 +32,7 @@ from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 from util import *
-from model import ValenceSeq2Seq 
+from model import ValenceSeq2Seq_DownsamplingEncoder
 
 import json
 
@@ -85,7 +85,6 @@ def validate_model_full(model, val_loader):
      print('\n')
      return recall
 
-
 def validate_model(model, val_loader):
      print("Validating the model")
      model.eval()
@@ -118,6 +117,7 @@ def train(model, train_loader, val_loader, optimizer,
     criterion = nn.CrossEntropyLoss()
     global global_step, global_epoch
     while global_epoch < nepochs:
+        #validate_model(model, val_loader)
         model.train()
         h = open(logfile_name, 'a')
         running_loss = 0.
@@ -147,7 +147,7 @@ def train(model, train_loader, val_loader, optimizer,
             optimizer.step()
 
             # Logs
-            log_value("Training Loss", float(loss.item()), global_step)
+            log_value("loss", float(loss.item()), global_step)
             log_value("gradient norm", grad_norm, global_step)
             log_value("learning rate", current_lr, global_step)
             global_step += 1
@@ -156,7 +156,7 @@ def train(model, train_loader, val_loader, optimizer,
         averaged_loss = running_loss / (len(train_loader))
         log_value("loss (per epoch)", averaged_loss, global_epoch)
         h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
-        h.close() 
+        h.close()
         recall = validate_model(model, val_loader)
         log_value("Unweighted Recall per epoch", recall, global_epoch)
 
@@ -189,7 +189,7 @@ if __name__ == "__main__":
     X_train = categorical_datasource( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name)
     X_val = categorical_datasource(vox_dir + '/' +  'fnames.val', vox_dir + '/' +  'etc/falcon_feats.desc', feats_name,  vox_dir + '/' +  'festival/falcon_' + feats_name)
 
-    feats_name = 'mfcc'
+    feats_name = 'mspec'
     Mel_train = float_datasource(vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
     Mel_val = float_datasource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
 
@@ -207,7 +207,7 @@ if __name__ == "__main__":
         collate_fn=collate_fn_valence, pin_memory=hparams.pin_memory)
 
     # Model
-    model = ValenceSeq2Seq(39)
+    model = ValenceSeq2Seq_DownsamplingEncoder(39)
     model = model.cuda()
 
     optimizer = optim.Adam(model.parameters(),
@@ -241,9 +241,10 @@ if __name__ == "__main__":
               checkpoint_interval=hparams.checkpoint_interval,
               nepochs=hparams.nepochs,
               clip_thresh=hparams.clip_thresh)
-        recall = validate_model_full(model, val_loader)
-        print("Final Recall: ", recall)
- 
+        validate_model_full(model, val_loader)
+        save_checkpoint(
+            model, optimizer, global_step, checkpoint_dir, global_epoch)
+
     except KeyboardInterrupt:
         save_checkpoint(
             model, optimizer, global_step, checkpoint_dir, global_epoch)

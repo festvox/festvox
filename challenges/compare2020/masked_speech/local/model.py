@@ -67,10 +67,10 @@ class DownsamplingEncoder(nn.Module):
 
 
 
-class ValenceSeq2Seq(nn.Module):
+class MaskSeq2Seq(nn.Module):
 
     def __init__(self, in_dim=80):
-        super(ValenceSeq2Seq, self).__init__()
+        super(MaskSeq2Seq, self).__init__()
         self.encoder = Encoder_TacotronOne(in_dim)
         self.mel2output = nn.Linear(256, 3)
 
@@ -81,7 +81,7 @@ class ValenceSeq2Seq(nn.Module):
 
 
 
-class ValenceSeq2Seq_DownsamplingEncoder(ValenceSeq2Seq):
+class ValenceSeq2Seq_DownsamplingEncoder(MaskSeq2Seq):
 
     def __init__(self, in_dim=80):
         super(ValenceSeq2Seq_DownsamplingEncoder, self).__init__(in_dim)
