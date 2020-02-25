@@ -69,8 +69,10 @@ def validate_model_full(model, val_loader):
      model.eval()
      y_true = []
      y_pred = []
+     ff = open(exp_dir + '/eval' ,'a')
+
      with torch.no_grad():
-      for step, (x, mel) in enumerate(val_loader):
+      for step, (x, mel, fname) in enumerate(val_loader):
           #print("Shape of input during validation: ", x.shape, mel.shape)    
           x, mel = Variable(x).cuda(), Variable(mel).cuda()
           logits = model(mel)
@@ -91,18 +93,29 @@ def validate_model(model, val_loader):
      model.eval()
      y_true = []
      y_pred = []
+     fnames = []
      with torch.no_grad():
-      for step, (x, mel) in enumerate(val_loader):
-       if step < 15: 
+      for step, (x, mel, fname) in enumerate(val_loader):
+       if step < 15:
+          
+          print(step)  
           #print("Shape of input during validation: ", x.shape, mel.shape)    
           x, mel = Variable(x).cuda(), Variable(mel).cuda()
           logits = model(mel)
           targets = x.cpu().view(-1).numpy()
           y_true += targets.tolist()
           predictions = return_classes(logits) 
-          y_pred += predictions.tolist()  
+          y_pred += predictions.tolist()
+          fnames += fname  
           #print(predictions, targets)
      #print(y_pred, y_true)
+       else:
+          break
+     ff = open(exp_dir + '/eval' ,'a')
+     for (f, yp, yt) in list(zip(fnames,y_pred, y_true)):
+          ff.write( f + ' ' + str(yp) + ' ' + str(yt) + '\n')
+     ff.close()
+ 
      recall = get_metrics(y_pred, y_true)
      print("Unweighted Recall for the validation set:  ", recall)
      print('\n')
@@ -117,11 +130,12 @@ def train(model, train_loader, val_loader, optimizer,
 
     criterion = nn.CrossEntropyLoss()
     global global_step, global_epoch
+    #validate_model(model, val_loader)
     while global_epoch < nepochs:
         model.train()
         h = open(logfile_name, 'a')
         running_loss = 0.
-        for step, (x, mel) in tqdm(enumerate(train_loader)):
+        for step, (x, mel, fname) in tqdm(enumerate(train_loader)):
 
             # Decay learning rate
             current_lr = learning_rate_decay(init_lr, global_step)
@@ -159,7 +173,7 @@ def train(model, train_loader, val_loader, optimizer,
         h.close() 
         recall = validate_model(model, val_loader)
         log_value("Unweighted Recall per epoch", recall, global_epoch)
-
+        #sys.exit()
         global_epoch += 1
 
 
@@ -184,6 +198,8 @@ if __name__ == "__main__":
     h = open(logfile_name, 'w')
     h.close()
 
+    ff = open(exp_dir + '/eval' ,'w')
+    ff.close()
 
     feats_name = 'mask'
     X_train = categorical_datasource( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name)
@@ -202,7 +218,7 @@ if __name__ == "__main__":
 
     valset = MaskDataset(X_val, Mel_val)
     val_loader = data_utils.DataLoader(
-        valset, batch_size=hparams.batch_size,
+        valset, batch_size=4,
         num_workers=hparams.num_workers, shuffle=True,
         collate_fn=collate_fn_valence, pin_memory=hparams.pin_memory)
 

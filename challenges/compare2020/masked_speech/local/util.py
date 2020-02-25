@@ -19,11 +19,14 @@ class categorical_datasource(CategoricalDataSource):
 
         assert self.feat_type == 'categorical'
         fname = self.filenames_array[idx]
+        arr = {}
+        arr['fname'] = fname
         fname = self.feats_dir + '/' + fname.strip() + '.feats'
         f = open(fname)
         for line in f:
-           valence = line.split('\n')[0]
-           return valence
+           mask = line.split('\n')[0]
+           arr['mask'] = mask
+           return arr
 
 class float_datasource(FloatDataSource):
 
@@ -31,8 +34,8 @@ class float_datasource(FloatDataSource):
         super(float_datasource, self).__init__(fnames_file, desc_file, feat_name, feats_dir, feats_dict)
 
 
-
 class MaskDataset(object):
+
     def __init__(self, X, Mel):
         self.X = X
         self.Mel = Mel
@@ -56,15 +59,17 @@ def collate_fn_valence(batch):
     # Add single zeros frame at least, so plus 1
     max_target_len = np.max([len(x[1]) for x in batch])
 
-    a = np.array([x[0] for x in batch], dtype=np.int)
+    a = np.array([x[0]['mask'] for x in batch], dtype=np.int)
     x_batch = torch.LongTensor(a)
+ 
+    f = [x[0]['fname'] for x in batch]
+
 
     b = np.array([_pad_2d(x[1], max_target_len) for x in batch],
                  dtype=np.float32)
     mel_batch = torch.FloatTensor(b)
 
-    return x_batch, mel_batch
-
+    return x_batch, mel_batch, f
 
 # Utility to return predictions
 def return_classes(logits, dim=-1):

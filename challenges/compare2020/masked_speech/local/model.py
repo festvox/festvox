@@ -72,7 +72,7 @@ class MaskSeq2Seq(nn.Module):
     def __init__(self, in_dim=80):
         super(MaskSeq2Seq, self).__init__()
         self.encoder = Encoder_TacotronOne(in_dim)
-        self.mel2output = nn.Linear(256, 3)
+        self.mel2output = nn.Linear(256, 2)
 
     def forward(self, mel):
         mel = self.encoder(mel)
