@@ -25,3 +25,8 @@ Wavenet is a model built on top of ResidualDilatedCausalConv1d
       (2) [replacing CBHG by LSTMsBlock in both Encoder and PostNet](http://tts.speech.cs.cmu.edu/rsk/projects/falcon/exp/lstmsblock_encoderNpostnet/lstmsblockencoderNpostnet_rms.html)
 
 [no ssil Expt]() Removing short silences obtained from EHMM alignment. Checkout the [samples](http://tts.speech.cs.cmu.edu/rsk/projects/falcon/exp/no_ssil.html)
+
+# 20.02
+#### 
+
+[Acoustic Model Baseline](https://github.com/festvox/festvox/blob/master/challenges/blizzard2020/v1/local/train_phones.py) Tokenize Mandarin, convert to pinyin, approximate phonemes using grapheme tools within festvox. [Checkout the samples](http://tts.speech.cs.cmu.edu/rsk/challenges/blizzard2020/exp/baseline.html)
