@@ -19,7 +19,7 @@ class DownsamplingEncoder(nn.Module):
         self.convs_wide = nn.ModuleList()
         self.convs_1x1 = nn.ModuleList()
         self.layer_specs = layer_specs
-        prev_channels = 80
+        prev_channels = 39
         total_scale = 1
         pad_left = 0
         self.skips = []
@@ -91,10 +91,10 @@ class ValenceSeq2Seq_DownsamplingEncoder(MaskSeq2Seq):
             (2, 4, 1),
             (2, 4, 1),
             (1, 4, 1),
-            (2, 4, 1),
-            (1, 4, 1),
-            (2, 4, 1),
-            (1, 4, 1),
+            #(2, 4, 1),
+            #(1, 4, 1),
+            #(2, 4, 1),
+            #(1, 4, 1),
             ]
         self.encoder = DownsamplingEncoder(in_dim, encoder_layers)
         self.post_lstm_i = nn.LSTM(in_dim, in_dim, bidirectional=True, batch_first=True)
@@ -104,8 +104,10 @@ class ValenceSeq2Seq_DownsamplingEncoder(MaskSeq2Seq):
         self.mel2output = nn.Linear(in_dim*2, 3)
 
     def forward(self, mel):
+
         mel = self.encoder(mel)
 
+        # Classification part
         mel_i, _ = self.post_lstm_i(mel)
 
         mel_h, _ = self.post_lstm_h(mel_i)
@@ -115,6 +117,84 @@ class ValenceSeq2Seq_DownsamplingEncoder(MaskSeq2Seq):
         mel_o = mel_o + mel_h
 
         val_prediction = self.mel2output(mel_o)
+
+
+
+        return val_prediction[:,-1,:], pos_mel, neg_mel
+
+
+
+class MaskSeq2Seq_Triplet(ValenceSeq2Seq_DownsamplingEncoder):
+
+    def __init__(self, in_dim=39):
+        super(MaskSeq2Seq_Triplet, self).__init__(in_dim)
+
+        encoder_layers = [
+            (2, 4, 1),
+            (2, 4, 1),
+            (2, 4, 1),
+            (1, 4, 1),
+            #(2, 4, 1),
+            #(1, 4, 1),
+            #(2, 4, 1),
+            #(1, 4, 1),
+            ]
+        self.encoder = DownsamplingEncoder(in_dim, encoder_layers)
+        self.post_lstm_i = nn.LSTM(in_dim*2, in_dim, bidirectional=True, batch_first=True)
+        self.post_lstm_h = nn.LSTM(in_dim*2, in_dim, bidirectional=True, batch_first=True)
+        self.post_lstm_o = nn.LSTM(in_dim*2, in_dim, bidirectional=True, batch_first=True)
+
+        self.triplet_lstm = nn.LSTM(in_dim, in_dim, bidirectional=True, batch_first=True)
+
+        self.mel2output = nn.Linear(in_dim*2, 3)
+        self.triplet_encoder = nn.LSTM(in_dim, in_dim, bidirectional=True, batch_first=True)
+
+    def forward(self, mel, pos_mel, neg_mel):
+
+        mel = self.encoder(mel)
+
+        # Triplet Loss part
+        pos_mel = self.encoder(pos_mel)
+        neg_mel = self.encoder(neg_mel)
+
+        mel, _ = self.triplet_lstm(mel) 
+        pos_mel, _ = self.triplet_lstm(pos_mel)
+        neg_mel, _ = self.triplet_lstm(neg_mel)
+
+        # Classification part
+        mel_i, _ = self.post_lstm_i(mel)
+
+        mel_h, _ = self.post_lstm_h(mel_i)
+        mel_h = mel_h + mel_i
+
+        mel_o,_ = self.post_lstm_o(mel_h)
+        mel_o = mel_o + mel_h
+
+        val_prediction = self.mel2output(mel_o)
+
+
+
+        return val_prediction[:,-1,:], mel[:, -1,:], pos_mel[:,-1,:], neg_mel[:,-1,:]
+
+
+    def forward_eval(self, mel):
+
+        mel = self.encoder(mel)
+
+        mel, _ = self.triplet_lstm(mel) 
+
+        # Classification part
+        mel_i, _ = self.post_lstm_i(mel)
+
+        mel_h, _ = self.post_lstm_h(mel_i)
+        mel_h = mel_h + mel_i
+
+        mel_o,_ = self.post_lstm_o(mel_h)
+        mel_o = mel_o + mel_h
+
+        val_prediction = self.mel2output(mel_o)
+
+
 
         return val_prediction[:,-1,:]
 

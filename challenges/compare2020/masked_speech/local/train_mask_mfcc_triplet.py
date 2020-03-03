@@ -32,7 +32,7 @@ from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 from util import *
-from model import MaskSeq2Seq 
+from model import MaskSeq2Seq_Triplet
 
 import json
 
@@ -75,7 +75,7 @@ def validate_model_full(model, val_loader):
       for step, (x, mel, fname) in enumerate(val_loader):
           #print("Shape of input during validation: ", x.shape, mel.shape)    
           x, mel = Variable(x).cuda(), Variable(mel).cuda()
-          logits = model(mel)
+          logits = model.forward_eval(mel)
           targets = x.cpu().view(-1).numpy()
           y_true += targets.tolist()
           predictions = return_classes(logits) 
@@ -83,7 +83,7 @@ def validate_model_full(model, val_loader):
           #print(predictions, targets)
      #print(y_pred, y_true)
      recall = get_metrics(y_pred, y_true)
-     print("Unweighted Recall for the validation set:  ", recall)
+     print("Unweighted Recall for the full validation set:  ", recall)
      print('\n')
      return recall
 
@@ -101,7 +101,7 @@ def validate_model(model, val_loader):
           print(step)  
           #print("Shape of input during validation: ", x.shape, mel.shape)    
           x, mel = Variable(x).cuda(), Variable(mel).cuda()
-          logits = model(mel)
+          logits = model.forward_eval(mel)
           targets = x.cpu().view(-1).numpy()
           y_true += targets.tolist()
           predictions = return_classes(logits) 
@@ -129,13 +129,15 @@ def train(model, train_loader, val_loader, optimizer,
         model = model.cuda()
 
     criterion = nn.CrossEntropyLoss()
+    triplet_criterion = nn.BCELoss()
+
     global global_step, global_epoch
     #validate_model(model, val_loader)
     while global_epoch < nepochs:
         model.train()
         h = open(logfile_name, 'a')
         running_loss = 0.
-        for step, (x, mel, fname) in tqdm(enumerate(train_loader)):
+        for step, (x, mel, pos, neg, fname) in tqdm(enumerate(train_loader)):
 
             # Decay learning rate
             current_lr = learning_rate_decay(init_lr, global_step)
@@ -145,14 +147,27 @@ def train(model, train_loader, val_loader, optimizer,
             optimizer.zero_grad()
 
             # Feed data
-            x, mel = Variable(x), Variable(mel)
+            x, mel, pos, neg = Variable(x), Variable(mel), Variable(pos), Variable(neg)
             if use_cuda:
-                x, mel = x.cuda(), mel.cuda()
+                x, mel, pos, neg = x.cuda(), mel.cuda(), pos.cuda(), neg.cuda()
 
-            val_outputs = model(mel)
+            val_outputs, mel_encoded, pos_mel_encoded, neg_mel_encoded = model(mel, pos, neg)
+            #print("Shapes of mel_encoded and pos_mel_encoded: ", mel_encoded.shape, pos_mel_encoded.shape)
 
             # Loss
-            loss = criterion(val_outputs, x)
+            cross_entropy_loss = criterion(val_outputs, x)
+
+            pos = torch.bmm(mel_encoded.view(x.shape[0], 1, mel_encoded.shape[1]), pos_mel_encoded.view(x.shape[0], pos_mel_encoded.shape[1], 1))
+            pos = torch.sigmoid(pos.squeeze(1).squeeze(1))
+
+            triplet_loss_pos = triplet_criterion(pos, torch.ones(pos.shape[0]).cuda())            
+
+            neg = torch.bmm(mel_encoded.view(x.shape[0], 1, mel_encoded.shape[1]), neg_mel_encoded.view(x.shape[0], pos_mel_encoded.shape[1], 1))
+            neg = torch.sigmoid(neg.squeeze(1).squeeze(1))
+
+            triplet_loss_neg = triplet_criterion(pos, torch.zeros(pos.shape[0]).cuda())
+
+            loss = cross_entropy_loss + triplet_loss_pos - triplet_loss_neg
 
             # Update
             loss.backward(retain_graph=False)
@@ -210,11 +225,11 @@ if __name__ == "__main__":
     Mel_val = float_datasource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
 
     # Dataset and Dataloader setup
-    trainset = MaskDataset(X_train, Mel_train)
+    trainset = mask_dataset_triplet(X_train, Mel_train)
     train_loader = data_utils.DataLoader(
         trainset, batch_size=hparams.batch_size,
         num_workers=hparams.num_workers, shuffle=True,
-        collate_fn=collate_fn_mask, pin_memory=hparams.pin_memory)
+        collate_fn=collate_fn_mask_triplet, pin_memory=hparams.pin_memory)
 
     valset = MaskDataset(X_val, Mel_val)
     val_loader = data_utils.DataLoader(
@@ -223,7 +238,7 @@ if __name__ == "__main__":
         collate_fn=collate_fn_mask, pin_memory=hparams.pin_memory)
 
     # Model
-    model = MaskSeq2Seq(39)
+    model = MaskSeq2Seq_Triplet(39)
     model = model.cuda()
 
     optimizer = optim.Adam(model.parameters(),
