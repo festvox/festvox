@@ -10,6 +10,8 @@ Built baseline for Mandarin TTS
 ### 23 - 29 Feb 2020
 
 
+Vocoder: [Checkout the samples](http://tts.speech.cs.cmu.edu/rsk/challenges/blizzard2020/exp/vocoder/baseline.html)
+
 ### 01 - 07 March 2020
 
 ### 08 - 14 March 2020
