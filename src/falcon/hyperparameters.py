@@ -26,7 +26,7 @@ hparams = tf.contrib.training.HParams(
     use_memory_mask=True,
 
     # Data loader
-    pin_memory=True,
+    pin_memory=False,
     num_workers=4,
 
     # Training:

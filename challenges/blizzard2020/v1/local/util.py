@@ -8,7 +8,7 @@ from utils import audio
 from utils.plot import plot_alignment
 
 
-### Text Processign Stuff
+### Text Processing Stuff
 def populate_phonesarray(fname, feats_dir, feats_dict):
     if feats_dict is None:
        print("Expected a feature dictionary") 
@@ -22,6 +22,29 @@ def populate_phonesarray(fname, feats_dir, feats_dict):
     feats = np.array(feats)
     return feats
 
+def populate_quantsarray(fname, feats_dir):
+
+    arr = {}
+    arr['fname'] = fname
+    quant = np.load(fname)
+    quant = quant.astype(np.int64) + 2**15
+
+    assert len(quant) > 1
+    #print("Shape of quant: ", quant.shape)
+    coarse = quant // 256
+    coarse_float = coarse.astype(np.float) / 127.5 - 1.
+  
+    fine = quant % 256
+    fine_float = fine.astype(float) / 127.5 - 1.
+ 
+    arr['coarse'] = coarse
+    arr['coarse_float'] = coarse_float
+    arr['fine'] = fine
+    arr['fine_float'] = fine_float
+
+    return arr
+
+
 ### Data Source Stuff
 class categorical_datasource(CategoricalDataSource):
 
@@ -34,12 +57,14 @@ class categorical_datasource(CategoricalDataSource):
         fname =  str(self.filenames_array[idx])
         #fname = ''.join(k for k in fname[2:])
         fname = fname.lstrip("0")
-        fname = self.feats_dir + '/' + fname.strip() + '.feats'
+        fname = self.feats_dir + '/' + fname.strip().zfill(8) + '.feats'
         if self.feat_name == 'phones':
             return populate_phonesarray(fname, self.feats_dir, self.feats_dict)
         elif self.feat_name == 'phonesnossil':
             return populate_phonesarray(fname, self.feats_dir, self.feats_dict)
-
+        elif self.feat_name == 'quants':
+            fname += '.npy'
+            return populate_quantsarray(fname, self.feats_dir)
         else:
             print("Unknown feature type: ", self.feat_name)
             sys.exit()
@@ -49,6 +74,20 @@ class float_datasource(FloatDataSource):
     def __init__(self, fnames_file, desc_file, feat_name, feats_dir, feats_dict = None):
         super(float_datasource, self).__init__(fnames_file, desc_file, feat_name, feats_dir, feats_dict)
 
+
+    def __getitem__(self, idx):
+
+        if self.feat_name == 'mspeckotha':
+            fname =  str(self.filenames_array[idx]).zfill(8)
+            fname = self.feats_dir + '/' + fname.strip() + '.feats.npy'
+            #print("Shape I am loading is ", np.load(fname).T.shape)
+            mspec = np.load(fname).T
+            #print("Shape I loaded is ", mspec.shape)
+            return mspec
+        elif self.feat_name == 'mspec':
+            fname =  str(self.filenames_array[idx]).zfill(8)
+            fname = self.feats_dir + '/' + fname.strip() + '.feats.npy'
+            return np.load(fname)
 
 
 #### Visualization Stuff
@@ -105,3 +144,106 @@ def visualize_latent_embeddings(model, checkpoints_dir, step):
        plt.savefig(path, format="png")
        plt.close()
 
+
+class Blzrd2020Dataset(object):
+    def __init__(self, X, Mel):
+        self.X = X
+        self.Mel = Mel
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.Mel[idx]
+
+    def __len__(self):
+        return len(self.X)
+
+
+class WaveLSTMDataset(object):
+    def __init__(self, X, Mel):
+        self.X = X
+        self.Mel = Mel
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.Mel[idx]
+
+    def __len__(self):
+        return len(self.X)
+
+def save_alignment(global_step, attn, checkpoint_dir=None):
+
+    step = str(global_step).zfill(7)
+    print("Save intermediate states at step {}".format(step))
+
+    idx = 0
+
+    # Alignment
+    path = join(checkpoint_dir, "step{}_alignment.png".format(step))
+
+    alignment = attn[idx].cpu().data.numpy()
+    save_alignment(path, alignment, step)
+
+
+
+def collate_fn_mspeckotha(batch):
+    """Create batch"""
+    r = hparams.outputs_per_step
+    input_lengths = [len(x[0]) for x in batch]
+    max_input_len = np.max(input_lengths) + 1
+    # Add single zeros frame at least, so plus 1
+    max_target_len = np.max([len(x[1]) for x in batch]) + 1
+    if max_target_len % r != 0:
+        max_target_len += r - max_target_len % r
+        assert max_target_len % r == 0
+
+    a = np.array([_pad(x[0], max_input_len) for x in batch], dtype=np.int)
+    x_batch = torch.LongTensor(a)
+
+    input_lengths = torch.LongTensor(input_lengths)
+
+    b = np.array([_pad_2d(x[1], max_target_len) for x in batch],
+                 dtype=np.float32)
+    mel_batch = torch.FloatTensor(b)
+
+    return x_batch, input_lengths, mel_batch
+
+def _pad(seq, max_len):
+    #print("Shape of seq: ", seq.shape, " and the max length: ", max_len)     
+    assert len(seq) < max_len
+    return np.pad(seq, (0, max_len - len(seq)),
+                  mode='constant', constant_values=0)
+
+
+def _pad_2d(x, max_len):
+    x = np.pad(x, [(0, max_len - len(x)), (0, 0)],
+               mode="constant", constant_values=0)
+    return x
+
+
+
+
+def collate_fn_mspecNquant(batch):
+    """Create batch"""
+    r = hparams.outputs_per_step
+    seq_len = 4
+    max_offsets = [x[1].shape[0] - seq_len for x in batch]
+    mel_lengths = [x[1].shape[0] for x in batch]
+    #print("Shortest utterance in this batch: ", min(mel_lengths))
+    #print("Max offsets and lengths: ", ' '.join(str(k) + '_' + str(x) + '_' + str(x-k) for (k,x) in list(zip(max_offsets, mel_lengths))))
+    mel_offsets = [np.random.randint(0, offset) for offset in max_offsets]
+    sig_offsets = [int(offset * hparams.frame_shift_ms * hparams.sample_rate / 1000) for offset in mel_offsets]
+    sig_lengths = [x[0]['coarse'].shape[0] for x in batch]
+    #print(sig_offsets, sig_lengths)
+    sig_length = int(seq_len * hparams.frame_shift_ms * hparams.sample_rate / 1000)
+    #print("Length of the raw samples I am taking in: ", sig_length)
+
+    coarse = [x[0]['coarse'] for x in batch]
+    fine = [x[0]['fine'] for x in batch]
+    coarse_float = [x[0]['coarse_float'] for x in batch]  
+    fine_float = [x[0]['fine_float'] for x in batch]
+
+    mels = torch.FloatTensor([x[1][mel_offsets[i]:mel_offsets[i] + seq_len] for i, x in enumerate(batch)])
+    coarse = torch.LongTensor([x[sig_offsets[i]:int(sig_offsets[i] + sig_length)] for i, x in enumerate(coarse)])
+    fine = torch.LongTensor([x[sig_offsets[i]:int(sig_offsets[i] + sig_length)] for i, x in enumerate(fine)])
+    coarse_float = torch.FloatTensor([x[sig_offsets[i]:int(sig_offsets[i] + sig_length)] for i, x in enumerate(coarse_float)])
+    fine_float = torch.FloatTensor([x[sig_offsets[i]:int(sig_offsets[i] + sig_length)] for i, x in enumerate(fine_float)])
+    #print("Max value in coarse: ", torch.max(coarse.view(-1)))
+    return mels, coarse, coarse_float, fine, fine_float
