@@ -80,6 +80,23 @@ class ValenceSeq2Seq(nn.Module):
         return val_prediction[:,-1,:]
 
 
+class ValenceNArousalSeq2Seq(nn.Module):
+
+    def __init__(self, in_dim=80):
+        super(ValenceNArousalSeq2Seq, self).__init__()
+        self.encoder = Encoder_TacotronOne(in_dim)
+        self.mel2output_valence = nn.Linear(256, 3)
+        self.mel2output_arousal = nn.Linear(256, 3)
+
+    def forward(self, mel):
+        mel = self.encoder(mel)
+
+        valence_prediction = self.mel2output_valence(mel)
+        arousal_prediction = self.mel2output_arousal(mel)
+
+        return valence_prediction[:,-1,:], arousal_prediction[:, -1,:]
+
+
 
 class ValenceSeq2Seq_DownsamplingEncoder(ValenceSeq2Seq):
 

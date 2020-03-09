@@ -43,6 +43,19 @@ class ValenceDataset(object):
     def __len__(self):
         return len(self.X)
 
+class ValenceNArousalDataset(object):
+    def __init__(self, Xa, Xv, Mel):
+        self.Xa = Xa
+        self.Xv = Xv
+        self.Mel = Mel
+
+    def __getitem__(self, idx):
+        return self.Xa[idx], self.Xv[idx], self.Mel[idx]
+
+    def __len__(self):
+        return len(self.Xa)
+
+
 
 def _pad_2d(x, max_len):
     x = np.pad(x, [(0, max_len - len(x)), (0, 0)],
@@ -65,6 +78,27 @@ def collate_fn_valence(batch):
 
     return x_batch, mel_batch
 
+def collate_fn_valenceNarousal(batch):
+    """Create batch"""
+    r = hparams.outputs_per_step
+
+
+    # Add single zeros frame at least, so plus 1
+    max_target_len = np.max([len(x[2]) for x in batch])
+
+    a = np.array([x[0] for x in batch], dtype=np.int)
+    xa_batch = torch.LongTensor(a)
+
+    a = np.array([x[1] for x in batch], dtype=np.int)
+    xv_batch = torch.LongTensor(a)
+
+
+    b = np.array([_pad_2d(x[2], max_target_len) for x in batch],
+                 dtype=np.float32)
+    mel_batch = torch.FloatTensor(b)
+
+    return xa_batch, xv_batch, mel_batch
+
 
 # Utility to return predictions
 def return_classes(logits, dim=-1):
@@ -74,6 +108,7 @@ def return_classes(logits, dim=-1):
 
 def get_metrics(predicteds, targets):
    print(classification_report(targets, predicteds))
+   print("Accuracy is ", accuracy_score(targets, predicteds))
    fpr, tpr, threshold = roc_curve(targets, predicteds, pos_label=1)
    EER = threshold[np.argmin(np.absolute(tpr-fpr))]
    print("EER is ", EER)
