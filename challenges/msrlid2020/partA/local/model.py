@@ -4,7 +4,7 @@ FALCON_DIR = os.environ.get('FALCONDIR')
 sys.path.append(FALCON_DIR)
 from models import *
 from blocks import *
-
+from layers import *
 
 
 
@@ -71,8 +71,134 @@ class LIDSeq2Seq(nn.Module):
 
     def __init__(self, in_dim=80):
         super(LIDSeq2Seq, self).__init__()
+
         self.encoder = Encoder_TacotronOne(in_dim)
         self.mel2output = nn.Linear(256, 2)
+
+    def forward(self, mel):
+        mel = self.encoder(mel)
+        val_prediction = self.mel2output(mel)
+        return val_prediction[:,-1,:]
+
+
+
+class LIDSeq2SeqMixtureofExperts_basic(nn.Module):
+
+    def __init__(self, in_dim=80):
+        super(LIDSeq2SeqMixtureofExperts, self).__init__()
+
+        # Shared encoder
+        self.encoder = Encoder_TacotronOne(in_dim)
+
+        # Expert 01
+        self.exp1_fc_a = SequenceWise(nn.Linear(256, 128))
+        self.exp1_fc_b = SequenceWise(nn.Linear(128, 256))
+
+        # Expert 02
+        self.exp2_fc_a = SequenceWise(nn.Linear(256, 128))
+        self.exp2_fc_b = SequenceWise(nn.Linear(128, 256))
+
+        self.mel2output = nn.Linear(256, 2)
+
+
+    def forward(self, mel):
+
+        # Pass through shared layers
+        mel = self.encoder(mel)
+
+        # Pass through expert 01
+        exp1_logits = torch.tanh(self.exp1_fc_a(mel))
+        exp1_logits = self.exp1_fc_b(exp1_logits)
+
+        # Pass through expert 02
+        exp2_logits = torch.tanh(self.exp2_fc_a(mel))
+        exp2_logits = self.exp2_fc_b(exp2_logits)
+
+        # Combine the experts
+        combination = torch.tanh(exp1_logits) * torch.sigmoid(exp2_logits)
+
+        val_prediction = self.mel2output(combination)
+        return val_prediction[:,-1,:]
+
+
+
+class LIDSeq2SeqMixtureofExperts(nn.Module):
+
+    def __init__(self, in_dim=80):
+        super(LIDSeq2SeqMixtureofExperts, self).__init__()
+
+        # Shared encoder
+        self.encoder = Encoder_TacotronOne(in_dim)
+
+        # Expert 01
+        self.exp1_fc_a = SequenceWise(nn.Linear(256, 128))
+        self.exp1_fc_b = SequenceWise(nn.Linear(128, 256))
+
+        # Expert 02
+        self.exp2_fc_a = SequenceWise(nn.Linear(256, 128))
+        self.exp2_fc_b = SequenceWise(nn.Linear(128, 256))
+
+        # Expert 03
+        self.exp3_fc_a = SequenceWise(nn.Linear(256, 128))
+        self.exp3_fc_b = SequenceWise(nn.Linear(128, 256))
+
+        # Expert 04
+        self.exp4_fc_a = SequenceWise(nn.Linear(256, 128))
+        self.exp4_fc_b = SequenceWise(nn.Linear(128, 256))
+
+        self.mel2output = nn.Linear(256, 2)
+
+
+    def forward(self, mel):
+
+        # Pass through shared layers
+        mel = self.encoder(mel)
+
+        # Pass through expert 01
+        exp1_logits = torch.tanh(self.exp1_fc_a(mel))
+        exp1_logits = self.exp1_fc_b(exp1_logits)
+
+        # Pass through expert 02
+        exp2_logits = torch.tanh(self.exp2_fc_a(mel))
+        exp2_logits = self.exp2_fc_b(exp2_logits)
+
+        # Pass through expert 03
+        exp3_logits = torch.tanh(self.exp3_fc_a(mel))
+        exp3_logits = self.exp3_fc_b(exp3_logits)
+
+        # Pass through expert 04
+        exp4_logits = torch.tanh(self.exp4_fc_a(mel))
+        exp4_logits = self.exp4_fc_b(exp4_logits)
+
+        # Combine the experts
+        experts = torch.stack([exp1_logits, exp2_logits, exp3_logits, exp4_logits], dim=0)
+        weights_experts = torch.softmax(experts, dim=0)
+
+        logits = weights_experts[0,:,:] * exp1_logits + weights_experts[1,:,:] * exp2_logits + weights_experts[2,:,:] * exp3_logits + weights_experts[3,:,:] * exp4_logits
+
+        val_prediction = self.mel2output(logits)
+        return val_prediction[:,-1,:]
+
+
+class LIDSeq2SeqDownsampling(nn.Module):
+
+    def __init__(self, in_dim=80):
+        super(LIDSeq2SeqDownsampling, self).__init__()
+
+        encoder_layers = [
+            (2, 4, 1),
+            (2, 4, 1),
+            (2, 4, 1),
+            (1, 4, 1),
+            #(2, 4, 1),
+            (1, 4, 1),
+            #(2, 4, 1),
+            (1, 4, 1),
+            ]
+        self.encoder = DownsamplingEncoder(in_dim, encoder_layers)
+        
+
+        self.mel2output = nn.Linear(39, 2)
 
     def forward(self, mel):
         mel = self.encoder(mel)

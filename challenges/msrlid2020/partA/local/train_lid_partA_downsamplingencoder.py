@@ -32,7 +32,7 @@ from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 from util import *
-from model import LIDSeq2Seq 
+from model import LIDSeq2SeqDownsampling
 
 import json
 
@@ -228,7 +228,7 @@ if __name__ == "__main__":
         collate_fn=collate_fn_lid, pin_memory=hparams.pin_memory)
 
     # Model
-    model = LIDSeq2Seq(39)
+    model = LIDSeq2SeqDownsampling(39)
     model = model.cuda()
 
     optimizer = optim.Adam(model.parameters(),
