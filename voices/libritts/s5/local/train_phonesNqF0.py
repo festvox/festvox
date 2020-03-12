@@ -32,8 +32,7 @@ from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 from util import *
-from model import TacotronOneGST as Tacotron
-
+from model import TacotronOneSeqwiseMultispeakerqF0 as Tacotron
 
 import json
 
@@ -81,7 +80,7 @@ def train(model, train_loader, val_loader, optimizer,
     while global_epoch < nepochs:
         h = open(logfile_name, 'a')
         running_loss = 0.
-        for step, (x, input_lengths, mel, y) in tqdm(enumerate(train_loader)):
+        for step, (x, spk, stress, input_lengths, mel, y) in tqdm(enumerate(train_loader)):
 
             # Decay learning rate
             current_lr = learning_rate_decay(init_lr, global_step)
@@ -95,12 +94,12 @@ def train(model, train_loader, val_loader, optimizer,
                 input_lengths.view(-1), dim=0, descending=True)
             sorted_lengths = sorted_lengths.long().numpy()
 
-            x, mel, y = x[indices], mel[indices], y[indices]
+            x, spk, stress, mel, y = x[indices], spk[indices], stress[indices], mel[indices], y[indices]
 
             # Feed data
-            x, mel, y = Variable(x), Variable(mel), Variable(y)
+            x, spk, stress, mel, y = Variable(x), Variable(spk), Variable(stress), Variable(mel), Variable(y)
             if use_cuda:
-                x, mel, y = x.cuda(), mel.cuda(), y.cuda()
+                x, spk, stress, mel, y = x.cuda(), spk.cuda(), stress.cuda(), mel.cuda(), y.cuda()
 
             # Multi GPU Configuration
             if use_multigpu:
@@ -108,7 +107,7 @@ def train(model, train_loader, val_loader, optimizer,
                mel_outputs, linear_outputs, attn = outputs[0], outputs[1], outputs[2]
  
             else:
-                mel_outputs, linear_outputs, attn = model.forward_gst(x, mel, input_lengths=sorted_lengths)
+                mel_outputs, linear_outputs, attn = model(x, spk, stress, mel, input_lengths=sorted_lengths)
 
             # Loss
             mel_loss = criterion(mel_outputs, mel)
@@ -123,6 +122,7 @@ def train(model, train_loader, val_loader, optimizer,
                     global_step, mel_outputs, linear_outputs, attn, y,
                     None, checkpoint_dir)
                 visualize_phone_embeddings(model, checkpoint_dir, global_step)
+                visualize_speaker_embeddings(model, checkpoint_dir, global_step)
 
             if global_step > 0 and global_step % checkpoint_interval == 0:
                 save_checkpoint(
@@ -148,7 +148,6 @@ def train(model, train_loader, val_loader, optimizer,
         log_value("loss (per epoch)", averaged_loss, global_epoch)
         h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
         h.close()
-        #sys.exit()
 
         global_epoch += 1
 
@@ -186,11 +185,28 @@ if __name__ == "__main__":
     with open(idsdict_file, 'w') as outfile:
        json.dump(ph_ids, outfile)
 
+    spk_ids = defaultdict(lambda: len(spk_ids))
+    f = open(vox_dir + '/' + 'etc/spk.list')
+    for line in f:
+        line = line.split('\n')[0]
+        print(line)
+        spk_ids[line]
+    spk_ids = dict(spk_ids)
 
+    with open(checkpoint_dir + '/spk_ids', 'w') as f:
+       json.dump(spk_ids, f)
 
-    feats_name = 'phones'
-    X_train = categorical_datasource( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name, ph_ids)
+    qF0_ids = defaultdict(lambda: len(qF0_ids))
+    for i in range(20):
+        qF0_ids[str(float(i))]
+
+    feats_name = 'phonesNspk'
+    X_train = categorical_datasource_spk( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name, ph_ids, spk_ids)
     X_val = CategoricalDataSource(vox_dir + '/' +  'fnames.val', vox_dir + '/' +  'etc/falcon_feats.desc', feats_name,  feats_name, ph_ids)
+
+    feats_name = 'qF0'
+    Xstress_train = categorical_datasource_qF0( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name, ph_ids, qF0_ids)
+    Xstress_val = CategoricalDataSource(vox_dir + '/' +  'fnames.val', vox_dir + '/' +  'etc/falcon_feats.desc', feats_name,  feats_name, ph_ids)
 
     feats_name = 'lspec'
     Y_train = float_datasource(vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
@@ -201,11 +217,11 @@ if __name__ == "__main__":
     Mel_val = FloatDataSource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
 
     # Dataset and Dataloader setup
-    trainset = PyTorchDataset(X_train, Mel_train, Y_train)
+    trainset = LocalControlDataset(X_train, Xstress_train, Mel_train, Y_train)
     train_loader = data_utils.DataLoader(
         trainset, batch_size=hparams.batch_size,
         num_workers=hparams.num_workers, shuffle=True,
-        collate_fn=collate_fn, pin_memory=hparams.pin_memory)
+        collate_fn=collate_fn_spkNstress, pin_memory=hparams.pin_memory)
 
     valset = PyTorchDataset(X_val, Mel_val, Y_val)
     val_loader = data_utils.DataLoader(
@@ -221,6 +237,8 @@ if __name__ == "__main__":
                      r=hparams.outputs_per_step,
                      padding_idx=hparams.padding_idx,
                      use_memory_mask=hparams.use_memory_mask,
+                     num_spk = len(spk_ids),
+                     num_controls = 20
                      )
     model = model.cuda()
     #model = DataParallelFix(model)
@@ -237,8 +255,8 @@ if __name__ == "__main__":
         model.load_state_dict(checkpoint["state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer"])
         try:
-            global_step = int(checkpoint["global_step"])
-            global_epoch = int(checkpoint["global_epoch"])
+            global_step = checkpoint["global_step"]
+            global_epoch = checkpoint["global_epoch"]
         except:
             # TODO
             pass

@@ -3,8 +3,8 @@
 usage: train.py [options]
 
 options:
-    --conf=<json>             Path of configuration file (json).
-    --gpu-id=<N>               ID of the GPU to use [default: 0]
+    --conf=<json>             Path of preset parameters (json).
+    --gpu-id=<N>              ID of the GPU to use [default: 0]
     --exp-dir=<dir>           Experiment directory
     --checkpoint-dir=<dir>    Directory where to save model checkpoints [default: checkpoints].
     --checkpoint-path=<name>  Restore model from checkpoint path if given.
@@ -12,6 +12,7 @@ options:
     --log-event-path=<dir>    Log Path [default: exp/log_tacotronOne]
     -h, --help                Show this help message and exit
 """
+
 import os, sys
 from docopt import docopt
 args = docopt(__doc__)
@@ -21,7 +22,6 @@ print("Using GPU ", gpu_id)
 os.environ["CUDA_VISIBLE_DEVICES"]=gpu_id
 
 
-from collections import defaultdict
 
 ### This is not supposed to be hardcoded #####
 FALCON_DIR = os.environ.get('FALCONDIR')
@@ -32,8 +32,7 @@ from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 from util import *
-from model import TacotronOneGST as Tacotron
-
+from model import TacotronOneSeqwiseqF0s as Tacotron
 
 import json
 
@@ -81,7 +80,7 @@ def train(model, train_loader, val_loader, optimizer,
     while global_epoch < nepochs:
         h = open(logfile_name, 'a')
         running_loss = 0.
-        for step, (x, input_lengths, mel, y) in tqdm(enumerate(train_loader)):
+        for step, (x, input_lengths, qF0s, mel, y) in tqdm(enumerate(train_loader)):
 
             # Decay learning rate
             current_lr = learning_rate_decay(init_lr, global_step)
@@ -95,12 +94,12 @@ def train(model, train_loader, val_loader, optimizer,
                 input_lengths.view(-1), dim=0, descending=True)
             sorted_lengths = sorted_lengths.long().numpy()
 
-            x, mel, y = x[indices], mel[indices], y[indices]
+            x, qF0s, mel, y = x[indices], qF0s[indices], mel[indices], y[indices]
 
             # Feed data
-            x, mel, y = Variable(x), Variable(mel), Variable(y)
+            x, qF0s, mel, y = Variable(x), Variable(qF0s), Variable(mel), Variable(y)
             if use_cuda:
-                x, mel, y = x.cuda(), mel.cuda(), y.cuda()
+                x, qF0s, mel, y = x.cuda(), qF0s.cuda(), mel.cuda(), y.cuda()
 
             # Multi GPU Configuration
             if use_multigpu:
@@ -108,7 +107,7 @@ def train(model, train_loader, val_loader, optimizer,
                mel_outputs, linear_outputs, attn = outputs[0], outputs[1], outputs[2]
  
             else:
-                mel_outputs, linear_outputs, attn = model.forward_gst(x, mel, input_lengths=sorted_lengths)
+                mel_outputs, linear_outputs, attn = model(x, qF0s, mel, input_lengths=sorted_lengths)
 
             # Loss
             mel_loss = criterion(mel_outputs, mel)
@@ -148,14 +147,14 @@ def train(model, train_loader, val_loader, optimizer,
         log_value("loss (per epoch)", averaged_loss, global_epoch)
         h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
         h.close()
-        #sys.exit()
 
         global_epoch += 1
 
 
 if __name__ == "__main__":
-
-    exp_dir = args["--exp-dir"]
+    args = docopt(__doc__)
+    print("Command line args:\n", args)
+    exp_dir = args["--exp-dir"] 
     checkpoint_dir = args["--exp-dir"] + '/checkpoints'
     checkpoint_path = args["--checkpoint-path"]
     log_path = args["--exp-dir"] + '/tracking'
@@ -188,7 +187,7 @@ if __name__ == "__main__":
 
 
 
-    feats_name = 'phones'
+    feats_name = 'phonesNqF0s'
     X_train = categorical_datasource( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name, ph_ids)
     X_val = CategoricalDataSource(vox_dir + '/' +  'fnames.val', vox_dir + '/' +  'etc/falcon_feats.desc', feats_name,  feats_name, ph_ids)
 
@@ -205,13 +204,13 @@ if __name__ == "__main__":
     train_loader = data_utils.DataLoader(
         trainset, batch_size=hparams.batch_size,
         num_workers=hparams.num_workers, shuffle=True,
-        collate_fn=collate_fn, pin_memory=hparams.pin_memory)
+        collate_fn=collate_fn_phonesNqF0s, pin_memory=hparams.pin_memory)
 
     valset = PyTorchDataset(X_val, Mel_val, Y_val)
     val_loader = data_utils.DataLoader(
         valset, batch_size=hparams.batch_size,
         num_workers=hparams.num_workers, shuffle=True,
-        collate_fn=collate_fn, pin_memory=hparams.pin_memory)
+        collate_fn=collate_fn_phonesNqF0s, pin_memory=hparams.pin_memory)
 
     # Model
     model = Tacotron(n_vocab=1+ len(ph_ids),
@@ -237,8 +236,8 @@ if __name__ == "__main__":
         model.load_state_dict(checkpoint["state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer"])
         try:
-            global_step = int(checkpoint["global_step"])
-            global_epoch = int(checkpoint["global_epoch"])
+            global_step = checkpoint["global_step"]
+            global_epoch = checkpoint["global_epoch"]
         except:
             # TODO
             pass

@@ -24,5 +24,14 @@ python3.5 $FALCONDIR/utils/dataprep_addmspec.py ${VOXDIR}/fnames ${VOXDIR}
 ${VOXDIR}/bin/traintest ${VOXDIR}/fnames 
 cp ${VOXDIR}/fnames.test ${VOXDIR}/fnames.val
 
+## Sort based on lengths and build a model for small utterances
+cat ${VOXDIR}/fnames.train | while read fname; 
+  do
+      duration=`soxi -d ${VOXDIR}/wav/$fname.wav`
+      echo $fname $duration 
+  done | sort -k2 > ${VOXDIR}/etc/fnamesNdurations
+#head -600 ${VOXDIR}/etc/fnamesNdurations > ${VOXDIR}/fnames.train
+
+
 #python3.5 local/train_phones.py --exp-dir exp/taco_one_phseq 
 #python3.5 local/synthesize_phones.py exp/taco_one_phseq/checkpoints/checkpoint_step30000.pth  vox/ehmm/etc/txt.phseq.data.test.head exp/taco_one_phseq/tts_phseq

@@ -64,8 +64,8 @@ class TacotronOneSeqwiseStress(TacotronOneSeqwise):
         super(TacotronOneSeqwiseStress, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
                  r=5, padding_idx=None, use_memory_mask=False)
 
-        self.qF0_embedding = nn.Embedding(num_qF0s, 32)
-        self.embeddings2inputs = SequenceWise(nn.Linear(embedding_dim + 32, embedding_dim))
+        self.qF0_embedding = nn.Embedding(num_qF0s, 128)
+        self.embeddings2inputs = SequenceWise(nn.Linear(embedding_dim + 128, embedding_dim))
 
 
     def forward(self, inputs, qF0s, targets=None, input_lengths=None):
@@ -80,7 +80,7 @@ class TacotronOneSeqwiseStress(TacotronOneSeqwise):
 
         # Combination
         inputs = torch.cat([inputs, qF0s_embedding], dim=-1)
-        inputs = torch.tanh(self.embeddings2inputs(inputs))
+        inputs = self.embeddings2inputs(inputs) 
 
         # Text Encoder
         encoded_phonemes = self.encoder(inputs, input_lengths)
@@ -174,8 +174,6 @@ class TacotronOneGST(TacotronOneSeqwise):
             (1, 4, 1),
             ]
         self.mel_encoder = DownsamplingEncoder(80, encoder_layers)
-        self.mel_lstm = nn.LSTM(80, 128, bidirectional=True, batch_first=True)
-        self.mel_linear = SequenceWise(nn.Linear(256, 80))
 
         self.num_styletokens = 10
         self.attention_layer = SequenceWise(nn.Linear(80, 1))
@@ -193,8 +191,6 @@ class TacotronOneGST(TacotronOneSeqwise):
 
         # Embeddings for mels
         reference_embedding = self.mel_encoder(targets)
-        reference_embedding, _ = self.mel_lstm(reference_embedding)
-        reference_embedding = torch.tanh(self.mel_linear(reference_embedding))
 
         # Attention
         query = reference_embedding[:,-1,:]
@@ -202,63 +198,17 @@ class TacotronOneGST(TacotronOneSeqwise):
         #print("Shape of style embedding modified and query: ", style_embedding_modified.shape, query.shape)
         alignment = self.attention_layer(torch.tanh(style_embedding_modified + query.unsqueeze(1)))
         alignment = F.softmax(alignment, dim=1).squeeze(2)
-        #print("Shape of alignment: ", alignment.shape, alignment[0,:])
         attention = torch.bmm(alignment.unsqueeze(1), style_embedding_modified).squeeze(1)
         attention = attention.unsqueeze(1).expand(B, inputs.shape[1], 80)
         #print("Shape of attention: ", attention.shape)
 
         # Text Encoder
         encoded_phonemes = self.encoder(inputs)
-        
-        # Decoder inputs
-        #print("Shape of style_embedding and encoded phonemes: ", attention.shape, encoded_phonemes.shape)
-        encoded_phonesNstyle_embedding = torch.cat([encoded_phonemes, attention], dim=-1)
-        decoder_inputs = torch.tanh(self.styleattentionNencodedphonemes2decoderinputs(encoded_phonesNstyle_embedding))
 
-        # Decoder
-        mel_outputs, alignments = self.decoder(decoder_inputs, targets, memory_lengths=input_lengths)
-        mel_outputs = mel_outputs.view(B, -1, self.mel_dim)
-
-        # PostNet
-        linear_outputs = self.postnet(mel_outputs)
-        linear_outputs = self.last_linear(linear_outputs)
-
-        return mel_outputs, linear_outputs, alignments
-
-
-    def forward_generate_gst(self, inputs, targets=None, input_lengths=None):
-
-        B = inputs.size(0)
-
-        # Embeddings for Text
-        inputs = self.embedding(inputs)
-
-        # Embeddings for mels
-        reference_embedding = self.mel_encoder(targets)
-        reference_embedding, _ = self.mel_lstm(reference_embedding)
-        reference_embedding = torch.tanh(self.mel_linear(reference_embedding))
-
-        # Attention
-        query = reference_embedding[:,-1,:]
-        style_embedding_modified = self.style_embedding.expand(B, 80, self.num_styletokens).transpose(1,2)
-        #print("Shape of style embedding modified and query: ", style_embedding_modified.shape, query.shape)
-        alignment = self.attention_layer(torch.tanh(style_embedding_modified + query.unsqueeze(1)))
-        alignment = F.softmax(alignment, dim=1).squeeze(2)
-        alignment = torch.Tensor([[1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]]).cuda()
-        print("Shape of alignment: ", alignment.shape, alignment)
-        attention = torch.bmm(alignment.unsqueeze(1), style_embedding_modified).squeeze(1)
-        attention = attention.unsqueeze(1).expand(B, inputs.shape[1], 80)
-        #print("Shape of attention: ", attention.shape)
-
-        # Text Encoder
-        encoded_phonemes = self.encoder(inputs)
-        
         # Decoder inputs
         #print("Shape of style_embedding and encoded phonemes: ", attention.shape, encoded_phonemes.shape)
         encoded_phonesNstyle_embedding = torch.cat([encoded_phonemes, attention], dim=-1)
         decoder_inputs = self.styleattentionNencodedphonemes2decoderinputs(encoded_phonesNstyle_embedding)
-
-        targets = None 
 
         # Decoder
         mel_outputs, alignments = self.decoder(decoder_inputs, targets, memory_lengths=input_lengths)

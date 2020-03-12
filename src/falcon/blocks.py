@@ -940,8 +940,7 @@ class LSTMDiscriminator(nn.Module):
 
         self.lstm = nn.LSTM(self.in_dim, self.hidden_dim, bidirectional=True, batch_first=True)
 
-        self.output_linear = nn.Linear(self.hidden_dim*2, self.out_dim) # Note that this is not SequenceWise
-
+        self.output_linear = SequenceWise(nn.Linear(self.hidden_dim*2, self.out_dim))
 
     def forward(self,x):
 

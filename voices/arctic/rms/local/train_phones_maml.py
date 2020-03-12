@@ -32,8 +32,9 @@ from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 from util import *
-from model import TacotronOneGST as Tacotron
+from model import TacotronOneSeqwise as Tacotron
 
+from copy import deepcopy
 
 import json
 
@@ -76,6 +77,7 @@ def train(model, train_loader, val_loader, optimizer,
     linear_dim = model.linear_dim
 
     criterion = nn.L1Loss()
+    model_copy = deepcopy(model)
 
     global global_step, global_epoch
     while global_epoch < nepochs:
@@ -108,7 +110,7 @@ def train(model, train_loader, val_loader, optimizer,
                mel_outputs, linear_outputs, attn = outputs[0], outputs[1], outputs[2]
  
             else:
-                mel_outputs, linear_outputs, attn = model.forward_gst(x, mel, input_lengths=sorted_lengths)
+                mel_outputs, linear_outputs, attn = model(x, mel, input_lengths=sorted_lengths)
 
             # Loss
             mel_loss = criterion(mel_outputs, mel)
@@ -132,7 +134,13 @@ def train(model, train_loader, val_loader, optimizer,
             loss.backward(retain_graph=False)
             grad_norm = torch.nn.utils.clip_grad_norm_(
                  model.parameters(), clip_thresh)
-            optimizer.step()
+
+            if global_step % 2 ==  1:
+               model = deepcopy(model_copy)
+               optimizer.step()
+            else:
+               optimizer.step()
+               model_copy = deepcopy(model)
 
             # Logs
             log_value("loss", float(loss.item()), global_step)
@@ -147,7 +155,7 @@ def train(model, train_loader, val_loader, optimizer,
         averaged_loss = running_loss / (len(train_loader))
         log_value("loss (per epoch)", averaged_loss, global_epoch)
         h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
-        h.close()
+        h.close() 
         #sys.exit()
 
         global_epoch += 1
@@ -237,8 +245,8 @@ if __name__ == "__main__":
         model.load_state_dict(checkpoint["state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer"])
         try:
-            global_step = int(checkpoint["global_step"])
-            global_epoch = int(checkpoint["global_epoch"])
+            global_step = checkpoint["global_step"]
+            global_epoch = checkpoint["global_epoch"]
         except:
             # TODO
             pass

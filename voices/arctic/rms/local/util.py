@@ -22,6 +22,24 @@ def populate_phonesarray(fname, feats_dir, feats_dict):
     feats = np.array(feats)
     return feats
 
+def populate_phonesNstressarray(fname, feats_dir, feats_dict):
+    if feats_dict is None:
+       print("Expected a feature dictionary")
+       sys.exit()
+    f = open(fname)
+    arr = {}
+    arr['fname'] = fname
+    for line in f:
+        line = line.split('\n')[0].split()
+        phones  = [feats_dict[phdur.split('_')[0]] for phdur in line]
+        stress  = [int(float(phdur.split('_')[1])) for phdur in line]
+
+    phones = np.array(phones)
+    stress = np.array(stress)
+    arr['phones'] = phones
+    arr['stress'] = stress 
+    return arr
+
 ### Data Source Stuff
 class categorical_datasource(CategoricalDataSource):
 
@@ -37,6 +55,8 @@ class categorical_datasource(CategoricalDataSource):
             return populate_phonesarray(fname, self.feats_dir, self.feats_dict)
         elif self.feat_name == 'phonesnossil':
             return populate_phonesarray(fname, self.feats_dir, self.feats_dict)
+        elif self.feat_name == 'phonesNstress':
+            return populate_phonesNstressarray(fname, self.feats_dir, self.feats_dict)
 
         else:
             print("Unknown feature type: ", self.feat_name)
@@ -46,6 +66,89 @@ class float_datasource(FloatDataSource):
 
     def __init__(self, fnames_file, desc_file, feat_name, feats_dir, feats_dict = None):
         super(float_datasource, self).__init__(fnames_file, desc_file, feat_name, feats_dir, feats_dict)
+
+
+### Collate stuff
+
+def _pad(seq, max_len):
+    #print("Shape of seq: ", seq.shape, " and the max length: ", max_len)     
+    #assert len(seq) < max_len
+    if len(seq) == max_len:
+        return seq
+    return np.pad(seq, (0, max_len - len(seq)),
+                  mode='constant', constant_values=0)
+
+
+def _pad_2d(x, max_len):
+    x = np.pad(x, [(0, max_len - len(x)), (0, 0)],
+               mode="constant", constant_values=0)
+    return x
+
+
+
+def collate_fn_phonesNqF0s(batch):
+
+
+    r = hparams.outputs_per_step
+    input_lengths = [len(x[0]['phones']) for x in batch]
+
+    max_input_len = np.max(input_lengths) + 1
+    # Add single zeros frame at least, so plus 1
+    max_target_len = np.max([len(x[1]) for x in batch]) + 1
+    if max_target_len % r != 0:
+        max_target_len += r - max_target_len % r
+        assert max_target_len % r == 0
+
+    x_inputs = [_pad(x[0]['phones'], max_input_len) for x in batch]
+    x_batch = torch.LongTensor(x_inputs)
+
+    x_qF0s = [_pad(x[0]['qF0s'], max_input_len) for x in batch]
+    x_qF0s_batch = torch.LongTensor(x_qF0s)
+
+    b = np.array([_pad_2d(x[1], max_target_len) for x in batch],
+                 dtype=np.float32)
+    mel_batch = torch.FloatTensor(b)
+
+    c = np.array([_pad_2d(x[2], max_target_len) for x in batch],
+                 dtype=np.float32)
+    y_batch = torch.FloatTensor(c)
+
+    input_lengths = torch.LongTensor(input_lengths)
+
+    return x_batch, input_lengths, x_qF0s_batch, mel_batch, y_batch
+
+
+
+def collate_fn_phonesNstress(batch):
+
+
+    r = hparams.outputs_per_step
+    input_lengths = [len(x[0]['phones']) for x in batch]
+
+    max_input_len = np.max(input_lengths) + 1
+    # Add single zeros frame at least, so plus 1
+    max_target_len = np.max([len(x[1]) for x in batch]) + 1
+    if max_target_len % r != 0:
+        max_target_len += r - max_target_len % r
+        assert max_target_len % r == 0
+
+    x_inputs = [_pad(x[0]['phones'], max_input_len) for x in batch]
+    x_batch = torch.LongTensor(x_inputs)
+
+    x_qF0s = [_pad(x[0]['stress'], max_input_len) for x in batch]
+    x_qF0s_batch = torch.LongTensor(x_qF0s)
+
+    b = np.array([_pad_2d(x[1], max_target_len) for x in batch],
+                 dtype=np.float32)
+    mel_batch = torch.FloatTensor(b)
+
+    c = np.array([_pad_2d(x[2], max_target_len) for x in batch],
+                 dtype=np.float32)
+    y_batch = torch.FloatTensor(c)
+
+    input_lengths = torch.LongTensor(input_lengths)
+
+    return x_batch, input_lengths, x_qF0s_batch, mel_batch, y_batch
 
 
 

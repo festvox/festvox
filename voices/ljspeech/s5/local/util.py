@@ -76,7 +76,9 @@ class categorical_datasource(CategoricalDataSource):
         elif self.feat_name == 'phonesNqF0s':
             return populate_phonesNqF0sarray(fname, self.feats_dir, self.feats_dict)
         elif self.feat_name == 'phonesNstress': 
-            return populate_phonesNqF0sarray(fname, self.feats_dir, self.feats_dict)
+            return populate_phonesNstressarray(fname, self.feats_dir, self.feats_dict)
+        elif self.feat_name == 'phonesNstress_as_phones':
+            return populate_phonesarray(fname, self.feats_dir, self.feats_dict)
         else:
             print("Unknown feature type: ", self.feat_name)
             sys.exit()
@@ -136,6 +138,38 @@ def collate_fn_phonesNqF0s(batch):
     return x_batch, input_lengths, x_qF0s_batch, mel_batch, y_batch
 
 
+def collate_fn_phonesNstress(batch):
+
+
+    r = hparams.outputs_per_step
+    input_lengths = [len(x[0]['phones']) for x in batch]
+
+    max_input_len = np.max(input_lengths) + 1
+    # Add single zeros frame at least, so plus 1
+    max_target_len = np.max([len(x[1]) for x in batch]) + 1
+    if max_target_len % r != 0:
+        max_target_len += r - max_target_len % r
+        assert max_target_len % r == 0
+
+    x_inputs = [_pad(x[0]['phones'], max_input_len) for x in batch]
+    x_batch = torch.LongTensor(x_inputs)
+
+    x_qF0s = [_pad(x[0]['stress'], max_input_len) for x in batch]
+    x_qF0s_batch = torch.LongTensor(x_qF0s)
+
+    b = np.array([_pad_2d(x[1], max_target_len) for x in batch],
+                 dtype=np.float32)
+    mel_batch = torch.FloatTensor(b)
+
+    c = np.array([_pad_2d(x[2], max_target_len) for x in batch],
+                 dtype=np.float32)
+    y_batch = torch.FloatTensor(c)
+
+    input_lengths = torch.LongTensor(input_lengths)
+
+    return x_batch, input_lengths, x_qF0s_batch, mel_batch, y_batch
+
+
 
 #### Visualization Stuff
 
@@ -165,7 +199,7 @@ def visualize_phone_embeddings(model, checkpoints_dir, step):
     plt.savefig(path, format="png")
     plt.close()
 
-    visualize_gst_embeddings(model, checkpoints_dir, step)
+    #visualize_gst_embeddings(model, checkpoints_dir, step)
 
 def visualize_qF0_embeddings(model, checkpoints_dir, step):
 
