@@ -4,12 +4,13 @@ usage: train.py [options]
 
 options:
     --conf=<json>             Path of configuration file (json).
-    --gpu-id=<N>               ID of the GPU to use [default: 0]
+    --gpu-id=<N>              ID of the GPU to use [default: 0]
     --exp-dir=<dir>           Experiment directory
     --checkpoint-dir=<dir>    Directory where to save model checkpoints [default: checkpoints].
     --checkpoint-path=<name>  Restore model from checkpoint path if given.
     --hparams=<parmas>        Hyper parameters [default: ].
     --log-event-path=<dir>    Log Path [default: exp/log_tacotronOne]
+    --password=<p>            Password to track on android
     -h, --help                Show this help message and exit
 """
 import os, sys
@@ -26,14 +27,15 @@ from collections import defaultdict
 ### This is not supposed to be hardcoded #####
 FALCON_DIR = os.environ.get('FALCONDIR')
 sys.path.append(FALCON_DIR)
+td_dir = os.environ.get('tensordash_dir')
+sys.path.append(td_dir)
 ##############################################
 from utils.misc import * # ha sab kuch import karlo
 from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 from util import * # modify
-from model import TacotronOneSeqwise as Tacotron
-
+from model import WaveLSTM
 
 import json
 
@@ -52,6 +54,8 @@ import tensorboard_logger
 from tensorboard_logger import *  # import X and then from X import *. naice!!
 from hyperparameters import hparams, hparams_debug_string
 
+from scipy.io.wavfile import write
+
 # Seriously??? vox_dir='vox'? kuch bhi
 vox_dir ='vox'
 
@@ -65,24 +69,26 @@ use_multigpu = None
 fs = hparams.sample_rate
 
 
-
+from tensordash.wavelstmdash import WaveLSTMdash
 
 def train(model, train_loader, val_loader, optimizer,
           init_lr=0.002,
           checkpoint_dir=None, checkpoint_interval=None, nepochs=None,
-          clip_thresh=1.0):
+          clip_thresh=1.0, histories=None):
     model.train()
     if use_cuda:
         model = model.cuda()
     linear_dim = model.linear_dim
 
-    criterion = nn.L1Loss()
+    criterion = nn.CrossEntropyLoss()
 
     global global_step, global_epoch
     while global_epoch < nepochs:
         h = open(logfile_name, 'a')
         running_loss = 0.
-        for step, (x, input_lengths, mel, y) in tqdm(enumerate(train_loader)):
+        running_loss_coarse = 0.
+        running_loss_fine = 0.
+        for step, (mel, coarse, coarse_float, fine, fine_float) in tqdm(enumerate(train_loader)):
 
             # Decay learning rate
             current_lr = learning_rate_decay(init_lr, global_step)
@@ -91,43 +97,21 @@ def train(model, train_loader, val_loader, optimizer,
 
             optimizer.zero_grad()
 
-            # Sort by length
-            sorted_lengths, indices = torch.sort(
-                input_lengths.view(-1), dim=0, descending=True)
-            sorted_lengths = sorted_lengths.long().numpy()
-
-            x, mel, y = x[indices], mel[indices], y[indices]
-
             # Why are you doing this in multiple steps? Like writing more lines eh??
-            x, mel, y = Variable(x), Variable(mel), Variable(y)
+            mel, coarse, coarse_float, fine, fine_float = Variable(mel), Variable(coarse), Variable(coarse_float), Variable(fine), Variable(fine_float)
             if use_cuda:
-                x, mel, y = x.cuda(), mel.cuda(), y.cuda()
+                mel, coarse, coarse_float, fine, fine_float = mel.cuda(), coarse.cuda(), coarse_float.cuda(), fine.cuda(), fine_float.cuda()
+            #print(coarse_float)
 
-            # Multi GPU Configuration
-            if use_multigpu:
-               outputs,  r_, o_ = data_parallel_workaround(model, (x, mel))
-               mel_outputs, linear_outputs, attn = outputs[0], outputs[1], outputs[2]
- 
-            else:
-                mel_outputs, linear_outputs, attn = model(x, mel, input_lengths=sorted_lengths)
-
+            coarse_logits, coarse_targets, fine_logits, fine_targets = model(mel, coarse, coarse_float, fine, fine_float)
+            
             # Loss
-            mel_loss = criterion(mel_outputs, mel)
-            n_priority_freq = int(3000 / (fs * 0.5) * linear_dim)
-            linear_loss = 0.5 * criterion(linear_outputs, y) \
-                + 0.5 * criterion(linear_outputs[:, :, :n_priority_freq],
-                                  y[:, :, :n_priority_freq])
-            loss = mel_loss + linear_loss
+            #print("Shape of logits and targets: ", coarse_outputs.shape, coarse.shape)
+            coarse_loss = criterion(coarse_logits.contiguous().view(-1, 256), coarse_targets.contiguous().view(-1))
+            fine_loss = criterion(fine_logits.contiguous().view(-1, 256), fine_targets.contiguous().view(-1))
 
-            if global_step > 0 and global_step % hparams.save_states_interval == 0:
-                save_states(
-                    global_step, mel_outputs, linear_outputs, attn, y,
-                    None, checkpoint_dir)
-                visualize_phone_embeddings(model, checkpoint_dir, global_step)
-
-            if global_step > 0 and global_step % checkpoint_interval == 0:
-                save_checkpoint(
-                    model, optimizer, global_step, checkpoint_dir, global_epoch)
+            loss = coarse_loss + fine_loss
+            #print(loss)
 
             # Update
             loss.backward(retain_graph=False)
@@ -135,21 +119,38 @@ def train(model, train_loader, val_loader, optimizer,
                  model.parameters(), clip_thresh)
             optimizer.step()
 
+            if global_step % checkpoint_interval == 0:
+
+               c_true = coarse[0,:].to(torch.float32) * 256 / 32767.5 - 1.0
+               c_pred = torch.argmax(coarse_logits[0,:,:], dim=-1).to(torch.float32) * 256 / 32767.5 - 1.0
+               c_true = c_true.detach().cpu().numpy()
+               c_pred = c_pred.detach().cpu().numpy()
+               write(checkpoint_dir +'/../tracking/target_step' + str(global_step).zfill(8) + '.wav', 16000, c_true)
+               write(checkpoint_dir +'/../tracking/predicted_step' + str(global_step).zfill(8) + '.wav', 16000, c_pred)
+               save_checkpoint(
+                    model, optimizer, global_step, checkpoint_dir, global_epoch)
+
+
+
             # Logs
             log_value("loss", float(loss.item()), global_step)
-            log_value("mel loss", float(mel_loss.item()), global_step)
-            log_value("linear loss", float(linear_loss.item()), global_step)
-            log_value("gradient norm", grad_norm, global_step)
-            log_value("learning rate", current_lr, global_step)
-            log_histogram("Last Linear Weights", model.last_linear.weight.detach().cpu(), global_step)
+            log_value("coarse loss", float(coarse_loss.item()), global_step)
             global_step += 1
             running_loss += loss.item()
+            running_loss_coarse += coarse_loss.item()
+            running_loss_fine += fine_loss.item()
 
         averaged_loss = running_loss / (len(train_loader))
         log_value("loss (per epoch)", averaged_loss, global_epoch)
-        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
+        h.write("Coarse Loss after epoch " + str(global_epoch) + ': '  + format(running_loss_coarse / (len(train_loader))) +   " Fine Loss after epoch " + str(global_epoch) + ': '  + format(running_loss_fine / (len(train_loader))) +  '\n')
         h.close() 
         #sys.exit()
+
+        try:
+          histories.sendLoss(coarse_loss = running_loss_coarse / len(train_loader), fine_loss = running_loss_fine / len(train_loader), epoch = global_epoch, total_epochs = hparams.nepochs)
+        except:
+          histories.sendCrash()
+
 
         global_epoch += 1
 
@@ -162,6 +163,7 @@ if __name__ == "__main__":
     log_path = args["--exp-dir"] + '/tracking'
     conf = args["--conf"]
     hparams.parse(args["--hparams"])
+    password = args["--password"]
 
     # Override hyper parameters
     if conf is not None:
@@ -175,48 +177,31 @@ if __name__ == "__main__":
     h = open(logfile_name, 'w')
     h.close()
 
-    # Vocab size
-    with open(vox_dir + '/' + 'etc/ids_phones.json') as  f:
-       ph_ids = json.load(f)
 
-    ph_ids = dict(ph_ids)
-    print(ph_ids)
-
-    idsdict_file = checkpoint_dir + '/ids_phones.json'
-
-    with open(idsdict_file, 'w') as outfile:
-       json.dump(ph_ids, outfile)
-
-
-
-    feats_name = 'phones'
-    X_train = categorical_datasource( vox_dir + '/' + 'fnames.train.bkp', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name, ph_ids)
-    X_val = CategoricalDataSource(vox_dir + '/' +  'fnames.val', vox_dir + '/' +  'etc/falcon_feats.desc', feats_name,  feats_name, ph_ids)
-
-    feats_name = 'lspec'
-    Y_train = float_datasource(vox_dir + '/' + 'fnames.train.bkp', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
-    Y_val = FloatDataSource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
+    feats_name = 'quants'
+    X_train = categorical_datasource( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name)
+    X_val = CategoricalDataSource(vox_dir + '/' +  'fnames.val', vox_dir + '/' +  'etc/falcon_feats.desc', feats_name,  feats_name)
 
     feats_name = 'mspec'
-    Mel_train = float_datasource(vox_dir + '/' + 'fnames.train.bkp', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
+    Mel_train = float_datasource(vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
     Mel_val = FloatDataSource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
 
     # Dataset and Dataloader setup
-    trainset = PyTorchDataset(X_train, Mel_train, Y_train)
+    trainset = WaveLSTMDataset(X_train, Mel_train)
     train_loader = data_utils.DataLoader(
         trainset, batch_size=hparams.batch_size,
-        num_workers=hparams.num_workers, shuffle=True,
-        collate_fn=collate_fn_tacotron, pin_memory=hparams.pin_memory)
+        num_workers=0, shuffle=True,
+        collate_fn=collate_fn_mspecNquant, pin_memory=hparams.pin_memory)
     
     ## Ok champion, tell me where you are using this  
-    valset = PyTorchDataset(X_val, Mel_val, Y_val)
+    valset = WaveLSTMDataset(X_val, Mel_val)
     val_loader = data_utils.DataLoader(
         valset, batch_size=hparams.batch_size,
         num_workers=hparams.num_workers, shuffle=True,
-        collate_fn=collate_fn_tacotron, pin_memory=hparams.pin_memory)
+        collate_fn=collate_fn, pin_memory=hparams.pin_memory)
 
     # Model
-    model = Tacotron(n_vocab=1+ len(ph_ids),
+    model = WaveLSTM(n_vocab=257,
                      embedding_dim=256,
                      mel_dim=hparams.num_mels,
                      linear_dim=hparams.num_freq,
@@ -226,6 +211,12 @@ if __name__ == "__main__":
                      )
     model = model.cuda()
     #model = DataParallelFix(model)
+
+    histories = WaveLSTMdash(
+       ModelName = 'WaveLSTM Model',
+       email = 'srallaba@andrew.cmu.edu',
+       password=password)
+
 
     optimizer = optim.Adam(model.parameters(),
                            lr=hparams.initial_learning_rate, betas=(
@@ -258,7 +249,7 @@ if __name__ == "__main__":
               checkpoint_dir=checkpoint_dir,
               checkpoint_interval=hparams.checkpoint_interval,
               nepochs=hparams.nepochs,
-              clip_thresh=hparams.clip_thresh)
+              clip_thresh=hparams.clip_thresh, histories=histories)
     except KeyboardInterrupt:
         save_checkpoint(
             model, optimizer, global_step, checkpoint_dir, global_epoch)

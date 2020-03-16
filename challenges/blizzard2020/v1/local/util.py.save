@@ -57,7 +57,7 @@ class categorical_datasource(CategoricalDataSource):
         fname =  str(self.filenames_array[idx])
         #fname = ''.join(k for k in fname[2:])
         fname = fname.lstrip("0")
-        fname = self.feats_dir + '/' + fname.strip().zfill(8) + '.feats'
+        fname = self.feats_dir + '/' + fname.strip() + '.feats'
         if self.feat_name == 'phones':
             return populate_phonesarray(fname, self.feats_dir, self.feats_dict)
         elif self.feat_name == 'phonesnossil':
@@ -93,7 +93,7 @@ class float_datasource(FloatDataSource):
             fname =  str(self.filenames_array[idx]).zfill(8)
             fname = self.feats_dir + '/' + fname.strip() + '.feats.npy'
             return np.load(fname)
-
+ 
 
 #### Visualization Stuff
 
