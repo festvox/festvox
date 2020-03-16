@@ -65,7 +65,9 @@ use_multigpu = None
 fs = hparams.sample_rate
 
 
+# Sample Implementations:
 
+# https://github.com/dragen1860/Reptile-Pytorch/blob/master/main.py
 
 def train(model, train_loader, val_loader, optimizer,
           init_lr=0.002,
