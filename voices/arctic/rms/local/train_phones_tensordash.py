@@ -10,6 +10,7 @@ options:
     --checkpoint-path=<name>  Restore model from checkpoint path if given.
     --hparams=<parmas>        Hyper parameters [default: ].
     --log-event-path=<dir>    Log Path [default: exp/log_tacotronOne]
+    --password=<p>            Password to track on android
     -h, --help                Show this help message and exit
 """
 import os, sys
@@ -167,6 +168,7 @@ if __name__ == "__main__":
     checkpoint_path = args["--checkpoint-path"]
     log_path = args["--exp-dir"] + '/tracking'
     conf = args["--conf"]
+    password = args["--password"]
     hparams.parse(args["--hparams"])
 
     # Override hyper parameters
@@ -240,7 +242,7 @@ if __name__ == "__main__":
     histories = Torchdash(
        ModelName = 'model',
        email = 'srallaba@andrew.cmu.edu',
-       password = 'Saikallis901!')
+       password = password)
 
     # Load checkpoint
     if checkpoint_path:
