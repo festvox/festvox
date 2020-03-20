@@ -11,6 +11,8 @@ Conv1d++ class is a layer that enables temporal convolutions during eval.<br>
 ResidualDilatedCausalConv1d is a module built on top of Conv1d++ <br>
 Wavenet is a model built on top of ResidualDilatedCausalConv1d
 
+Sample [run.sh](https://github.com/festvox/festvox/blob/master/voices/arctic/rms/run.sh) can be found in any of the voices directories.
+
 
 # 20.01 
 #### Acquisitions : 63% (14 blocks out of 22)
