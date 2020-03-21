@@ -7,13 +7,13 @@
 
 We follow a three step procedure: Data preparation, Training and Testing. Everything related to a particular voice is in the directory 'vox'
 
-# Vox Setup
+#### Vox Setup
 
 mkdir vox
 cd vox
 $FESTVOXDIR/src/clustergen/setup_cg cmu us rms # For building RMS voice from arctic database
 
-# Copy the wavefiles and txt.done.data
+#### Copy the wavefiles and txt.done.data
 
 #### Data Preparation
 
