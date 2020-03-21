@@ -1,7 +1,4 @@
-# Building a vanilla voice
-
-
-### Sample build
+# Voice Building
 
 ### Building a vanilla phone level model
 
