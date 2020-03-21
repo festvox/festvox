@@ -5,7 +5,15 @@
 
 ### Building a vanilla phone level model
 
-We follow a three step procedure: Data preparation, Training and Testing
+We follow a three step procedure: Data preparation, Training and Testing. Everything related to a particular voice is in the directory 'vox'
+
+# Vox Setup
+
+mkdir vox
+cd vox
+$FESTVOXDIR/src/clustergen/setup_cg cmu us rms # For building RMS voice from arctic database
+
+# Copy the wavefiles and txt.done.data
 
 #### Data Preparation
 
@@ -18,6 +26,9 @@ The idea is to use the file 'txt.phseq.data'. Then we can iterate through the fi
 
 ```text
 python3.5 $FALCONDIR/utils/dataprep_addphones.py ehmm/etc/txt.phseq.data vox 
+python3.5 $FALCONDIR/utils/dataprep_addlspec.py vox/fnames vox 
+python3.5 $FALCONDIR/utils/dataprep_addmspec.py vox/fnames vox 
+
 ```
 
 #### Training
