@@ -42,7 +42,7 @@
 ##  not as SHARED easier                                                 ##
 ###########################################################################
 
-ESTDIR=/home/srallaba/tools/build/speech_tools
+ESTDIR=/home/srallaba/tools/speech_tools
 
 ###########################################################################
 ##  The location of your compiled Festival (2.0)                         ##

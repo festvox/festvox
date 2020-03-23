@@ -74,7 +74,7 @@ then
 	if [ "$wav_exist" = "0" ]
 	then
 		echo "Wave files are missing. Aborting EHMM"
-		#exit 1
+		exit 1
 	fi
 
    $0 setup
