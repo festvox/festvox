@@ -19,10 +19,27 @@ class Judith(object):
                  glob.iglob(files_path), key=os.path.getctime, reverse=True) 
        return files[0]
 
+    def accelerate(self):
+
+       with open(self.projects_dir + '/' + self.default_project + '/defaults.json') as json_file:
+            info = json.load(json_file)
+       slave = info['slave']
+       acceleration_file = config.acceleration_file
+       print("Boosting now")
+       cmd = 'scp ' + acceleration_file + ' ' + slave + ':'
+       print(cmd)
+       os.system(cmd)
+
     def get_project_info(self, parameters):
 
        query = parameters['project_info'].lower()
        print("Checking for ", query)
+
+       if query == 'acceleration':
+          self.accelerate()
+          msg = "Done Boss"
+          return {'fulfillmentText': msg}
+
 
        with open(self.projects_dir + '/' + self.default_project + '/defaults.json') as json_file:
             info = json.load(json_file)
