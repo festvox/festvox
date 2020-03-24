@@ -1,6 +1,7 @@
 import os, sys
 import glob
 import config
+import json
 
 projects_dir = config.projects_dir
 
@@ -18,12 +19,28 @@ class Judith(object):
                  glob.iglob(files_path), key=os.path.getctime, reverse=True) 
        return files[0]
 
+    def get_project_info(self, parameters):
+
+       query = parameters['project_info'].lower()
+       print("Checking for ", query)
+
+       with open(self.projects_dir + '/' + self.default_project + '/defaults.json') as json_file:
+            info = json.load(json_file)
+       val = info[query]
+       msg = "The " + query + " is " + val
+       return {'fulfillmentText': msg}
 
     def set_default_project(self, parameters):
 
        project_id = parameters['project'].lower()
        print("Checking for the project id ", project_id)
-       assert os.path.exists(projects_dir + '/' + project_id)
+
+       try:
+         assert os.path.exists(projects_dir + '/' + project_id)
+       except AssertionError:
+         msg = " I didnt catch that Boss. All I got was this " + project_id + " and it doesnt exist. Could you please repeat that"
+         return {'fulfillmentText': msg}
+
        self.default_project = project_id
 
        msg = " I have set the default project to " + project_id
@@ -42,6 +59,11 @@ class Judith(object):
 
        return {'fulfillmentText': msg}
 
+    def get_official_baseline(self):
+
+       project = self.default_project
+       assert project is not None 
+
 
     def act_upon_action(self, action, parameters=None):
 
@@ -51,12 +73,22 @@ class Judith(object):
        elif action == 'get_default_project':
           return self.get_default_project()
 
+       elif action == 'project_info':
+
+          try:
+             assert self.default_project is not None
+             return self.get_project_info(parameters)
+
+          except AssertionError:
+             msg = "Boss I dont have a default project"
+             return {'fulfillmentText': msg} 
+
        else:
           msg = " I am sorry. I dont understand this " + action
           return {'fulfillmentText': msg}
 
 
-
+    
 
 
 
