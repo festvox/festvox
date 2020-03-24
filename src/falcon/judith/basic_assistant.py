@@ -8,7 +8,6 @@ import config
 
 judith = Judith()
 
-projects_dir = config.projects_dir
 
 # initialize the flask app
 app = Flask(__name__)
@@ -20,18 +19,21 @@ def index():
 
 # function for responses
 def results():
+
     # build a request object
     req = request.get_json(force=True)
+    #print("The whole request is ", req)
 
     # fetch action from json
     action = req.get('queryResult').get('action')
+    parameters = req.get('queryResult').get('parameters')
+    #print("The parameter is ", parameters)
 
-    # Read the file that contains information about the projects being tracked
     try:
-      return judith.act_upon_action(action, projects_dir)
+      return judith.act_upon_action(action, parameters)
     except Exception as e:
       print(e)
-      sys.exit() 
+      sys.exit()
 
 # create a route for webhook
 @app.route('/webhook', methods=['GET', 'POST'])

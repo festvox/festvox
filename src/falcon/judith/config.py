@@ -1,1 +1,1 @@
-projects_dir='/home_original/srallaba/projects_judith'
+projects_dir='/home/srallaba/projects_judith'
