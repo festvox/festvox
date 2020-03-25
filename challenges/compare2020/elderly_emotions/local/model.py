@@ -79,12 +79,39 @@ class ValenceSeq2Seq(nn.Module):
         val_prediction = self.mel2output(mel)
         return val_prediction[:,-1,:]
 
+class ValenceSeq2Seq_CPCLoss(nn.Module):
+
+    def __init__(self, in_dim=39):
+        super(ValenceSeq2Seq_CPCLoss, self).__init__()
+        self.encoder = Encoder_TacotronOne(in_dim)
+        self.mel2output = nn.Linear(256, 3)
+
+    def forward(self, mel, mel_negative):
+        mel = self.encoder(mel)
+        mel_negative = self.encoder(mel_negative)
+
+        feature_positive = mel[:,-1,:]
+        feature_negative = mel[:,-1,:]
+
+        val_prediction = self.mel2output(feature_positive)
+
+        return val_prediction, feature_positive, feature_negative
+
+    def forward_eval(self, mel):
+        mel = self.encoder(mel)
+
+        feature_positive = mel[:,-1,:]
+
+        val_prediction = self.mel2output(feature_positive)
+
+        return val_prediction
 
 class ValenceNArousalSeq2Seq(nn.Module):
 
     def __init__(self, in_dim=80):
         super(ValenceNArousalSeq2Seq, self).__init__()
         self.encoder = Encoder_TacotronOne(in_dim)
+
         self.mel2output_valence = nn.Linear(256, 3)
         self.mel2output_arousal = nn.Linear(256, 3)
 
@@ -93,6 +120,69 @@ class ValenceNArousalSeq2Seq(nn.Module):
 
         valence_prediction = self.mel2output_valence(mel)
         arousal_prediction = self.mel2output_arousal(mel)
+
+        return valence_prediction[:,-1,:], arousal_prediction[:, -1,:]
+
+
+class ValenceNArousalExperts(nn.Module):
+
+    def __init__(self, in_dim=80):
+        super(ValenceNArousalExperts, self).__init__()
+ 
+        # Shared Encoder
+        self.encoder = Encoder_TacotronOne(in_dim)
+
+        # Expert 01
+        self.exp1_fc_a = SequenceWise(nn.Linear(256, 128))
+        self.exp1_fc_b = SequenceWise(nn.Linear(128, 256))
+
+        # Expert 02
+        self.exp2_fc_a = SequenceWise(nn.Linear(256, 128))
+        self.exp2_fc_b = SequenceWise(nn.Linear(128, 64))
+        self.exp2_fc_c = SequenceWise(nn.Linear(64, 256))
+
+        # Gates
+        self.gate_arousal = nn.LSTM(in_dim, 128, bidirectional=True, batch_first=True)
+        self.gate_valence = nn.LSTM(in_dim, 128, bidirectional=True, batch_first=True)
+
+        self.mel2output_valence = nn.Linear(256, 3)
+        self.mel2output_arousal = nn.Linear(256, 3)
+
+    def forward(self, mel):
+
+        mel_copy = mel
+        mel = self.encoder(mel)
+
+        # Pass through expert 01
+        exp1_logits = torch.tanh(self.exp1_fc_a(mel))
+        exp1_logits = self.exp1_fc_b(exp1_logits)
+
+        # Pass through expert 02
+        exp2_logits = torch.tanh(self.exp2_fc_a(mel))
+        exp2_logits = self.exp2_fc_b(exp2_logits)
+        exp2_logits = self.exp2_fc_c(exp2_logits)
+        
+
+        # Gates
+        gate_arousal, _ = self.gate_arousal(mel_copy) 
+        gate_arousal = gate_arousal[:, -1,:].unsqueeze(1)
+
+        gate_valence, _ = self.gate_valence(mel_copy) 
+        gate_valence = gate_valence[:, -1,:].unsqueeze(1)
+
+        # Combine the experts
+        #print("Shape of gate_arousal and exp1_logits: ", gate_arousal.shape, exp1_logits.shape)
+   
+        exp1_logits_arousal = gate_arousal + exp1_logits
+        exp2_logits_arousal = gate_arousal + exp2_logits
+        combination_arousal = torch.tanh(exp1_logits_arousal) * torch.sigmoid(exp2_logits_arousal)
+
+        exp1_logits_valence = gate_valence + exp1_logits
+        exp2_logits_valence = gate_valence + exp2_logits
+        combination_valence = torch.tanh(exp1_logits_valence) * torch.sigmoid(exp2_logits_valence)
+
+        valence_prediction = self.mel2output_valence(combination_valence)
+        arousal_prediction = self.mel2output_arousal(combination_arousal)
 
         return valence_prediction[:,-1,:], arousal_prediction[:, -1,:]
 

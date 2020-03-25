@@ -7,7 +7,7 @@ from utils.misc import *
 from utils import audio
 from utils.plot import plot_alignment
 from sklearn.metrics import *
-
+import random
 
 ### Data Source Stuff
 class categorical_datasource(CategoricalDataSource):
@@ -30,6 +30,21 @@ class float_datasource(FloatDataSource):
     def __init__(self, fnames_file, desc_file, feat_name, feats_dir, feats_dict = None):
         super(float_datasource, self).__init__(fnames_file, desc_file, feat_name, feats_dir, feats_dict)
 
+
+class filenamesDataset(object):
+    def __init__(self, fnames):
+       self.fnames = fnames
+       self.fnames_array = []
+       f = open(self.fnames)
+       for line in f:
+           line = line.split('\n')[0]
+           self.fnames_array.append(line)
+
+    def __getitem__(self, idx):
+        return self.fnames_array[idx]
+
+    def __len__(self):
+        return len(self.fnames_array)
 
 
 class ValenceDataset(object):
@@ -56,6 +71,37 @@ class ValenceNArousalDataset(object):
         return len(self.Xa)
 
 
+class ValenceDataset_CPCLoss(object):
+    def __init__(self, X, Mel, fnames):
+        self.X = X
+        self.Mel = Mel
+        self.labels_file = '/home1/srallaba/challenges/compare2020/ComParE2020_Elderly/lab/labels.csv'
+        self.column_num = 5
+        self.low, self.medium, self.high, self.fname2label_dict = get_label_arrays(self.labels_file, self.column_num)
+        self.fnames = fnames
+        self.labels = [0,1,2]
+        self.fnamearrays = [self.low, self.medium, self.high]
+
+    def __getitem__(self, idx):
+        label = self.X[idx]
+        mel = self.Mel[idx]
+        fname = self.fnames[idx]
+        contrastive_label = get_contrastive_label(self.labels, label)
+        random_contrastive_fname = random.choice(self.fnamearrays[contrastive_label])
+        contrastive_mel = np.load('vox/festival/falcon_mfcc/' + random_contrastive_fname + '.feats.npy')
+        return label, mel, contrastive_mel
+
+    def __len__(self):
+        return len(self.X)
+
+
+def get_contrastive_label(label_array, current_label):
+
+   while True:
+     random_element = random.choice(label_array)
+     if random_element != current_label:
+       return random_element
+
 
 def _pad_2d(x, max_len):
     x = np.pad(x, [(0, max_len - len(x)), (0, 0)],
@@ -77,6 +123,28 @@ def collate_fn_valence(batch):
     mel_batch = torch.FloatTensor(b)
 
     return x_batch, mel_batch
+
+def collate_fn_valence_contrastiveloss(batch):
+    """Create batch"""
+    r = hparams.outputs_per_step
+
+    # Add single zeros frame at least, so plus 1
+    max_target_len_positive  = np.max([len(x[1]) for x in batch])
+    max_target_len_negative = np.max([len(x[2]) for x in batch])
+
+    a = np.array([x[0] for x in batch], dtype=np.int)
+    x_batch = torch.LongTensor(a)
+
+    b = np.array([_pad_2d(x[1], max_target_len_positive) for x in batch],
+                 dtype=np.float32)
+    mel_batch = torch.FloatTensor(b)
+
+    c = np.array([_pad_2d(x[2], max_target_len_negative) for x in batch],
+                 dtype=np.float32)
+    mel_batch_negative = torch.FloatTensor(c)
+
+    return x_batch, mel_batch, mel_batch_negative
+
 
 def collate_fn_valenceNarousal(batch):
     """Create batch"""
@@ -114,3 +182,48 @@ def get_metrics(predicteds, targets):
    print("EER is ", EER)
    return recall_score(predicteds, targets,average='macro')
 
+
+
+
+def get_label_arrays(fnames, column_num=None):
+
+   try:
+       assert column_num is not None
+   except AssertionError:
+       print("You need to call this function with a column number for me to read from")
+       sys.exit()
+
+   low_array = []
+   medium_array = []
+   high_array = []
+   fname2label_dict = {}
+
+   f = open(fnames)
+   cnt = 0
+   for line in f:
+     if cnt == 0:
+         cnt += 1
+         continue
+     print(line)
+     line = line.split('\n')[0]
+     fname = line.split(',')[0].split('.')[0]
+     try:
+       feature = int(line.split(',')[column_num])
+     except ValueError:
+       continue
+
+     if feature == 0:
+        low_array.append(fname)
+     elif feature == 1:
+        medium_array.append(fname)
+     elif feature == 2:
+        high_array.append(fname)
+     else:
+        print("Houston, we have got problems. I think the feature is ", feature)
+        sys.exit()
+
+     fname2label_dict[fname] = feature
+
+   f.close()
+
+   return low_array, medium_array, high_array, fname2label_dict
