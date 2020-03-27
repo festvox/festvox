@@ -22,5 +22,5 @@ python3.5 $FALCONDIR/utils/dataprep_addmspec.py ${VOXDIR}/fnames ${VOXDIR}
 ${VOXDIR}/bin/traintest ${VOXDIR}/fnames 
 cp ${VOXDIR}/fnames.test ${VOXDIR}/fnames.val
 
-python3.5 local/train_phones.py --exp-dir exp/taco_one_phseq > log_taco_phseq 2>&1&
-python3.5 local/synthesize_phones.py exp/taco_one_phseq/checkpoints/checkpoint_step30000.pth  vox/ehmm/etc/txt.phseq.data.test.head exp/taco_one_phseq/tts_phseq
+#python3.5 local/train_phones.py --exp-dir exp/taco_one_phseq > log_taco_phseq 2>&1&
+#python3.5 local/synthesize_phones.py exp/taco_one_phseq/checkpoints/checkpoint_step30000.pth  vox/ehmm/etc/txt.phseq.data.test.head exp/taco_one_phseq/tts_phseq
