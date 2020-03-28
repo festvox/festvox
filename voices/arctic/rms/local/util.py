@@ -206,3 +206,28 @@ def visualize_latent_embeddings(model, checkpoints_dir, step):
        plt.savefig(path, format="png")
        plt.close()
 
+def collate_fn_transformer(batch):
+    """Create batch"""
+    r = hparams.outputs_per_step
+    input_lengths = [len(x[0]) for x in batch]
+    max_input_len = 86
+    # Add single zeros frame at least, so plus 1
+    max_target_len = np.max([len(x[1]) for x in batch]) + 1
+    if max_target_len % r != 0:
+        max_target_len += r - max_target_len % r
+        assert max_target_len % r == 0
+
+    a = np.array([_pad(x[0], max_input_len) for x in batch], dtype=np.int)
+    x_batch = torch.LongTensor(a)
+
+    input_lengths = torch.LongTensor(input_lengths)
+    
+    b = np.array([_pad_2d(x[1], max_target_len) for x in batch],
+                 dtype=np.float32)
+    mel_batch = torch.FloatTensor(b)
+
+    c = np.array([_pad_2d(x[2], max_target_len) for x in batch],
+                 dtype=np.float32)
+    y_batch = torch.FloatTensor(c)
+    return x_batch, input_lengths, mel_batch, y_batch
+
