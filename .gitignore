@@ -8,4 +8,4 @@ log_*
 challenges/*/*/vox
 challenges/*/*/exp
 config*
-vox
+voices/multispeaker/*/*/vox
