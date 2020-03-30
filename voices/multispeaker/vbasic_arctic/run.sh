@@ -1,50 +1,56 @@
 source path.sh
 
 mkdir -p ehmm/etc
-rm -r ehmm/etc/txt.phseq.data
-rm -r etc/fnames*
-rm -r ehmm/etc/fnames*
+rm -r vox/ehmm/etc/txt.phseq.data
+rm -r vox/etc/fnames*
+rm -r vox/fnames.*
 
 for spk in awb rms #slt #iitm ljspeech
   do
 
-    spk_dir='/home/srallaba/projects/text2speech/voices/cmu_us_'${spk}
+    spk_dir=${arctic_dir}/${spk}/vox
     echo "Copying data from speaker " ${spk}
 
     # Copy lspec
-    mkdir -p festival/falcon_lspec
     for file in ${spk_dir}/festival/falcon_lspec/*
       do
-        fname=$(basename "$file")
-        cp $file festival/falcon_lspec/${spk}_${fname}
+        fname=$(basename "$file" .feats.npy)
+        echo ${spk}_$fname $file >> vox/etc/fnamesNlspec 
       done
 
     # Copy mspec
-    mkdir -p festival/falcon_mspec
     for file in ${spk_dir}/festival/falcon_mspec/*
       do
-        fname=$(basename "$file")
-        cp $file festival/falcon_mspec/${spk}_${fname}
+        fname=$(basename "$file" .feats.npy)
+        echo ${spk}_$fname $file >> vox/etc/fnamesNmspec
       done
 
     # Copy phones
-    mkdir -p festival/falcon_phones
     for file in ${spk_dir}/festival/falcon_phones/*
       do
-        fname=$(basename "$file")
-        cp $file festival/falcon_phones/${spk}_${fname}
+        fname=$(basename "$file" .feats)
+        echo ${spk}_$fname $file >> vox/etc/fnamesNphones
       done
 
     # Copy txt.phseq.data
-    cat  ${spk_dir}/ehmm/etc/txt.phseq.data | while read line
+    cat ${spk_dir}/ehmm/etc/txt.phseq.data | while read line
       do
-         echo ${spk}_${line} >> ehmm/etc/txt.phseq.data
+         echo ${spk}_${line} >> vox/ehmm/etc/txt.phseq.data
       done
+
+    # Copy fnames*
+    cat ${spk_dir}/fnames.train | while read line 
+      do 
+         echo ${spk}_${line} >> vox/fnames.train
+      done
+    cat ${spk_dir}/fnames.test | while read line 
+      do 
+         echo ${spk}_${line} >> vox/fnames.test
+      done
+
 
   done
 
-cat ehmm/etc/txt.phseq.data | awk '{print $1}' > fnames
-./bin/traintest fnames
-cp fnames.test fnames.val
-
-# Edit etc/falcon_feats.desc
+  
+python3.5 $FALCONDIR/utils/dataprep_addphones.py vox/ehmm/etc/txt.phseq.data vox
+python3.5 local/dataprep_addspeakers.py vox/ehmm/etc/txt.phseq.data vox/
