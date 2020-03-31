@@ -11,6 +11,9 @@ options:
     --hparams=<parmas>        Hyper parameters [default: ].
     --log-event-path=<dir>    Log Path [default: exp/log_tacotronOne]
     -h, --help                Show this help message and exit
+This implementation is inspired by Mockingjay paper: https://arxiv.org/abs/1910.12638. But to understand well, we are first implementing the non masked version.
+Since mask was kind of the important component in that paper, wen naming this file, we thought a nice justice wud be to remove vowels from the name, since we are removing the masking component from the original.
+Anyways, that shows we name nerdy too. 
 """
 import os, sys
 from docopt import docopt
@@ -32,7 +35,7 @@ from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 from util import *
-from model import TacotronOneSeqwiseMultispeaker as Tacotron
+from model import TacotronOneSelfAttention as Tacotron
 
 
 import json
@@ -81,7 +84,7 @@ def train(model, train_loader, val_loader, optimizer,
     while global_epoch < nepochs:
         h = open(logfile_name, 'a')
         running_loss = 0.
-        for step, (x, spk, input_lengths, mel, y) in tqdm(enumerate(train_loader)):
+        for step, (x, input_lengths, mel, y) in tqdm(enumerate(train_loader)):
 
             # Decay learning rate
             current_lr = learning_rate_decay(init_lr, global_step)
@@ -95,12 +98,12 @@ def train(model, train_loader, val_loader, optimizer,
                 input_lengths.view(-1), dim=0, descending=True)
             sorted_lengths = sorted_lengths.long().numpy()
 
-            x, spk, mel, y = x[indices], spk[indices], mel[indices], y[indices]
+            x, mel, y = x[indices], mel[indices], y[indices]
 
             # Feed data
-            x, spk, mel, y = Variable(x), Variable(spk), Variable(mel), Variable(y)
+            x, mel, y = Variable(x), Variable(mel), Variable(y)
             if use_cuda:
-                x, spk, mel, y = x.cuda(), spk.cuda(), mel.cuda(), y.cuda()
+                x, mel, y = x.cuda(), mel.cuda(), y.cuda()
 
             # Multi GPU Configuration
             if use_multigpu:
@@ -108,7 +111,7 @@ def train(model, train_loader, val_loader, optimizer,
                mel_outputs, linear_outputs, attn = outputs[0], outputs[1], outputs[2]
  
             else:
-                mel_outputs, linear_outputs, attn = model(x, spk, mel, input_lengths=sorted_lengths)
+                mel_outputs, linear_outputs, attn = model(x, mel, input_lengths=sorted_lengths)
 
             # Loss
             mel_loss = criterion(mel_outputs, mel)
@@ -122,7 +125,7 @@ def train(model, train_loader, val_loader, optimizer,
                 save_states(
                     global_step, mel_outputs, linear_outputs, attn, y,
                     None, checkpoint_dir)
-                #visualize_phone_embeddings(model, checkpoint_dir, global_step)
+                visualize_phone_embeddings(model, checkpoint_dir, global_step)
 
             if global_step > 0 and global_step % checkpoint_interval == 0:
                 save_checkpoint(
@@ -140,7 +143,7 @@ def train(model, train_loader, val_loader, optimizer,
             log_value("linear loss", float(linear_loss.item()), global_step)
             log_value("gradient norm", grad_norm, global_step)
             log_value("learning rate", current_lr, global_step)
-            log_histogram("Last Linear Weights", model.last_linear.weight.detach().cpu(), global_step)
+            #log_histogram("Last Linear Weights", model.last_linear.weight.detach().cpu(), global_step)
             global_step += 1
             running_loss += loss.item()
 
@@ -178,57 +181,43 @@ if __name__ == "__main__":
     with open(vox_dir + '/' + 'etc/ids_phones.json') as  f:
        ph_ids = json.load(f)
 
-    with open(vox_dir + '/' + 'etc/ids_speakers.json') as  f:
-       spk_ids = json.load(f)
-
     ph_ids = dict(ph_ids)
-    spk_ids = dict(spk_ids)
+    print(ph_ids)
 
+    idsdict_file = checkpoint_dir + '/ids_phones.json'
 
-    phidsdict_file = checkpoint_dir + '/ids_phones.json'
-    with open(phidsdict_file, 'w') as outfile:
+    with open(idsdict_file, 'w') as outfile:
        json.dump(ph_ids, outfile)
 
-    spkidsdict_file = checkpoint_dir + '/ids_speakers.json'
-    with open(spkidsdict_file, 'w') as outfile:
-       json.dump(spk_ids, outfile)
 
 
-    # fnames_file, desc_file, feat_name, feats_dict=None, spk_dict=None
     feats_name = 'phones'
-    X_train = categorical_datasource( fnames_file = vox_dir + '/' + 'fnames.train', 
-                                      desc_file = vox_dir + '/' + 'etc/falcon_feats.desc', 
-                                      feat_name = feats_name, 
-                                      feats_dict = ph_ids)
+    X_train = categorical_datasource( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name, ph_ids)
+    X_val = CategoricalDataSource(vox_dir + '/' +  'fnames.val', vox_dir + '/' +  'etc/falcon_feats.desc', feats_name,  feats_name, ph_ids)
 
-    feats_name = 'speaker'
-    spk_train = categorical_datasource( fnames_file = vox_dir + '/' + 'fnames.train', 
-                                      desc_file = vox_dir + '/' + 'etc/falcon_feats.desc', 
-                                      feat_name = feats_name, 
-                                      feats_dict = ph_ids,
-                                      spk_dict = spk_ids)
-
-    # fnames_file, desc_file, feat_name
     feats_name = 'lspec'
-    Y_train = float_datasource(fnames_file = vox_dir + '/' + 'fnames.train', 
-                               desc_file = vox_dir + '/' + 'etc/falcon_feats.desc', 
-                               feat_name = feats_name)
+    Y_train = float_datasource(vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
+    Y_val = FloatDataSource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
 
     feats_name = 'mspec'
-    Mel_train = float_datasource(fnames_file = vox_dir + '/' + 'fnames.train', 
-                               desc_file = vox_dir + '/' + 'etc/falcon_feats.desc', 
-                               feat_name = feats_name)
+    Mel_train = float_datasource(vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
+    Mel_val = FloatDataSource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
 
     # Dataset and Dataloader setup
-    trainset = MultispeakerDataset(X_train, spk_train, Mel_train, Y_train)
+    trainset = PyTorchDataset(X_train, Mel_train, Y_train)
     train_loader = data_utils.DataLoader(
         trainset, batch_size=hparams.batch_size,
         num_workers=hparams.num_workers, shuffle=True,
-        collate_fn=collate_fn_spk, pin_memory=hparams.pin_memory)
+        collate_fn=collate_fn, pin_memory=hparams.pin_memory)
+
+    valset = PyTorchDataset(X_val, Mel_val, Y_val)
+    val_loader = data_utils.DataLoader(
+        valset, batch_size=hparams.batch_size,
+        num_workers=hparams.num_workers, shuffle=True,
+        collate_fn=collate_fn, pin_memory=hparams.pin_memory)
 
     # Model
     model = Tacotron(n_vocab=1+ len(ph_ids),
-                     num_spk=2,
                      embedding_dim=256,
                      mel_dim=hparams.num_mels,
                      linear_dim=hparams.num_freq,
@@ -264,7 +253,7 @@ if __name__ == "__main__":
 
     # Train!
     try:
-        train(model, train_loader, train_loader, optimizer,
+        train(model, train_loader, val_loader, optimizer,
               init_lr=hparams.initial_learning_rate,
               checkpoint_dir=checkpoint_dir,
               checkpoint_interval=hparams.checkpoint_interval,
