@@ -1,1 +1,1 @@
-arctic_dir=/home/srallaba/projects/metalearning/repos/festvox/voices/arctic/
+arctic_dir=/home/srallaba/challenges/compare2020/repos/festvox/voices/arctic

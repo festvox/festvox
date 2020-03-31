@@ -114,7 +114,7 @@ def collate_fn_valence(batch):
 
     # Add single zeros frame at least, so plus 1
     max_target_len = np.max([len(x[1]) for x in batch])
-
+    #print(batch)
     a = np.array([x[0] for x in batch], dtype=np.int)
     x_batch = torch.LongTensor(a)
 
@@ -123,6 +123,26 @@ def collate_fn_valence(batch):
     mel_batch = torch.FloatTensor(b)
 
     return x_batch, mel_batch
+
+
+def collate_fn_valence_seqlen10(batch):
+    """Create batch"""
+    r = hparams.outputs_per_step
+    seq_len = 100
+    max_offsets = [x[1].shape[0] - seq_len for x in batch]
+    mel_lengths = [x[1].shape[0] for x in batch]
+    mel_offsets = [np.random.randint(0, offset) for offset in max_offsets]
+
+    # Add single zeros frame at least, so plus 1
+    max_target_len = np.max([len(x[1]) for x in batch])
+    #print(batch)
+    a = np.array([x[0] for x in batch], dtype=np.int)
+    x_batch = torch.LongTensor(a)
+        
+    mel_batch = torch.FloatTensor([x[1][mel_offsets[i]:mel_offsets[i] + seq_len] for i, x in enumerate(batch)])
+
+    return x_batch, mel_batch
+
 
 def collate_fn_valence_contrastiveloss(batch):
     """Create batch"""

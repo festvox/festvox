@@ -7,6 +7,24 @@ from blocks import *
 
 
 
+# https://pytorch.org/tutorials/beginner/transformer_tutorial.html
+class PositionalEncoding(nn.Module):
+
+    def __init__(self, d_model, dropout=0.1, max_len=5000):
+        super(PositionalEncoding, self).__init__()
+        self.dropout = nn.Dropout(p=dropout)
+
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0).transpose(0, 1)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        x = x + self.pe[:x.size(0), :]
+        return self.dropout(x)
 
 class DownsamplingEncoder(nn.Module):
     """
@@ -78,6 +96,55 @@ class ValenceSeq2Seq(nn.Module):
         mel = self.encoder(mel)
         val_prediction = self.mel2output(mel)
         return val_prediction[:,-1,:]
+
+class ValenceSeq2SeqTransformer(ValenceSeq2Seq):
+
+    def __init__(self, in_dim=80, num_encoder_layers=6, num_attention_heads=4 ):
+        super(ValenceSeq2SeqTransformer, self).__init__()
+
+        self.encoder = nn.LSTM(80, 80, bidirectional=True, batch_first=True)
+        self.mel2output = nn.Linear(160, 3)
+        self.in_dim = in_dim
+        self.dropout = 0.2
+        self.activation = "relu"
+        self.num_encoder_layers = num_encoder_layers
+        self.src_mask = None
+        self.num_attention_heads = num_attention_heads
+        self.embedding_dim = in_dim
+        self.pos_encoder = PositionalEncoding(in_dim, self.dropout)
+        encoder_layers = nn.TransformerEncoderLayer(in_dim, self.num_attention_heads, 128, self.dropout)
+        encoder_norm = nn.LayerNorm(in_dim)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, self.num_encoder_layers, encoder_norm)
+
+
+    def _generate_square_subsequent_mask(self, sz):
+        mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
+        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
+        return mask
+
+    def forward(self, mel):
+
+
+        B = mel.size(0)
+        T = mel.size(1)
+
+        # Generate mask Transformer takes (T,B,C)
+        mel = mel.transpose(0,1)
+
+        if self.src_mask is None or self.src_mask.size(0) != T:
+            mask = self._generate_square_subsequent_mask(T).cuda()
+            self.src_mask = mask
+
+        mel = mel  * math.sqrt(self.in_dim)
+        mel = self.pos_encoder(mel)
+        mel = self.transformer_encoder(mel)
+        mel,_ = self.encoder(mel.transpose(0,1))
+        mel = mel[:,-1,:]
+        val_prediction = self.mel2output(mel)
+
+        return val_prediction
+
+
 
 class ValenceSeq2Seq_CPCLoss(nn.Module):
 

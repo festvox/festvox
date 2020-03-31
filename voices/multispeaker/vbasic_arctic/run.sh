@@ -1,6 +1,11 @@
 source path.sh
 
-mkdir -p ehmm/etc
+#mkdir vox
+#cd vox 
+#$FESTVOXDIR/src/clustergen/setup_cg cmu us multispeaker
+#cd ..
+
+mkdir -p vox/ehmm/etc
 rm -r vox/ehmm/etc/txt.phseq.data
 rm -r vox/etc/fnames*
 rm -r vox/fnames.*

@@ -46,6 +46,8 @@ import torch.backends.cudnn as cudnn
 from torch.utils import data as data_utils
 import numpy as np
 
+from torch import autograd
+
 from os.path import join, expanduser
 
 import tensorboard_logger
@@ -66,7 +68,7 @@ fs = hparams.sample_rate
 
 
 
-def train(model, train_loader, val_loader, optimizer,
+def train(model, theta_loader, phi_loader, optimizer,
           init_lr=0.002,
           checkpoint_dir=None, checkpoint_interval=None, nepochs=None,
           clip_thresh=1.0):
@@ -81,8 +83,10 @@ def train(model, train_loader, val_loader, optimizer,
     while global_epoch < nepochs:
         h = open(logfile_name, 'a')
         running_loss = 0.
-        for step, (x, spk, input_lengths, mel, y) in tqdm(enumerate(train_loader)):
-
+        for step, (x, spk, input_lengths, mel, y) in tqdm(enumerate(theta_loader)):
+        
+         with autograd.detect_anomaly(): 
+          
             # Decay learning rate
             current_lr = learning_rate_decay(init_lr, global_step)
             for param_group in optimizer.param_groups:
@@ -144,9 +148,9 @@ def train(model, train_loader, val_loader, optimizer,
             global_step += 1
             running_loss += loss.item()
 
-        averaged_loss = running_loss / (len(train_loader))
+        averaged_loss = running_loss / (len(theta_loader))
         log_value("loss (per epoch)", averaged_loss, global_epoch)
-        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
+        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(theta_loader))) + '\n')
         h.close() 
         #sys.exit()
 

@@ -32,7 +32,7 @@ from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 from util import * # ha sab kuch import karlo
-from model import ValenceSeq2Seq 
+from model import ValenceSeq2SeqTransformer
 
 import json
 
@@ -117,12 +117,6 @@ def train(model, train_loader, val_loader, optimizer,
             # Loss
             loss = criterion(val_outputs, x)
 
-            if global_step > 0 and global_step % hparams.save_states_interval == 0:
-                save_states(
-                    global_step, mel_outputs, linear_outputs, attn, y,
-                    None, checkpoint_dir)
-                visualize_phone_embeddings(model, checkpoint_dir, global_step)
-
             if global_step > 0 and global_step % checkpoint_interval == 0:
                 save_checkpoint(
                     model, optimizer, global_step, checkpoint_dir, global_epoch)
@@ -184,16 +178,16 @@ if __name__ == "__main__":
     train_loader = data_utils.DataLoader(
         trainset, batch_size=hparams.batch_size,
         num_workers=hparams.num_workers, shuffle=True,
-        collate_fn=collate_fn_valence, pin_memory=hparams.pin_memory)
+        collate_fn=collate_fn_valence_seqlen10, pin_memory=hparams.pin_memory)
 
     valset = ValenceDataset(X_val, Mel_val)
     val_loader = data_utils.DataLoader(
         valset, batch_size=hparams.batch_size,
         num_workers=hparams.num_workers, shuffle=True,
-        collate_fn=collate_fn_valence, pin_memory=hparams.pin_memory)
+        collate_fn=collate_fn_valence_seqlen10, pin_memory=hparams.pin_memory)
 
     # Model
-    model = ValenceSeq2Seq()
+    model = ValenceSeq2SeqTransformer()
     model = model.cuda()
 
     optimizer = optim.Adam(model.parameters(),
