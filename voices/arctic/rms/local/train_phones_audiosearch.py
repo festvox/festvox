@@ -140,12 +140,16 @@ def train(model, train_loader, val_loader, optimizer,
                mel_outputs, linear_outputs, attn = outputs[0], outputs[1], outputs[2]
  
             else:
-                choice = random.choice([pos, neg])
+                inps = [pos, neg]
+                labels = [positive_labels, negative_labels] 
+                choice = random.choice([0, 1])
+                choice_inputs = inps[choice]
+                choice_labels = labels[choice]
                 #print("Shape of choice: ", choice.shape)
-                logits, x_reconstructed  = model(choice.long(), x)
+                logits, x_reconstructed  = model(choice_inputs.long(), x)
 
             # Loss
-            loss_search = criterion(logits.contiguous().view(-1, 2), positive_labels.long())
+            loss_search = criterion(logits.contiguous().view(-1, 2), choice_labels.long())
             #print("Shapes of x and x_recon: ", x.shape, x_reconstructed.shape) 
             loss_reconstruction = criterion(x_reconstructed.contiguous().view(-1, 1 + len(ph_ids)), x.long().contiguous().view(-1) )
             loss = loss_search + loss_reconstruction
