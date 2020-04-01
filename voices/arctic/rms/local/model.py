@@ -21,6 +21,137 @@ class TacotronOneSeqwise(TacotronOne):
         self.decoder = Decoder_TacotronOneSeqwise(mel_dim, r)
 
 
+class Decoder_Audiosearch(nn.Module):
+    def __init__(self, in_dim, r):
+        super(Decoder_Audiosearch, self).__init__()
+        self.in_dim = in_dim
+        self.r = r
+        self.prenet = Prenet(in_dim * r, sizes=[256, 128])
+        # (prenet_out + attention context) -> output
+        self.attention_rnn = AttentionWrapper(
+            nn.GRUCell(256 + 128, 256),
+            BahdanauAttention(256)
+        )
+        self.memory_layer = nn.Linear(256, 256, bias=False)
+        self.project_to_decoder_in = nn.Linear(512, 256)
+
+        self.decoder_rnns = nn.ModuleList(
+            [nn.GRUCell(256, 256) for _ in range(2)])
+
+        self.proj_to_mel = nn.Linear(256, in_dim * r)
+        self.max_decoder_steps = 200
+
+    def forward(self, encoder_outputs, inputs=None, memory_lengths=None):
+        """
+        Decoder forward step.
+        If decoder inputs are not given (e.g., at testing time), as noted in
+        Tacotron paper, greedy decoding is adapted.
+        Args:
+            encoder_outputs: Encoder outputs. (B, T_encoder, dim)
+            inputs: Decoder inputs. i.e., mel-spectrogram. If None (at eval-time),
+              decoder outputs are used as decoder inputs.
+            memory_lengths: Encoder output (memory) lengths. If not None, used for
+              attention masking.
+        """
+        B = encoder_outputs.size(0)
+      
+        processed_memory = self.memory_layer(encoder_outputs)
+        if memory_lengths is not None:
+            mask = get_mask_from_lengths(processed_memory, memory_lengths)
+        else:
+            mask = None
+
+        # Run greedy decoding if inputs is None
+        greedy = inputs is None
+
+        if inputs is not None:
+            #print("Shape of inputs and r: ", inputs.shape, self.r)
+            # Grouping multiple frames if necessary
+            if inputs.size(-1) == self.in_dim:
+                inputs = inputs.view(B, inputs.size(1) // self.r, -1)
+            assert inputs.size(-1) == self.in_dim * self.r
+            T_decoder = inputs.size(1)
+
+        # go frames
+        initial_input = Variable(
+            encoder_outputs.data.new(B, self.in_dim * self.r).zero_())
+
+        # Init decoder states
+        attention_rnn_hidden = Variable(
+            encoder_outputs.data.new(B, 256).zero_())
+        decoder_rnn_hiddens = [Variable(
+            encoder_outputs.data.new(B, 256).zero_())
+            for _ in range(len(self.decoder_rnns))]
+        current_attention = Variable(
+            encoder_outputs.data.new(B, 256).zero_())
+
+        # Time first (T_decoder, B, in_dim)
+        if inputs is not None:
+            inputs = inputs.transpose(0, 1)
+
+        outputs = []
+        alignments = []
+
+        t = 0
+        current_input = initial_input
+        while True:
+            if t > 0:
+                current_input = outputs[-1] if greedy else inputs[t - 1]
+            # Prenet
+            ####### Sai Krishna Rallabandi 15 June 2019 #####################
+            #print("Shape of input to the decoder prenet: ", current_input.shape)
+            if len(current_input.shape) < 3:
+               current_input = current_input.unsqueeze(1)
+            #################################################################
+ 
+            current_input = self.prenet(current_input)
+
+            # Attention RNN
+            attention_rnn_hidden, current_attention, alignment = self.attention_rnn(
+                current_input, current_attention, attention_rnn_hidden,
+                encoder_outputs, processed_memory=processed_memory, mask=mask)
+
+            # Concat RNN output and attention context vector
+            decoder_input = self.project_to_decoder_in(
+                torch.cat((attention_rnn_hidden, current_attention), -1))
+
+            # Pass through the decoder RNNs
+            for idx in range(len(self.decoder_rnns)):
+                decoder_rnn_hiddens[idx] = self.decoder_rnns[idx](
+                    decoder_input, decoder_rnn_hiddens[idx])
+                # Residual connectinon
+                decoder_input = decoder_rnn_hiddens[idx] + decoder_input
+
+            output = decoder_input
+            output = self.proj_to_mel(output)
+
+            outputs += [output]
+            alignments += [alignment]
+
+            t += 1
+
+            if greedy:
+                if t > 1 and is_end_of_frames(output):
+                    break
+                elif t > self.max_decoder_steps:
+                    print("Warning! doesn't seems to be converged")
+                    break
+            else:
+                if t >= T_decoder:
+                    break
+
+        assert greedy or len(outputs) == T_decoder
+
+        # Back to batch first
+        alignments = torch.stack(alignments).transpose(0, 1)
+        outputs = torch.stack(outputs).transpose(0, 1).contiguous()
+
+        return outputs, alignments
+
+# Type: Acquisition_CodeBorrowed Source: https://github.com/r9y9/tacotron_pytorch/blob/62db7217c10da3edb34f67b185cc0e2b04cdf77e/tacotron_pytorch/tacotron.py#L273
+def is_end_of_frames(output, eps=0.2):
+    return (output.data <= eps).all()
+
 # https://pytorch.org/tutorials/beginner/transformer_tutorial.html
 class PositionalEncoding(nn.Module):
 
@@ -117,17 +248,24 @@ class TacotronOneSeqwiseAudiosearch(TacotronOne):
                  r=5, padding_idx=None, use_memory_mask=False)
  
         self.decoder_LSTM = nn.LSTM(256, 128, batch_first=True, bidirectional = True)
-        self.decoder_fc = nn.Linear(256, 2)
+        self.decoderfc_search = nn.Linear(256, 2)
 
-    def forward(self, inputs):
+        self.decoder = Decoder_Audiosearch(256, r)
+        self.decoderfc_reconstruction = SequenceWise(nn.Linear(256, n_vocab))
+
+    def forward(self, inputs, targets):
 
         B = inputs.size(0)
 
         inputs = self.embedding(inputs)
+        targets = self.embedding(targets.long())
         encoder_outputs = self.encoder(inputs)
  
         outputs, _ = self.decoder_LSTM(encoder_outputs)
         outputs = outputs[:, 0, :] 
         #print("Shape of final hidden state from decoder lstm: ", outputs.shape)
         
-        return self.decoder_fc(outputs)
+        outputs_reconstructed, alignments  = self.decoder(encoder_outputs, targets)
+        #print("Shape of reconstructed outputs : ", outputs_reconstructed.shape)
+
+        return self.decoderfc_search(outputs), self.decoderfc_reconstruction(outputs_reconstructed.view(B, -1, 256))

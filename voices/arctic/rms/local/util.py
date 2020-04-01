@@ -255,12 +255,14 @@ def collate_fn_audiosearch(batch):
     inputs = [x[0] for x in batch]
     positive_batch = [ _pad(np.array(x.tolist() + [1] + pos.tolist()), 93)  for (x, pos) in list(zip(inputs,pos)) ]
     negative_batch = [ _pad(np.array(x.tolist() + [1] + neg.tolist()), 93) for (x, neg) in list(zip(inputs,pos)) ]
+    original_batch = [ _pad(x[0], 93) for x in batch ]
+
     #print(positive_batch)  
     positive_batch = torch.FloatTensor(positive_batch)
     negative_batch = torch.FloatTensor(negative_batch)
-    
+    original_batch = torch.FloatTensor(original_batch) 
  
-    return torch.FloatTensor(positive_batch), torch.FloatTensor(negative_batch)
+    return original_batch, positive_batch, negative_batch
 
 class AudiosearchDataset(object):
     def __init__(self, X):

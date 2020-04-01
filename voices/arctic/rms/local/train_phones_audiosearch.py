@@ -35,6 +35,7 @@ from util import *
 from model import TacotronOneSeqwiseAudiosearch as Tacotron
 
 from torch import autograd
+import random
 
 import json
 
@@ -83,7 +84,7 @@ def train(model, train_loader, val_loader, optimizer,
      with autograd.detect_anomaly():
         h = open(logfile_name, 'a')
         running_loss = 0.
-        for step, (pos, neg) in tqdm(enumerate(train_loader)):
+        for step, (x, pos, neg) in tqdm(enumerate(train_loader)):
 
             # Decay learning rate
             current_lr = learning_rate_decay(init_lr, global_step)
@@ -93,9 +94,9 @@ def train(model, train_loader, val_loader, optimizer,
             optimizer.zero_grad()
 
             # Feed data
-            pos, neg = Variable(pos), Variable(neg)
+            x, pos, neg = Variable(x), Variable(pos), Variable(neg)
             if use_cuda:
-                pos, neg = pos.cuda(), neg.cuda()
+                x, pos, neg = x.cuda(), pos.cuda(), neg.cuda()
 
             positive_labels = pos.new(pos.shape[0]).zero_() + 1
             negative_labels = pos.new(neg.shape[0]).zero_()
@@ -106,13 +107,15 @@ def train(model, train_loader, val_loader, optimizer,
                mel_outputs, linear_outputs, attn = outputs[0], outputs[1], outputs[2]
  
             else:
-                logits_positive = model(pos.long())
-                logits_negative = model(neg.long())
+                choice = random.choice([pos, neg])
+                #print("Shape of choice: ", choice.shape)
+                logits, x_reconstructed  = model(choice.long(), x)
 
             # Loss
-            loss_positive = criterion(logits_positive.contiguous().view(-1, 2), positive_labels.long())
-            loss_negative = criterion(logits_negative.contiguous().view(-1, 2), negative_labels.long())
-            loss = loss_positive + loss_negative
+            loss_search = criterion(logits.contiguous().view(-1, 2), positive_labels.long())
+            #print("Shapes of x and x_recon: ", x.shape, x_reconstructed.shape) 
+            loss_reconstruction = criterion(x_reconstructed.contiguous().view(-1, 1 + len(ph_ids)), x.long().contiguous().view(-1) )
+            loss = loss_search + loss_reconstruction
 
 
             if global_step > 0 and global_step % checkpoint_interval == 0:
@@ -127,8 +130,8 @@ def train(model, train_loader, val_loader, optimizer,
 
             # Logs
             log_value("loss", float(loss.item()), global_step)
-            log_value("positive loss", float(loss_positive.item()), global_step)
-            log_value("negative loss", float(loss_negative.item()), global_step)
+            log_value("search loss", float(loss_search.item()), global_step)
+            log_value("reconstruction loss", float(loss_reconstruction.item()), global_step)
             log_value("gradient norm", grad_norm, global_step)
             log_value("learning rate", current_lr, global_step)
             global_step += 1
