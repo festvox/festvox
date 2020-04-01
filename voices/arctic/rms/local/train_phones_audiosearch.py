@@ -32,8 +32,9 @@ from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 from util import *
-from model import TacotronOneSeqwiseMultispeaker as Tacotron
+from model import TacotronOneSeqwiseAudiosearch as Tacotron
 
+from torch import autograd
 
 import json
 
@@ -45,9 +46,6 @@ from torch import optim
 import torch.backends.cudnn as cudnn
 from torch.utils import data as data_utils
 import numpy as np
-
-from torch import autograd
-from torchsummary import summary
 
 from os.path import join, expanduser
 
@@ -69,7 +67,7 @@ fs = hparams.sample_rate
 
 
 
-def train(model, theta_loader, phi_loader, optimizer,
+def train(model, train_loader, val_loader, optimizer,
           init_lr=0.002,
           checkpoint_dir=None, checkpoint_interval=None, nepochs=None,
           clip_thresh=1.0):
@@ -78,16 +76,15 @@ def train(model, theta_loader, phi_loader, optimizer,
         model = model.cuda()
     linear_dim = model.linear_dim
 
-    criterion = nn.L1Loss()
+    criterion = nn.CrossEntropyLoss()
 
     global global_step, global_epoch
     while global_epoch < nepochs:
+     with autograd.detect_anomaly():
         h = open(logfile_name, 'a')
         running_loss = 0.
-        for step, (x, spk, input_lengths, mel, y) in tqdm(enumerate(theta_loader)):
-        
-         with autograd.detect_anomaly(): 
-          
+        for step, (pos, neg) in tqdm(enumerate(train_loader)):
+
             # Decay learning rate
             current_lr = learning_rate_decay(init_lr, global_step)
             for param_group in optimizer.param_groups:
@@ -95,17 +92,13 @@ def train(model, theta_loader, phi_loader, optimizer,
 
             optimizer.zero_grad()
 
-            # Sort by length
-            sorted_lengths, indices = torch.sort(
-                input_lengths.view(-1), dim=0, descending=True)
-            sorted_lengths = sorted_lengths.long().numpy()
-
-            x, spk, mel, y = x[indices], spk[indices], mel[indices], y[indices]
-
             # Feed data
-            x, spk, mel, y = Variable(x), Variable(spk), Variable(mel), Variable(y)
+            pos, neg = Variable(pos), Variable(neg)
             if use_cuda:
-                x, spk, mel, y = x.cuda(), spk.cuda(), mel.cuda(), y.cuda()
+                pos, neg = pos.cuda(), neg.cuda()
+
+            positive_labels = pos.new(pos.shape[0]).zero_() + 1
+            negative_labels = pos.new(neg.shape[0]).zero_()
 
             # Multi GPU Configuration
             if use_multigpu:
@@ -113,50 +106,38 @@ def train(model, theta_loader, phi_loader, optimizer,
                mel_outputs, linear_outputs, attn = outputs[0], outputs[1], outputs[2]
  
             else:
-                mel_outputs, linear_outputs, attn = model(x, spk, mel, input_lengths=sorted_lengths)
+                logits_positive = model(pos.long())
+                logits_negative = model(neg.long())
 
             # Loss
-            mel_loss = criterion(mel_outputs, mel)
-            n_priority_freq = int(3000 / (fs * 0.5) * linear_dim)
-            linear_loss = 0.5 * criterion(linear_outputs, y) \
-                + 0.5 * criterion(linear_outputs[:, :, :n_priority_freq],
-                                  y[:, :, :n_priority_freq])
-            loss = mel_loss + linear_loss
+            loss_positive = criterion(logits_positive.contiguous().view(-1, 2), positive_labels.long())
+            loss_negative = criterion(logits_negative.contiguous().view(-1, 2), negative_labels.long())
+            loss = loss_positive + loss_negative
 
-            if global_step > 0 and global_step % hparams.save_states_interval == 0:
-                save_states(
-                    global_step, mel_outputs, linear_outputs, attn, y,
-                    None, checkpoint_dir)
-                #visualize_phone_embeddings(model, checkpoint_dir, global_step)
 
             if global_step > 0 and global_step % checkpoint_interval == 0:
                 save_checkpoint(
                     model, optimizer, global_step, checkpoint_dir, global_epoch)
 
             # Update
-            grad = torch.autograd.grad(loss, model.parameters())
-            fast_weights = list(map(lambda p: p[1] - current_lr * p[0], zip(grad, model.parameters())))
-            print(fast_weights)
-            sys.exit()
-
+            loss.backward(retain_graph=False)
             grad_norm = torch.nn.utils.clip_grad_norm_(
                  model.parameters(), clip_thresh)
             optimizer.step()
 
             # Logs
             log_value("loss", float(loss.item()), global_step)
-            log_value("mel loss", float(mel_loss.item()), global_step)
-            log_value("linear loss", float(linear_loss.item()), global_step)
+            log_value("positive loss", float(loss_positive.item()), global_step)
+            log_value("negative loss", float(loss_negative.item()), global_step)
             log_value("gradient norm", grad_norm, global_step)
             log_value("learning rate", current_lr, global_step)
-            log_histogram("Last Linear Weights", model.last_linear.weight.detach().cpu(), global_step)
             global_step += 1
             running_loss += loss.item()
 
-        averaged_loss = running_loss / (len(theta_loader))
+        averaged_loss = running_loss / (len(train_loader))
         log_value("loss (per epoch)", averaged_loss, global_epoch)
-        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(theta_loader))) + '\n')
-        h.close() 
+        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
+        h.close()
         #sys.exit()
 
         global_epoch += 1
@@ -187,81 +168,35 @@ if __name__ == "__main__":
     with open(vox_dir + '/' + 'etc/ids_phones.json') as  f:
        ph_ids = json.load(f)
 
-    with open(vox_dir + '/' + 'etc/ids_speakers.json') as  f:
-       spk_ids = json.load(f)
-
     ph_ids = dict(ph_ids)
-    spk_ids = dict(spk_ids)
+    print(ph_ids)
 
+    idsdict_file = checkpoint_dir + '/ids_phones.json'
 
-    phidsdict_file = checkpoint_dir + '/ids_phones.json'
-    with open(phidsdict_file, 'w') as outfile:
+    with open(idsdict_file, 'w') as outfile:
        json.dump(ph_ids, outfile)
 
-    spkidsdict_file = checkpoint_dir + '/ids_speakers.json'
-    with open(spkidsdict_file, 'w') as outfile:
-       json.dump(spk_ids, outfile)
 
 
-    # fnames_file, desc_file, feat_name, feats_dict=None, spk_dict=None
     feats_name = 'phones'
-    theta_X_train = categorical_datasource( fnames_file = vox_dir + '/' + 'fnames.train.awb', 
-                                      desc_file = vox_dir + '/' + 'etc/falcon_feats.desc', 
-                                      feat_name = feats_name, 
-                                      feats_dict = ph_ids)
-    phi_X_train = categorical_datasource( fnames_file = vox_dir + '/' + 'fnames.train.rms', 
-                                      desc_file = vox_dir + '/' + 'etc/falcon_feats.desc', 
-                                      feat_name = feats_name, 
-                                      feats_dict = ph_ids)
+    X_train = categorical_datasource( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name, ph_ids)
+    X_val = CategoricalDataSource(vox_dir + '/' +  'fnames.val', vox_dir + '/' +  'etc/falcon_feats.desc', feats_name,  feats_name, ph_ids)
 
-
-    feats_name = 'speaker'
-    theta_spk_train = categorical_datasource( fnames_file = vox_dir + '/' + 'fnames.train.awb', 
-                                      desc_file = vox_dir + '/' + 'etc/falcon_feats.desc', 
-                                      feat_name = feats_name, 
-                                      feats_dict = ph_ids,
-                                      spk_dict = spk_ids)
-    phi_spk_train = categorical_datasource( fnames_file = vox_dir + '/' + 'fnames.train.rms', 
-                                      desc_file = vox_dir + '/' + 'etc/falcon_feats.desc', 
-                                      feat_name = feats_name, 
-                                      feats_dict = ph_ids,
-                                      spk_dict = spk_ids)
-
-
-    # fnames_file, desc_file, feat_name
-    feats_name = 'lspec'
-    theta_Y_train = float_datasource(fnames_file = vox_dir + '/' + 'fnames.train.awb', 
-                               desc_file = vox_dir + '/' + 'etc/falcon_feats.desc', 
-                               feat_name = feats_name)
-    phi_Y_train = float_datasource(fnames_file = vox_dir + '/' + 'fnames.train.rms', 
-                               desc_file = vox_dir + '/' + 'etc/falcon_feats.desc', 
-                               feat_name = feats_name)
-
-    feats_name = 'mspec'
-    theta_Mel_train = float_datasource(fnames_file = vox_dir + '/' + 'fnames.train.awb', 
-                               desc_file = vox_dir + '/' + 'etc/falcon_feats.desc', 
-                               feat_name = feats_name)
-    phi_Mel_train = float_datasource(fnames_file = vox_dir + '/' + 'fnames.train.rms', 
-                               desc_file = vox_dir + '/' + 'etc/falcon_feats.desc', 
-                               feat_name = feats_name)
     # Dataset and Dataloader setup
-    thetaset = MultispeakerDataset(theta_X_train, theta_spk_train, theta_Mel_train, theta_Y_train)
-    phiset = MultispeakerDataset(phi_X_train, phi_spk_train, phi_Mel_train, phi_Y_train)
-
-    theta_loader = data_utils.DataLoader(
-        thetaset, batch_size=hparams.batch_size,
+    trainset = AudiosearchDataset(X_train)
+    train_loader = data_utils.DataLoader(
+        trainset, batch_size=hparams.batch_size,
         num_workers=hparams.num_workers, shuffle=True,
-        collate_fn=collate_fn_spk, pin_memory=hparams.pin_memory)
+        collate_fn=collate_fn_audiosearch, pin_memory=hparams.pin_memory)
 
-    phi_loader = data_utils.DataLoader(
-        phiset, batch_size=hparams.batch_size,
+    valset = AudiosearchDataset(X_val)
+    val_loader = data_utils.DataLoader(
+        valset, batch_size=hparams.batch_size,
         num_workers=hparams.num_workers, shuffle=True,
-        collate_fn=collate_fn_spk, pin_memory=hparams.pin_memory)
-
+        collate_fn=collate_fn_audiosearch, pin_memory=hparams.pin_memory)
 
     # Model
     model = Tacotron(n_vocab=1+ len(ph_ids),
-                     num_spk=2,
                      embedding_dim=256,
                      mel_dim=hparams.num_mels,
                      linear_dim=hparams.num_freq,
@@ -271,8 +206,6 @@ if __name__ == "__main__":
                      )
     model = model.cuda()
     #model = DataParallelFix(model)
-    print(model)
-    print(summary(model, [(32, 30), (32,)]))
 
     optimizer = optim.Adam(model.parameters(),
                            lr=hparams.initial_learning_rate, betas=(
@@ -299,7 +232,7 @@ if __name__ == "__main__":
 
     # Train!
     try:
-        train(model, theta_loader, phi_loader, optimizer,
+        train(model, train_loader, val_loader, optimizer,
               init_lr=hparams.initial_learning_rate,
               checkpoint_dir=checkpoint_dir,
               checkpoint_interval=hparams.checkpoint_interval,

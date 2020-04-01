@@ -7,6 +7,7 @@ from utils.misc import *
 from utils import audio
 from utils.plot import plot_alignment
 
+import random
 
 ### Text Processign Stuff
 def populate_phonesarray(fname, feats_dir, feats_dict):
@@ -57,6 +58,9 @@ class categorical_datasource(CategoricalDataSource):
             return populate_phonesarray(fname, self.feats_dir, self.feats_dict)
         elif self.feat_name == 'phonesNstress':
             return populate_phonesNstressarray(fname, self.feats_dir, self.feats_dict)
+        elif self.feat_name == 'phones_audiosearch':
+            random_fname = random.choice(self.filenames_array)
+            return populate_phonesarray(fname, self.feats_dir, self.feats_dict) #, populate_phonesarray(random_fname, self.feats_dir, self.feats_dict)
 
         else:
             print("Unknown feature type: ", self.feat_name)
@@ -221,7 +225,7 @@ def collate_fn_transformer(batch):
     x_batch = torch.LongTensor(a)
 
     input_lengths = torch.LongTensor(input_lengths)
-    
+
     b = np.array([_pad_2d(x[1], max_target_len) for x in batch],
                  dtype=np.float32)
     mel_batch = torch.FloatTensor(b)
@@ -230,4 +234,43 @@ def collate_fn_transformer(batch):
                  dtype=np.float32)
     y_batch = torch.FloatTensor(c)
     return x_batch, input_lengths, mel_batch, y_batch
+
+
+def collate_fn_audiosearch(batch):
+
+    """Create batch"""
+    r = hparams.outputs_per_step
+    input_lengths = [len(x[0]) for x in batch]
+    seq_len = 6
+    max_input_len = 86
+
+    max_offsets_pos = [x[0].shape[0] - seq_len for x in batch]
+    max_offsets_neg = [x[1].shape[0] - seq_len for x in batch]
+    offsets_pos = [np.random.randint(0, offset) for offset in max_offsets_pos]
+    offsets_neg = [np.random.randint(0, offset) for offset in max_offsets_neg]
+
+    pos = [x[0][offsets_pos[i]:offsets_pos[i] + seq_len] for i, x in enumerate(batch)]
+    neg = [x[1][offsets_neg[i]:offsets_neg[i] + seq_len] for i, x in enumerate(batch)]
+
+    inputs = [x[0] for x in batch]
+    positive_batch = [ _pad(np.array(x.tolist() + [1] + pos.tolist()), 93)  for (x, pos) in list(zip(inputs,pos)) ]
+    negative_batch = [ _pad(np.array(x.tolist() + [1] + neg.tolist()), 93) for (x, neg) in list(zip(inputs,pos)) ]
+    #print(positive_batch)  
+    positive_batch = torch.FloatTensor(positive_batch)
+    negative_batch = torch.FloatTensor(negative_batch)
+    
+ 
+    return torch.FloatTensor(positive_batch), torch.FloatTensor(negative_batch)
+
+class AudiosearchDataset(object):
+    def __init__(self, X):
+        self.X = X
+
+    def __getitem__(self, idx):
+        random_X = random.choice(self.X)
+        return self.X[idx], random_X
+
+    def __len__(self):
+        return len(self.X)
+
 

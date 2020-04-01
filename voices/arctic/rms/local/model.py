@@ -107,3 +107,27 @@ class TacotronOneSelfAttention(TacotronOneSeqwise):
 
 def isnan(x):
     return (x != x).any()
+
+
+class TacotronOneSeqwiseAudiosearch(TacotronOne):
+
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False):
+        super(TacotronOneSeqwiseAudiosearch, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False)
+ 
+        self.decoder_LSTM = nn.LSTM(256, 128, batch_first=True, bidirectional = True)
+        self.decoder_fc = nn.Linear(256, 2)
+
+    def forward(self, inputs):
+
+        B = inputs.size(0)
+
+        inputs = self.embedding(inputs)
+        encoder_outputs = self.encoder(inputs)
+ 
+        outputs, _ = self.decoder_LSTM(encoder_outputs)
+        outputs = outputs[:, 0, :] 
+        #print("Shape of final hidden state from decoder lstm: ", outputs.shape)
+        
+        return self.decoder_fc(outputs)
