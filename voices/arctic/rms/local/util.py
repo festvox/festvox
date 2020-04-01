@@ -8,6 +8,7 @@ from utils import audio
 from utils.plot import plot_alignment
 
 import random
+from sklearn.metrics import classification_report, confusion_matrix
 
 ### Text Processign Stuff
 def populate_phonesarray(fname, feats_dir, feats_dict):
@@ -276,3 +277,14 @@ class AudiosearchDataset(object):
         return len(self.X)
 
 
+
+def return_classes(logits, dim=-1):
+   #print(logits.shape)
+   _, predicted = torch.max(logits,dim)    
+   #print(predicted.shape)
+   return predicted 
+
+
+def get_metrics(predicteds, targets):
+   print(classification_report(targets, predicteds))
+   print(confusion_matrix(targets, predicteds)) 

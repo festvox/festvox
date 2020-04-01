@@ -68,6 +68,37 @@ fs = hparams.sample_rate
 
 
 
+def validate(val_loader):
+
+         with torch.no_grad():
+             predictions = []
+             targets = []
+             for step, (x, pos, neg) in tqdm(enumerate(val_loader)):     
+
+                # Feed data
+                x, pos, neg = Variable(x), Variable(pos), Variable(neg)
+                if use_cuda:
+                    x, pos, neg = x.cuda(), pos.cuda(), neg.cuda()
+
+                positive_labels = pos.new(pos.shape[0]).zero_() + 1
+                negative_labels = pos.new(neg.shape[0]).zero_()
+
+                logits_positive, x_reconstructed  = model(pos.long(), x)
+                logits_negative, x_reconstructed  = model(neg.long(), x)
+
+                classes = return_classes(logits_positive.view(-1, logits_positive.shape[-1]))
+                classes = classes.cpu().numpy().tolist()
+                predictions += classes
+                targets += positive_labels.detach().cpu().numpy().tolist()
+
+                classes = return_classes(logits_negative.view(-1, logits_negative.shape[-1]))
+                classes = classes.cpu().numpy().tolist()
+                predictions += classes
+                targets += negative_labels.detach().cpu().numpy().tolist()
+
+             get_metrics(predictions, targets)
+                      
+
 def train(model, train_loader, val_loader, optimizer,
           init_lr=0.002,
           checkpoint_dir=None, checkpoint_interval=None, nepochs=None,
@@ -78,6 +109,8 @@ def train(model, train_loader, val_loader, optimizer,
     linear_dim = model.linear_dim
 
     criterion = nn.CrossEntropyLoss()
+    validate(val_loader)
+    #sys.exit()
 
     global global_step, global_epoch
     while global_epoch < nepochs:
@@ -145,6 +178,8 @@ def train(model, train_loader, val_loader, optimizer,
 
         global_epoch += 1
 
+        validate(val_loader)
+
 
 if __name__ == "__main__":
 
@@ -183,7 +218,7 @@ if __name__ == "__main__":
 
     feats_name = 'phones'
     X_train = categorical_datasource( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name, ph_ids)
-    X_val = CategoricalDataSource(vox_dir + '/' +  'fnames.val', vox_dir + '/' +  'etc/falcon_feats.desc', feats_name,  feats_name, ph_ids)
+    X_val = categorical_datasource( vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name, ph_ids)
 
     # Dataset and Dataloader setup
     trainset = AudiosearchDataset(X_train)
