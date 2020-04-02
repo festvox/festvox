@@ -260,12 +260,10 @@ class TacotronOneSeqwiseAudiosearch(TacotronOne):
         inputs = self.embedding(inputs)
         targets = self.embedding(targets.long())
         encoder_outputs = self.encoder(inputs)
- 
+
         outputs, _ = self.decoder_LSTM(encoder_outputs)
-        outputs = outputs[:, 0, :] 
-        #print("Shape of final hidden state from decoder lstm: ", outputs.shape)
-        
+        outputs = outputs[:, 0, :]
+
         outputs_reconstructed, alignments  = self.decoder(encoder_outputs, targets)
-        #print("Shape of reconstructed outputs : ", outputs_reconstructed.shape)
 
         return self.decoderfc_search(outputs), self.decoderfc_reconstruction(outputs_reconstructed.view(B, -1, 256))

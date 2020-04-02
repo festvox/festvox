@@ -19,7 +19,7 @@ print("Command line args:\n", args)
 gpu_id = args['--gpu-id']
 print("Using GPU ", gpu_id)
 os.environ["CUDA_VISIBLE_DEVICES"]=gpu_id
-
+import copy
 
 from collections import defaultdict
 
@@ -33,7 +33,7 @@ from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 from util import *
 from model import TacotronOneSeqwiseMultispeaker as Tacotron
-
+from model import sgd_maml
 
 import json
 
@@ -68,8 +68,38 @@ fs = hparams.sample_rate
 
 
 
+def phi_eval(loader, model):
+    criterion = nn.L1Loss()
+    linear_dim = model.linear_dim
+    for (x, spk, input_lengths, mel, y) in loader:
 
-def train(model, theta_loader, phi_loader, optimizer,
+            # Sort by length
+            sorted_lengths, indices = torch.sort(
+                input_lengths.view(-1), dim=0, descending=True)
+            sorted_lengths = sorted_lengths.long().numpy()
+        
+            x, spk, mel, y = x[indices], spk[indices], mel[indices], y[indices]
+
+            # Feed data
+            x, spk, mel, y = Variable(x), Variable(spk), Variable(mel), Variable(y)
+            if use_cuda:
+                x, spk, mel, y = x.cuda(), spk.cuda(), mel.cuda(), y.cuda()
+             
+            mel_outputs, linear_outputs, attn = model(x, spk, mel, input_lengths=sorted_lengths)
+
+            # Loss
+            mel_loss = criterion(mel_outputs, mel)
+            n_priority_freq = int(3000 / (fs * 0.5) * linear_dim)
+            linear_loss = 0.5 * criterion(linear_outputs, y) \
+                + 0.5 * criterion(linear_outputs[:, :, :n_priority_freq],
+                                  y[:, :, :n_priority_freq])
+            loss = mel_loss + linear_loss
+
+            # You prolly should not return here
+            return loss 
+
+
+def train(model, model_copy, theta_loader, phi_loader, optimizer, optimizer_maml,
           init_lr=0.002,
           checkpoint_dir=None, checkpoint_interval=None, nepochs=None,
           clip_thresh=1.0):
@@ -85,14 +115,15 @@ def train(model, theta_loader, phi_loader, optimizer,
         h = open(logfile_name, 'a')
         running_loss = 0.
         for step, (x, spk, input_lengths, mel, y) in tqdm(enumerate(theta_loader)):
-        
-         with autograd.detect_anomaly(): 
+          #print("At update number ", step)       
+          #with autograd.detect_anomaly(): 
           
             # Decay learning rate
             current_lr = learning_rate_decay(init_lr, global_step)
             for param_group in optimizer.param_groups:
                 param_group['lr'] = current_lr
 
+            optimizer_maml.zero_grad()
             optimizer.zero_grad()
 
             # Sort by length
@@ -134,11 +165,28 @@ def train(model, theta_loader, phi_loader, optimizer,
                     model, optimizer, global_step, checkpoint_dir, global_epoch)
 
             # Update
-            grad = torch.autograd.grad(loss, model.parameters())
-            fast_weights = list(map(lambda p: p[1] - current_lr * p[0], zip(grad, model.parameters())))
-            print(fast_weights)
-            sys.exit()
+            #grad = torch.autograd.grad(loss, model.parameters())
+            #fast_weights = list(map(lambda p: p[1] - current_lr * p[0], zip(grad, model.parameters())))
+            #print(fast_weights)
+            #sys.exit()
+            loss.backward()
+            grad_norm = torch.nn.utils.clip_grad_norm_(
+                 model.parameters(), clip_thresh)
+            fast_weights = optimizer_maml.step_maml()
+            for (fwg, mg) in list(zip(fast_weights, model.parameters())):
+                for (fwp, mp) in list(zip(fwg, mg)):
+                    #print("FWP: ", fwp.shape)
+                    #print("MP: ", mp.shape) 
+                    assert mp.shape == fwp.shape
+                    mp.data = fwp.data 
+            #for i in range(len(fast_weights_params)):
+            #    model_copy[i].data[:] = fast_weights_params[i].data[:]
+            #print("Copied the model")
+            #sys.exit()
 
+
+            phi_loss = phi_eval(phi_loader, model)
+            phi_loss.backward()
             grad_norm = torch.nn.utils.clip_grad_norm_(
                  model.parameters(), clip_thresh)
             optimizer.step()
@@ -270,14 +318,20 @@ if __name__ == "__main__":
                      use_memory_mask=hparams.use_memory_mask,
                      )
     model = model.cuda()
+
+    model_copy = copy.deepcopy(model)
+
     #model = DataParallelFix(model)
     print(model)
-    print(summary(model, [(32, 30), (32,)]))
+    print(list(model.parameters()))
+    for name, module in model.named_children():
+        print(name)
 
     optimizer = optim.Adam(model.parameters(),
                            lr=hparams.initial_learning_rate, betas=(
                                hparams.adam_beta1, hparams.adam_beta2),
                            weight_decay=hparams.weight_decay)
+    optimizer_maml = sgd_maml(params = model.parameters(), lr=0.01)
 
     # Load checkpoint
     if checkpoint_path:
@@ -299,7 +353,7 @@ if __name__ == "__main__":
 
     # Train!
     try:
-        train(model, theta_loader, phi_loader, optimizer,
+        train(model, model_copy, theta_loader, phi_loader, optimizer, optimizer_maml,
               init_lr=hparams.initial_learning_rate,
               checkpoint_dir=checkpoint_dir,
               checkpoint_interval=hparams.checkpoint_interval,
