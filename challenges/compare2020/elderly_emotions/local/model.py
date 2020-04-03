@@ -26,6 +26,7 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[:x.size(0), :]
         return self.dropout(x)
 
+# https://github.com/mkotha/WaveRNN/blob/master/layers/downsampling_encoder.py
 class DownsamplingEncoder(nn.Module):
     """
         Input: (N, samples_i) numeric tensor
