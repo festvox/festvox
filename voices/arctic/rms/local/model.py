@@ -329,7 +329,9 @@ class DownsamplingEncoder(nn.Module):
         return x.transpose(1, 2)
 
 
-
+# https://github.com/jefflai108/Contrastive-Predictive-Coding-PyTorch/blob/a9dab4e759aaa68dce1b1ada46a8035076ba3296/src/model/model.py#L245
+# https://github.com/ssp573/Contrastive-Predictive-Coding
+# https://github.com/davidtellez/contrastive-predictive-coding
 class CPCBaseline(TacotronOne):
 
     def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
