@@ -267,3 +267,105 @@ class TacotronOneSeqwiseAudiosearch(TacotronOne):
         outputs_reconstructed, alignments  = self.decoder(encoder_outputs, targets)
 
         return self.decoderfc_search(outputs), self.decoderfc_reconstruction(outputs_reconstructed.view(B, -1, 256))
+
+
+
+
+# https://github.com/mkotha/WaveRNN/blob/master/layers/downsampling_encoder.py
+class DownsamplingEncoder(nn.Module):
+    """
+        Input: (N, samples_i) numeric tensor
+        Output: (N, samples_o, channels) numeric tensor
+    """
+    def __init__(self, channels, layer_specs):
+        super().__init__()
+
+        self.convs_wide = nn.ModuleList()
+        self.convs_1x1 = nn.ModuleList()
+        self.layer_specs = layer_specs
+        prev_channels = 1
+        total_scale = 1
+        pad_left = 0
+        self.skips = []
+        for stride, ksz, dilation_factor in layer_specs:
+            conv_wide = nn.Conv1d(prev_channels, 2 * channels, ksz, stride=stride, dilation=dilation_factor)
+            wsize = 2.967 / math.sqrt(ksz * prev_channels)
+            conv_wide.weight.data.uniform_(-wsize, wsize)
+            conv_wide.bias.data.zero_()
+            self.convs_wide.append(conv_wide)
+
+            conv_1x1 = nn.Conv1d(channels, channels, 1)
+            conv_1x1.bias.data.zero_()
+            self.convs_1x1.append(conv_1x1)
+
+            prev_channels = channels
+            skip = (ksz - stride) * dilation_factor
+            pad_left += total_scale * skip
+            self.skips.append(skip)
+            total_scale *= stride
+        self.pad_left = pad_left
+        self.total_scale = total_scale
+
+        self.final_conv_0 = nn.Conv1d(channels, channels, 1)
+        self.final_conv_0.bias.data.zero_()
+        self.final_conv_1 = nn.Conv1d(channels, channels, 1)
+
+    def forward(self, samples):
+        x = samples.transpose(1,2) #.unsqueeze(1)
+        #print("Shape of input: ", x.shape)
+        for i, stuff in enumerate(zip(self.convs_wide, self.convs_1x1, self.layer_specs, self.skips)):
+            conv_wide, conv_1x1, layer_spec, skip = stuff
+            stride, ksz, dilation_factor = layer_spec
+            #print(i)
+            x1 = conv_wide(x)
+            x1_a, x1_b = x1.split(x1.size(1) // 2, dim=1)
+            x2 = torch.tanh(x1_a) * torch.sigmoid(x1_b)
+            x3 = conv_1x1(x2)
+            if i == 0:
+                x = x3
+            else:
+                x = x3 + x[:, :, skip:skip+x3.size(2)*stride].view(x.size(0), x3.size(1), x3.size(2), -1)[:, :, :, -1]
+        x = self.final_conv_1(F.relu(self.final_conv_0(x)))
+        return x.transpose(1, 2)
+
+
+
+class CPCBaseline(TacotronOne):
+
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False):
+        super(CPCBaseline, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False)
+
+        encoder_layers = [
+            (2, 4, 1),
+            (2, 4, 1),
+            (2, 4, 1),
+            (1, 4, 1),
+            (2, 4, 1),
+            (1, 4, 1),
+            (2, 4, 1),
+            (1, 4, 1),
+
+            ]
+        self.encoder = DownsamplingEncoder(embedding_dim, encoder_layers)
+        self.decoder_fc = nn.Linear(embedding_dim, embedding_dim, bias=False)
+        self.decoder_lstm = nn.GRU(embedding_dim, embedding_dim, batch_first = True)
+        self.lsoftmax = nn.LogSoftmax(dim=-1)
+
+    def forward(self, inputs):
+
+        encoded = self.encoder(inputs.unsqueeze(-1))
+        latents, hidden = self.decoder_lstm(encoded)
+        #print("Shape of latents: ", latents.shape)
+        z = latents[:,-1,:]
+        #print("Shape of z: ", z.shape)
+        predictions = self.decoder_fc(z)
+        #print("Shape of predictions: ", predictions.shape)
+        total = torch.mm(predictions, predictions.transpose(0,1))
+        nce_loss = torch.sum(torch.diag(self.lsoftmax(total)))
+        return -1 * nce_loss
+
+   
+
+

@@ -10,7 +10,7 @@ from utils.plot import plot_alignment
 import random
 from sklearn.metrics import classification_report, confusion_matrix
 
-### Text Processign Stuff
+### Text Processing Stuff
 def populate_phonesarray(fname, feats_dir, feats_dict):
     if feats_dict is None:
        print("Expected a feature dictionary") 
@@ -23,6 +23,20 @@ def populate_phonesarray(fname, feats_dir, feats_dict):
         feats  = [feats_dict[phone] for phone in line]
     feats = np.array(feats)
     return feats
+
+def populate_quantsarray(fname, feats_dir, feats_dict):
+    if feats_dict is None:
+       print("Expected a feature dictionary") 
+       sys.exit()
+
+    feats_array = []
+    f = open(fname)
+    for line in f:
+        line = line.split('\n')[0].split()
+        feats  = [quant for quant in line]
+    feats = np.array(feats)
+    return feats
+
 
 def populate_phonesNstressarray(fname, feats_dir, feats_dict):
     if feats_dict is None:
@@ -55,6 +69,9 @@ class categorical_datasource(CategoricalDataSource):
         fname = self.feats_dir + '/' + fname.strip() + '.feats'
         if self.feat_name == 'phones':
             return populate_phonesarray(fname, self.feats_dir, self.feats_dict)
+        elif self.feat_name == 'quants':
+            return np.load(fname + '.npy')  
+            return populate_quantsarray(fname +'.npy' , self.feats_dir, self.feats_dict)
         elif self.feat_name == 'phonesnossil':
             return populate_phonesarray(fname, self.feats_dir, self.feats_dict)
         elif self.feat_name == 'phonesNstress':
@@ -288,3 +305,28 @@ def return_classes(logits, dim=-1):
 def get_metrics(predicteds, targets):
    print(classification_report(targets, predicteds))
    print(confusion_matrix(targets, predicteds)) 
+
+
+class CPCDataset(object):
+    def __init__(self, X):
+        self.X = X
+
+    def __getitem__(self, idx):
+        return self.X[idx]
+
+    def __len__(self):
+        return len(self.X)
+
+
+def collate_fn_quantsCPC(batch):
+
+
+    input_lengths = [len(x) for x in batch]
+    seq_len = 8000
+    
+    max_offsets = [x.shape[0] - seq_len for x in batch]
+    offsets = [np.random.randint(0, offset) for offset in max_offsets]
+
+    quants = torch.FloatTensor( [x[offsets[i]:offsets[i] + seq_len] for i,x in enumerate(batch) ] )
+
+    return quants
