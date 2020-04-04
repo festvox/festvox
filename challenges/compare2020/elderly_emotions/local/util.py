@@ -20,10 +20,16 @@ class categorical_datasource(CategoricalDataSource):
         assert self.feat_type == 'categorical'
         fname = self.filenames_array[idx]
         fname = self.feats_dir + '/' + fname.strip() + '.feats'
-        f = open(fname)
-        for line in f:
-           valence = line.split('\n')[0]
-           return valence
+
+        if self.feat_name == 'valence':
+          f = open(fname)
+          for line in f:
+             valence = line.split('\n')[0]
+             return valence
+
+        elif self.feat_name == 'quants':
+            return np.load(fname + '.npy')
+
 
 class float_datasource(FloatDataSource):
 
@@ -69,6 +75,18 @@ class ValenceNArousalDataset(object):
 
     def __len__(self):
         return len(self.Xa)
+
+class ValenceselfsupervisedMultitaskDataset(object):
+    def __init__(self, X, Mel, quants):
+        self.X = X
+        self.Mel = Mel
+        self.quants = quants
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.Mel[idx], self.quants[idx]
+
+    def __len__(self):
+        return len(self.X)
 
 
 class ValenceDataset_CPCLoss(object):
@@ -164,6 +182,32 @@ def collate_fn_valence_contrastiveloss(batch):
     mel_batch_negative = torch.FloatTensor(c)
 
     return x_batch, mel_batch, mel_batch_negative
+
+def collate_fn_valenceNquants(batch):
+    """Create batch"""
+
+    # Add single zeros frame at least, so plus 1
+    max_target_len = np.max([len(x[2]) for x in batch])
+    
+    a = np.array([x[0] for x in batch], dtype=np.int)
+    xv_batch = torch.LongTensor(a)
+
+    input_lengths = [len(x[2]) for x in batch]
+    seq_len = 800
+
+    max_offsets = [x[2].shape[0] - seq_len for x in batch]
+    offsets = [np.random.randint(0, offset) for offset in max_offsets]
+
+    quants_batch = torch.FloatTensor( [x[2][offsets[i]:offsets[i] + seq_len] for i,x in enumerate(batch) ] )
+
+
+    seq_len = 100
+    max_offsets = [x[1].shape[0] - seq_len for x in batch]
+    mel_lengths = [x[1].shape[0] for x in batch]
+    mel_offsets = [np.random.randint(0, offset) for offset in max_offsets]
+    mel_batch = torch.FloatTensor([x[1][mel_offsets[i]:mel_offsets[i] + seq_len] for i, x in enumerate(batch)])
+
+    return xv_batch, mel_batch, quants_batch
 
 
 def collate_fn_valenceNarousal(batch):

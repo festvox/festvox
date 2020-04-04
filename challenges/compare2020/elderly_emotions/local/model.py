@@ -38,7 +38,7 @@ class DownsamplingEncoder(nn.Module):
         self.convs_wide = nn.ModuleList()
         self.convs_1x1 = nn.ModuleList()
         self.layer_specs = layer_specs
-        prev_channels = 80
+        prev_channels = 1
         total_scale = 1
         pad_left = 0
         self.skips = []
@@ -294,3 +294,67 @@ class ValenceSeq2Seq_DownsamplingEncoder(ValenceSeq2Seq):
         return val_prediction[:,-1,:]
 
 
+
+class ValenceCPCMultitaskModel(nn.Module):
+        
+    def __init__(self, in_dim=80):
+        super(ValenceCPCMultitaskModel, self).__init__()
+
+        encoder_layers = [
+            (2, 4, 1),
+            (2, 4, 1),
+            (2, 4, 1),
+            (1, 4, 1),
+            ]
+        self.mel_encoder = nn.LSTM(in_dim, int(in_dim/2), bidirectional=True, batch_first=True)
+        self.quant_encoder = DownsamplingEncoder(1, encoder_layers)
+        self.post_lstm_i = nn.LSTM(in_dim, in_dim, bidirectional=True, batch_first=True)
+        self.post_lstm_h = nn.LSTM(in_dim*2, in_dim, bidirectional=True, batch_first=True)
+        self.post_lstm_o = nn.LSTM(in_dim*2, in_dim, bidirectional=True, batch_first=True)
+        self.latents_armodel = nn.GRU(1, 256, batch_first = True)
+        self.decoder_fc = nn.Linear(256, 256)
+        self.mel2output = nn.Linear(in_dim*2, 3)
+        self.lsoftmax = nn.LogSoftmax(dim=-1)
+
+
+    def forward(self, mel, quant):
+
+        # CPC Loss
+        #print("Shape of quant: ", quant.shape) 
+        encoded = self.quant_encoder(quant.unsqueeze(-1))
+        #print("Encoded")
+        latents, hidden = self.latents_armodel(encoded)
+        z = latents[:,-1,:]
+        predictions = self.decoder_fc(z)
+        total = torch.mm(predictions, predictions.transpose(0,1))
+        nce_loss = torch.sum(torch.diag(self.lsoftmax(total)))
+
+        # Mel Encoding
+        mel, _ = self.mel_encoder(mel)
+        mel_i, _ = self.post_lstm_i(mel)
+        mel_h, _ = self.post_lstm_h(mel_i)
+        mel_h = mel_h + mel_i
+        mel_o,_ = self.post_lstm_o(mel_h)
+        mel_o = mel_o + mel_h
+        mel_o = mel_o[:,-1,:]
+
+        val_prediction = self.mel2output(mel_o)
+
+        return val_prediction , nce_loss * -1
+
+    def forward_eval(self, mel):
+        mel, _ = self.mel_encoder(mel)
+    
+        mel_i, _ = self.post_lstm_i(mel)
+    
+        mel_h, _ = self.post_lstm_h(mel_i)
+        mel_h = mel_h + mel_i
+
+        mel_o,_ = self.post_lstm_o(mel_h)
+        mel_o = mel_o + mel_h
+
+        mel_o = mel_o[:,-1,:]
+
+        val_prediction = self.mel2output(mel_o)
+
+        return val_prediction 

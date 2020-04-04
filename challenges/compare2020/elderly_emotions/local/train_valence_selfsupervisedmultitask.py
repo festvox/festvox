@@ -32,7 +32,7 @@ from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 from util import * # ha sab kuch import karlo
-from model import ValenceSeq2Seq 
+from model import ValenceCPCMultitaskModel
 
 import json
 
@@ -74,7 +74,7 @@ def validate_model(model, val_loader):
        #if step < 15: 
           #print("Shape of input during validation: ", x.shape, mel.shape)    
           x, mel = Variable(x).cuda(), Variable(mel).cuda()
-          logits = model(mel)
+          logits = model.forward_eval(mel)
           targets = x.cpu().view(-1).numpy()
           y_true += targets.tolist()
           predictions = return_classes(logits) 
@@ -98,7 +98,9 @@ def train(model, train_loader, val_loader, optimizer,
         model.train()
         h = open(logfile_name, 'a')
         running_loss = 0.
-        for step, (x, mel) in tqdm(enumerate(train_loader)):
+        running_loss_nce =0.
+        running_loss_valence = 0.
+        for step, (x, mel, q) in tqdm(enumerate(train_loader)):
 
             # Decay learning rate
             current_lr = learning_rate_decay(init_lr, global_step)
@@ -108,14 +110,15 @@ def train(model, train_loader, val_loader, optimizer,
             optimizer.zero_grad()
 
             # Feed data
-            x, mel = Variable(x), Variable(mel)
+            x, mel, q = Variable(x), Variable(mel), Variable(q)
             if use_cuda:
-                x, mel = x.cuda(), mel.cuda()
+                x, mel,q = x.cuda(), mel.cuda(), q.cuda()
 
-            val_outputs = model(mel)
+            val_outputs, nce_loss = model(mel, q)
 
             # Loss
-            loss = criterion(val_outputs, x)
+            valence_loss = criterion(val_outputs, x)
+            loss = valence_loss + nce_loss
 
             if global_step > 0 and global_step % hparams.save_states_interval == 0:
                 save_states(
@@ -139,10 +142,15 @@ def train(model, train_loader, val_loader, optimizer,
             log_value("learning rate", current_lr, global_step)
             global_step += 1
             running_loss += loss.item()
+            running_loss_nce += nce_loss.item()
+            running_loss_valence += valence_loss.item()
 
         averaged_loss = running_loss / (len(train_loader))
         log_value("loss (per epoch)", averaged_loss, global_epoch)
-        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
+        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) 
+                + " NCE Loss: " + format(running_loss_nce / (len(train_loader)))
+                + " Valence Loss: " + format(running_loss_valence / (len(train_loader)))
+                + '\n')
         h.close() 
         validate_model(model, val_loader)
 
@@ -179,12 +187,19 @@ if __name__ == "__main__":
     Mel_train = float_datasource(vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
     Mel_val = float_datasource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
 
+    feats_name = 'quants'
+    quant_train = categorical_datasource( vox_dir + '/' + 'fnames.train', 
+                                      vox_dir + '/' + 'etc/falcon_feats.desc', 
+                                      feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name)
+
+
+
     # Dataset and Dataloader setup
-    trainset = ValenceDataset(X_train, Mel_train)
+    trainset = ValenceselfsupervisedMultitaskDataset(X_train, Mel_train, quant_train)
     train_loader = data_utils.DataLoader(
         trainset, batch_size=hparams.batch_size,
         num_workers=hparams.num_workers, shuffle=True,
-        collate_fn=collate_fn_valence, pin_memory=hparams.pin_memory)
+        collate_fn=collate_fn_valenceNquants, pin_memory=hparams.pin_memory)
 
     valset = ValenceDataset(X_val, Mel_val)
     val_loader = data_utils.DataLoader(
@@ -193,7 +208,7 @@ if __name__ == "__main__":
         collate_fn=collate_fn_valence, pin_memory=hparams.pin_memory)
 
     # Model
-    model = ValenceSeq2Seq()
+    model = ValenceCPCMultitaskModel()
     model = model.cuda()
 
     optimizer = optim.Adam(model.parameters(),
