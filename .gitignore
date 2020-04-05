@@ -5,6 +5,6 @@ voices/*/*/exp
 *.pyc
 *.o
 log_*
-challenges/*/*/vox
+challenges/*/*/vox*
 challenges/*/*/exp
 config*
