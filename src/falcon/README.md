@@ -40,4 +40,4 @@ Vocoder: [Checkout the samples](http://tts.speech.cs.cmu.edu/rsk/challenges/bliz
 #### Acquisitions : 58% (14 blocks out of 24)
 #### Experiments
 
-Vocoder: [WaveLSTM with additional FC for fine](https://github.com/festvox/festvox/blob/master/challenges/blizzard2020/v1/local/train_quants.py) [Checkout the samples](http://tts.speech.cs.cmu.edu/rsk/challenges/blizzard2020/exp/vocoder_wavernn/wavernn.html)
+[Vocoder](https://github.com/festvox/festvox/blob/master/challenges/blizzard2020/v1/local/train_quants.py): [WaveLSTM with additional FC for fine [Checkout the samples](http://tts.speech.cs.cmu.edu/rsk/challenges/blizzard2020/exp/vocoder_wavernn/wavernn.html)
