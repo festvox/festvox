@@ -241,7 +241,7 @@ if __name__ == "__main__":
                      )
     theta_model = theta_model.cuda()
 
-    optimizer = optim.Adam(model.parameters(),
+    optimizer = optim.Adam(phi_model.parameters(),
                            lr=hparams.initial_learning_rate, betas=(
                                hparams.adam_beta1, hparams.adam_beta2),
                            weight_decay=hparams.weight_decay)
