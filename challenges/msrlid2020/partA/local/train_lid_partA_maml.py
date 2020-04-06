@@ -32,7 +32,7 @@ from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 from util import *
-from model import LIDSeq2Seq, CPCBaseline
+from model import *
 
 import json
 
