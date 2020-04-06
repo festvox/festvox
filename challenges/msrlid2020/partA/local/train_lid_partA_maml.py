@@ -19,7 +19,7 @@ print("Command line args:\n", args)
 gpu_id = args['--gpu-id']
 print("Using GPU ", gpu_id)
 os.environ["CUDA_VISIBLE_DEVICES"]=gpu_id
-
+import copy
 
 from collections import defaultdict
 
@@ -121,12 +121,97 @@ def validate_model(model, val_loader):
      print('\n')
      return recall
 
+
+def phi_train(phi_model, train_loader):
+
+
+        criterion = nn.CrossEntropyLoss()
+        phi_model.train()
+
+        for step, (x, mel, fname) in enumerate(train_loader):
+
+            # Feed data
+            x, mel = Variable(x), Variable(mel)
+            if use_cuda:
+                x, mel = x.cuda(), mel.cuda()
+
+            valence_outputs = phi_model(mel)
+
+            # Loss
+            loss = criterion(valence_outputs, x)
+     
+            # You prolly should not return here
+            return loss
+
+
+
+def finetune_train(model, train_loader, val_loader, optimizer,
+          init_lr=0.002,
+          checkpoint_dir=None, checkpoint_interval=None, nepochs=None,
+          clip_thresh=1.0):
+    if use_cuda:
+        model = model.cuda()
+
+    criterion = nn.CrossEntropyLoss()
+    global global_step, global_epoch
+    #validate_model(model, val_loader)
+    while global_epoch < nepochs:
+        model.train()
+        h = open(logfile_name, 'a')
+        running_loss = 0.
+        for step, (x, mel, fname) in tqdm(enumerate(train_loader)):
+
+            # Decay learning rate
+            current_lr = learning_rate_decay(init_lr, global_step)
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = current_lr
+
+            optimizer.zero_grad()
+
+            # Feed data
+            x, mel = Variable(x), Variable(mel)
+            if use_cuda:
+                x, mel = x.cuda(), mel.cuda()
+
+            val_outputs = model(mel)
+
+            # Loss
+            loss = criterion(val_outputs, x)
+
+            # Update
+            loss.backward(retain_graph=False)
+            grad_norm = torch.nn.utils.clip_grad_norm_(
+                 model.parameters(), clip_thresh)
+            optimizer.step()
+
+            if global_step % checkpoint_interval == 0:
+
+               save_checkpoint(
+                    model, optimizer, global_step, checkpoint_dir, global_epoch)
+
+            # Logs
+            log_value("Finetune Training Loss", float(loss.item()), global_step)
+            log_value("gradient norm", grad_norm, global_step)
+            log_value("learning rate", current_lr, global_step)
+            global_step += 1
+            running_loss += loss.item()
+
+        averaged_loss = running_loss / (len(train_loader))
+        log_value("fine tune loss (per epoch)", averaged_loss, global_epoch)
+        h.write("Finetune Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
+        h.close() 
+        recall = validate_model(model, val_loader)
+        log_value("Unweighted Recall per epoch", recall, global_epoch)
+        #sys.exit()
+        global_epoch += 1
+
 def meta_train(theta_model, phi_model, train_loader, val_loader, optimizer, optimizer_maml,
           init_lr=0.002,
           checkpoint_dir=None, checkpoint_interval=None, nepochs=None,
           clip_thresh=1.0):
 
-
+    running_loss_theta = 0.
+    running_loss_phi = 0.
     criterion = nn.CrossEntropyLoss()
     global global_step, global_epoch
     #validate_model(model, val_loader)
@@ -137,6 +222,8 @@ def meta_train(theta_model, phi_model, train_loader, val_loader, optimizer, opti
         h = open(logfile_name, 'a')
         running_loss = 0.
         for step, (x, mel, fname) in tqdm(enumerate(train_loader)):
+
+            model_copy = copy.deepcopy(theta_model)
 
             # Decay learning rate
             current_lr = learning_rate_decay(init_lr, global_step)
@@ -151,36 +238,52 @@ def meta_train(theta_model, phi_model, train_loader, val_loader, optimizer, opti
             if use_cuda:
                 x, mel = x.cuda(), mel.cuda()
 
-            nce_loss = model(mel)
+            nce_loss = theta_model(mel)
+            loss_thetamodel = nce_loss
 
             # Update
             nce_loss.backward(retain_graph=False)
             grad_norm = torch.nn.utils.clip_grad_norm_(
                  theta_model.parameters(), clip_thresh)
-            fast_weights = optimizer_maml.step_maml()
-            for fwg in fast_weights:
-                for p in fwg:
-                    print(p.shape)
-            sys.exit()
+            #fast_weights = optimizer_maml.step_maml()
+            #for fwg in fast_weights:
+            #    for p in fwg:
+            #        print(p)
+            #sys.exit()
+            optimizer_maml.step()
+            #for p in phi_model.encoder:
+            #    print(p.shape)
+            phi_model.encoder = copy.deepcopy(theta_model.encoder)
+            theta_model = model_copy
+
+            loss_phimodel = phi_train(phi_model, train_loader)
+            loss_phimodel.backward()
+            grad_norm = torch.nn.utils.clip_grad_norm_(
+                 theta_model.parameters(), clip_thresh)
+            optimizer.step()
 
             if global_step % checkpoint_interval == 0:
 
                save_checkpoint(
-                    model, optimizer, global_step, checkpoint_dir, global_epoch)
+                    theta_model, optimizer, global_step, checkpoint_dir, global_epoch)
 
             # Logs
-            log_value("Training Loss", float(loss.item()), global_step)
+            log_value("Phi Loss", float(loss_phimodel.item()), global_step)
+            log_value("Theta Loss", float(loss_thetamodel.item()), global_step)
             log_value("gradient norm", grad_norm, global_step)
             log_value("learning rate", current_lr, global_step)
             global_step += 1
-            running_loss += loss.item()
+            running_loss_phi += loss_phimodel.item()
+            running_loss_theta += loss_thetamodel.item()
 
         averaged_loss = running_loss / (len(train_loader))
-        log_value("loss (per epoch)", averaged_loss, global_epoch)
-        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
+        log_value("theta loss (per epoch)", averaged_loss, global_epoch)
+        h.write("Theta Loss after epoch " + str(global_epoch) + ': '  + format(running_loss_theta / (len(train_loader))) 
+                  + "Phi Loss: " + format(running_loss_phi / (len(train_loader)))
+                  + '\n')
         h.close() 
-        recall = validate_model_full(model, val_loader)
-        log_value("Unweighted Recall per epoch", recall, global_epoch)
+        #recall = validate_model_full(model, val_loader)
+        #log_value("Unweighted Recall per epoch", recall, global_epoch)
         #sys.exit()
         global_epoch += 1
 
@@ -236,7 +339,7 @@ if __name__ == "__main__":
 
     theta_model = CPCBaseline(n_vocab=257,
                      embedding_dim=256,
-                     mel_dim=hparams.num_mels,
+                     mel_dim=39,
                      linear_dim=hparams.num_freq,
                      r=hparams.outputs_per_step,
                      padding_idx=hparams.padding_idx,
@@ -244,18 +347,22 @@ if __name__ == "__main__":
                      )
     theta_model = theta_model.cuda()
 
-    optimizer = optim.Adam(phi_model.parameters(),
+    optimizer = optim.Adam(theta_model.parameters(),
                            lr=hparams.initial_learning_rate, betas=(
                                hparams.adam_beta1, hparams.adam_beta2),
                            weight_decay=hparams.weight_decay)
     optimizer_maml = sgd_maml(params = theta_model.parameters(), lr=0.01)
 
+    optimizer_finetune = optim.Adam(phi_model.parameters(),
+                           lr=hparams.initial_learning_rate, betas=(
+                               hparams.adam_beta1, hparams.adam_beta2),
+                           weight_decay=hparams.weight_decay)
+
     for name, module in theta_model.named_children():
         print(name)
-    print('\n')    
+    print('\n')
     for name, module in phi_model.named_children():
-        print(name)    
-    sys.exit()    
+        print(name)
 
 
     # Load checkpoint
@@ -282,9 +389,15 @@ if __name__ == "__main__":
               init_lr=hparams.initial_learning_rate,
               checkpoint_dir=checkpoint_dir,
               checkpoint_interval=hparams.checkpoint_interval,
-              nepochs=hparams.nepochs,
+              nepochs=10,
               clip_thresh=hparams.clip_thresh)
-        meta_test()
+        finetune_train(phi_model, train_loader, val_loader, optimizer,
+              init_lr=hparams.initial_learning_rate,
+              checkpoint_dir=checkpoint_dir,
+              checkpoint_interval=hparams.checkpoint_interval,
+              nepochs=10,
+              clip_thresh=hparams.clip_thresh)
+
         recall = validate_model_full(model, val_loader)
         print("Final Recall: ", recall)
  

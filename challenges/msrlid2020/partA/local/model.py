@@ -20,7 +20,7 @@ class DownsamplingEncoder(nn.Module):
         self.convs_wide = nn.ModuleList()
         self.convs_1x1 = nn.ModuleList()
         self.layer_specs = layer_specs
-        prev_channels = 39
+        prev_channels = channels
         total_scale = 1
         pad_left = 0
         self.skips = []
@@ -191,16 +191,16 @@ class LIDSeq2SeqDownsampling(nn.Module):
             (2, 4, 1),
             (2, 4, 1),
             (1, 4, 1),
-            (2, 4, 1),
-            (1, 4, 1),
-            (2, 4, 1),
-            (1, 4, 1),
+            #(2, 4, 1),
+            #(1, 4, 1),
+            #(2, 4, 1),
+            #(1, 4, 1),
             ]
         self.embedding_dim = 256    
         self.encoder = DownsamplingEncoder(in_dim, encoder_layers)
         self.pre_encoder_fc = SequenceWise(nn.Linear(in_dim, self.embedding_dim))
 
-        self.mel2output = nn.Linear(39, 2)
+        self.mel2output = nn.Linear(256, 2)
 
     def forward(self, mel):
         mel = torch.tanh(self.pre_encoder_fc(mel))
@@ -224,20 +224,23 @@ class CPCBaseline(TacotronOne):
             (2, 4, 1),
             (2, 4, 1),
             (1, 4, 1),
-            (2, 4, 1),
-            (1, 4, 1),
-            (2, 4, 1),
-            (1, 4, 1),
+            #(2, 4, 1),
+            #(1, 4, 1),
+            #(2, 4, 1),
+            #(1, 4, 1),
 
             ]
         self.encoder = DownsamplingEncoder(embedding_dim, encoder_layers)
         self.decoder_fc = nn.Linear(embedding_dim, embedding_dim, bias=False)
         self.decoder_lstm = nn.GRU(embedding_dim, embedding_dim, batch_first = True)
         self.lsoftmax = nn.LogSoftmax(dim=-1)
+        self.embedding_dim = 256 
+        self.pre_encoder_fc = SequenceWise(nn.Linear(mel_dim, self.embedding_dim))
 
     def forward(self, inputs):
-
-        encoded = self.encoder(inputs.unsqueeze(-1))
+        mel = torch.tanh(self.pre_encoder_fc(inputs))
+        #print("Shape of mel: ", mel.shape)
+        encoded = self.encoder(mel)
         latents, hidden = self.decoder_lstm(encoded)
         #print("Shape of latents: ", latents.shape)
         z = latents[:,-1,:]
