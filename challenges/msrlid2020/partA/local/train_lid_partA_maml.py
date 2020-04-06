@@ -55,6 +55,8 @@ vox_dir ='vox'
 
 global_step = 0
 global_epoch = 0
+global_step_finetuning = 0
+global_epoch_finetuning = 0
 use_cuda = torch.cuda.is_available()
 if use_cuda:
     cudnn.benchmark = False
@@ -88,39 +90,6 @@ def validate_model_full(model, val_loader):
      return recall
 
 
-def validate_model(model, val_loader):
-     print("Validating the model")
-     model.eval()
-     y_true = []
-     y_pred = []
-     fnames = []
-     with torch.no_grad():
-      for step, (x, mel, fname) in enumerate(val_loader):
-       if step < 15:
-          
-          print(step)  
-          #print("Shape of input during validation: ", x.shape, mel.shape)    
-          x, mel = Variable(x).cuda(), Variable(mel).cuda()
-          logits = model(mel)
-          targets = x.cpu().view(-1).numpy()
-          y_true += targets.tolist()
-          predictions = return_classes(logits) 
-          y_pred += predictions.tolist()
-          fnames += fname  
-          #print(predictions, targets)
-     #print(y_pred, y_true)
-       else:
-          break
-     ff = open(exp_dir + '/eval' ,'a')
-     for (f, yp, yt) in list(zip(fnames,y_pred, y_true)):
-          ff.write( f + ' ' + str(yp) + ' ' + str(yt) + '\n')
-     ff.close()
- 
-     recall = get_metrics(y_pred, y_true)
-     print("Unweighted Recall for the validation set:  ", recall)
-     print('\n')
-     return recall
-
 
 def phi_train(phi_model, train_loader):
 
@@ -139,7 +108,8 @@ def phi_train(phi_model, train_loader):
 
             # Loss
             loss = criterion(valence_outputs, x)
-     
+            #print("In meta training inner loop")
+ 
             # You prolly should not return here
             return loss
 
@@ -153,16 +123,16 @@ def finetune_train(model, train_loader, val_loader, optimizer,
         model = model.cuda()
 
     criterion = nn.CrossEntropyLoss()
-    global global_step, global_epoch
+    global global_step_finetuning, global_epoch_finetuning
     #validate_model(model, val_loader)
-    while global_epoch < nepochs:
+    while global_epoch_finetuning < nepochs:
         model.train()
         h = open(logfile_name, 'a')
         running_loss = 0.
         for step, (x, mel, fname) in tqdm(enumerate(train_loader)):
 
             # Decay learning rate
-            current_lr = learning_rate_decay(init_lr, global_step)
+            current_lr = learning_rate_decay(init_lr, global_step_finetuning)
             for param_group in optimizer.param_groups:
                 param_group['lr'] = current_lr
 
@@ -184,26 +154,27 @@ def finetune_train(model, train_loader, val_loader, optimizer,
                  model.parameters(), clip_thresh)
             optimizer.step()
 
-            if global_step % checkpoint_interval == 0:
+            if global_step_finetuning % checkpoint_interval == 0:
 
                save_checkpoint(
-                    model, optimizer, global_step, checkpoint_dir, global_epoch)
+                    model, optimizer, global_step_finetuning, checkpoint_dir, global_epoch_finetuning)
 
             # Logs
-            log_value("Finetune Training Loss", float(loss.item()), global_step)
-            log_value("gradient norm", grad_norm, global_step)
-            log_value("learning rate", current_lr, global_step)
-            global_step += 1
+            log_value("Finetune Training Loss", float(loss.item()), global_step_finetuning)
+            log_value("gradient norm", grad_norm, global_step_finetuning)
+            log_value("learning rate", current_lr, global_step_finetuning)
+            global_step_finetuning += 1
             running_loss += loss.item()
 
+            #print("In finetuning loop")
+
         averaged_loss = running_loss / (len(train_loader))
-        log_value("fine tune loss (per epoch)", averaged_loss, global_epoch)
-        h.write("Finetune Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
-        h.close() 
-        recall = validate_model(model, val_loader)
-        log_value("Unweighted Recall per epoch", recall, global_epoch)
+        log_value("fine tune loss (per epoch)", averaged_loss, global_epoch_finetuning)
+        h.write("Finetune Loss after epoch " + str(global_epoch_finetuning) + ': '  + format(running_loss / (len(train_loader))) + '\n' + '\n')
+        h.close()
+        #log_value("Unweighted Recall per epoch", recall, global_epoch)
         #sys.exit()
-        global_epoch += 1
+        global_epoch_finetuning += 1
 
 def meta_train(theta_model, phi_model, train_loader, val_loader, optimizer, optimizer_maml,
           init_lr=0.002,
@@ -275,13 +246,15 @@ def meta_train(theta_model, phi_model, train_loader, val_loader, optimizer, opti
             global_step += 1
             running_loss_phi += loss_phimodel.item()
             running_loss_theta += loss_thetamodel.item()
+            #print("In meta training outer loop")
+
 
         averaged_loss = running_loss / (len(train_loader))
         log_value("theta loss (per epoch)", averaged_loss, global_epoch)
         h.write("Theta Loss after epoch " + str(global_epoch) + ': '  + format(running_loss_theta / (len(train_loader))) 
-                  + "Phi Loss: " + format(running_loss_phi / (len(train_loader)))
+                  + " Phi Loss: " + format(running_loss_phi / (len(train_loader)))
                   + '\n')
-        h.close() 
+        h.close()
         #recall = validate_model_full(model, val_loader)
         #log_value("Unweighted Recall per epoch", recall, global_epoch)
         #sys.exit()
@@ -385,25 +358,26 @@ if __name__ == "__main__":
 
     # Train!
     try:
-        meta_train(theta_model, phi_model, train_loader, val_loader, optimizer, optimizer_maml,
+       print("Meta Training")
+       meta_train(theta_model, phi_model, train_loader, val_loader, optimizer, optimizer_maml,
               init_lr=hparams.initial_learning_rate,
               checkpoint_dir=checkpoint_dir,
               checkpoint_interval=hparams.checkpoint_interval,
-              nepochs=10,
+              nepochs=1,
               clip_thresh=hparams.clip_thresh)
-        finetune_train(phi_model, train_loader, val_loader, optimizer,
+       print("Finetuning")
+       finetune_train(phi_model, train_loader, val_loader, optimizer_finetune,
               init_lr=hparams.initial_learning_rate,
               checkpoint_dir=checkpoint_dir,
               checkpoint_interval=hparams.checkpoint_interval,
-              nepochs=10,
+              nepochs=1,
               clip_thresh=hparams.clip_thresh)
 
-        recall = validate_model_full(model, val_loader)
-        print("Final Recall: ", recall)
- 
-    except KeyboardInterrupt:
-        save_checkpoint(
-            model, optimizer, global_step, checkpoint_dir, global_epoch)
+       recall = validate_model_full(phi_model, val_loader)
+       print("Final Recall: ", recall)
+    except Exception as e:
+       print(e)
+       sys.exit()
 
     print("Finished")
     sys.exit(0)

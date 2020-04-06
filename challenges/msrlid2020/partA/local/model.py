@@ -196,8 +196,8 @@ class LIDSeq2SeqDownsampling(nn.Module):
             #(2, 4, 1),
             #(1, 4, 1),
             ]
-        self.embedding_dim = 256    
-        self.encoder = DownsamplingEncoder(in_dim, encoder_layers)
+        self.embedding_dim = 256
+        self.encoder = DownsamplingEncoder(self.embedding_dim, encoder_layers)
         self.pre_encoder_fc = SequenceWise(nn.Linear(in_dim, self.embedding_dim))
 
         self.mel2output = nn.Linear(256, 2)
