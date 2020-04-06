@@ -206,3 +206,93 @@ class LIDSeq2SeqDownsampling(nn.Module):
         return val_prediction[:,-1,:]
 
 
+# https://github.com/jefflai108/Contrastive-Predictive-Coding-PyTorch/blob/a9dab4e759aaa68dce1b1ada46a8035076ba3296/src/model/model.py#L245
+# https://github.com/ssp573/Contrastive-Predictive-Coding
+# https://github.com/davidtellez/contrastive-predictive-coding
+class CPCBaseline(TacotronOne):
+
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False):
+        super(CPCBaseline, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False)
+
+        encoder_layers = [
+            (2, 4, 1),
+            (2, 4, 1),
+            (2, 4, 1),
+            (1, 4, 1),
+            (2, 4, 1),
+            (1, 4, 1),
+            (2, 4, 1),
+            (1, 4, 1),
+
+            ]
+        self.encoder = DownsamplingEncoder(embedding_dim, encoder_layers)
+        self.decoder_fc = nn.Linear(embedding_dim, embedding_dim, bias=False)
+        self.decoder_lstm = nn.GRU(embedding_dim, embedding_dim, batch_first = True)
+        self.lsoftmax = nn.LogSoftmax(dim=-1)
+
+    def forward(self, inputs):
+
+        encoded = self.encoder(inputs.unsqueeze(-1))
+        latents, hidden = self.decoder_lstm(encoded)
+        #print("Shape of latents: ", latents.shape)
+        z = latents[:,-1,:]
+        #print("Shape of z: ", z.shape)
+        predictions = self.decoder_fc(z)
+        #print("Shape of predictions: ", predictions.shape)
+        total = torch.mm(predictions, predictions.transpose(0,1))
+        nce_loss = torch.sum(torch.diag(self.lsoftmax(total)))
+        return -1 * nce_loss
+
+
+class sgd_maml(SGD):
+
+    def __init__(self, params, lr=0.01, momentum=0, dampening=0,
+                 weight_decay=0, nesterov=False):
+        super(sgd_maml, self).__init__(params, lr=0.01)
+
+        self.param_groups_fast = self.param_groups
+
+
+    @torch.no_grad()
+    def step_maml(self, closure=None):
+        """Performs a single optimization step.
+        Arguments:
+            closure (callable, optional): A closure that reevaluates the model
+                and returns the loss.
+        """
+        loss = None
+        if closure is not None:
+            with torch.enable_grad():
+                loss = closure()
+        parameters = []
+        for group in self.param_groups_fast:
+            weight_decay = group['weight_decay']
+            momentum = group['momentum']
+            dampening = group['dampening']
+            nesterov = group['nesterov']
+
+            for p in group['params']:
+                if p.grad is None:
+                    #print("Not computing grad since p.grad is None")
+                    parameters.append(p)
+                    continue
+                d_p = p.grad
+                if weight_decay != 0:
+                    d_p = d_p.add(p, alpha=weight_decay)
+                if momentum != 0:
+                    param_state = self.state[p]
+                    if 'momentum_buffer' not in param_state:
+                        buf = param_state['momentum_buffer'] = torch.clone(d_p).detach()
+                    else:
+                        buf = param_state['momentum_buffer']
+                        buf.mul_(momentum).add_(d_p, alpha=1 - dampening)
+                    if nesterov:
+                        d_p = d_p.add(buf, alpha=momentum)
+                    else:
+                        d_p = buf
+
+                p.add_(d_p, alpha=-group['lr'])
+                parameters.append(p)
+        return parameters        
