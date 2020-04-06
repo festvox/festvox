@@ -228,7 +228,7 @@ if __name__ == "__main__":
         collate_fn=collate_fn_lid, pin_memory=hparams.pin_memory)
 
     # Model
-    phi_model = LIDSeq2Seq(39)
+    phi_model = LIDSeq2SeqDownsampling(39)
     phi_model = phi_model.cuda()
 
     theta_model = CPCBaseline(n_vocab=257,
@@ -249,6 +249,7 @@ if __name__ == "__main__":
 
     for name, module in theta_model.named_children():
         print(name)
+    print('\n')    
     for name, module in phi_model.named_children():
         print(name)    
     sys.exit()    
