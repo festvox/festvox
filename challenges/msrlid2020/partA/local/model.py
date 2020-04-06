@@ -191,17 +191,19 @@ class LIDSeq2SeqDownsampling(nn.Module):
             (2, 4, 1),
             (2, 4, 1),
             (1, 4, 1),
-            #(2, 4, 1),
+            (2, 4, 1),
             (1, 4, 1),
-            #(2, 4, 1),
+            (2, 4, 1),
             (1, 4, 1),
             ]
+        self.embedding_dim = 256    
         self.encoder = DownsamplingEncoder(in_dim, encoder_layers)
-        
+        self.pre_encoder_fc = SequenceWise(nn.Linear(in_dim, self.embedding_dim))
 
         self.mel2output = nn.Linear(39, 2)
 
     def forward(self, mel):
+        mel = torch.tanh(self.pre_encoder_fc(mel))
         mel = self.encoder(mel)
         val_prediction = self.mel2output(mel)
         return val_prediction[:,-1,:]
