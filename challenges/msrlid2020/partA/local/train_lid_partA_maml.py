@@ -249,6 +249,8 @@ if __name__ == "__main__":
 
     for name, module in theta_model.named_children():
         print(name)
+    for name, module in phi_model.named_children():
+        print(name)    
     sys.exit()    
 
 
