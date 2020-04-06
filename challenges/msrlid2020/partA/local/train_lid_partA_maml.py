@@ -121,18 +121,19 @@ def validate_model(model, val_loader):
      print('\n')
      return recall
 
-def meta_train(model, train_loader, val_loader, optimizer,
+def meta_train(theta_model, phi_model, train_loader, val_loader, optimizer, optimizer_maml,
           init_lr=0.002,
           checkpoint_dir=None, checkpoint_interval=None, nepochs=None,
           clip_thresh=1.0):
-    if use_cuda:
-        model = model.cuda()
+
 
     criterion = nn.CrossEntropyLoss()
     global global_step, global_epoch
     #validate_model(model, val_loader)
     while global_epoch < nepochs:
-        model.train()
+        theta_model.train()
+        phi_model.train()
+
         h = open(logfile_name, 'a')
         running_loss = 0.
         for step, (x, mel, fname) in tqdm(enumerate(train_loader)):
@@ -143,22 +144,24 @@ def meta_train(model, train_loader, val_loader, optimizer,
                 param_group['lr'] = current_lr
 
             optimizer.zero_grad()
+            optimizer_maml.zero_grad()
 
             # Feed data
             x, mel = Variable(x), Variable(mel)
             if use_cuda:
                 x, mel = x.cuda(), mel.cuda()
 
-            val_outputs = model(mel)
-
-            # Loss
-            loss = criterion(val_outputs, x)
+            nce_loss = model(mel)
 
             # Update
-            loss.backward(retain_graph=False)
+            nce_loss.backward(retain_graph=False)
             grad_norm = torch.nn.utils.clip_grad_norm_(
-                 model.parameters(), clip_thresh)
-            optimizer.step()
+                 theta_model.parameters(), clip_thresh)
+            fast_weights = optimizer_maml.step_maml()
+            for fwg in fast_weights:
+                for p in fwg:
+                    print(p.shape)
+            sys.exit()
 
             if global_step % checkpoint_interval == 0:
 
@@ -275,7 +278,7 @@ if __name__ == "__main__":
 
     # Train!
     try:
-        meta_train(model, train_loader, val_loader, optimizer,
+        meta_train(theta_model, phi_model, train_loader, val_loader, optimizer, optimizer_maml,
               init_lr=hparams.initial_learning_rate,
               checkpoint_dir=checkpoint_dir,
               checkpoint_interval=hparams.checkpoint_interval,
