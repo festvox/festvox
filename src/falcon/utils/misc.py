@@ -37,7 +37,14 @@ def _pad_2d(x, max_len):
                mode="constant", constant_values=0)
     return x
 
-def save_checkpoint(model, optimizer, step, checkpoint_dir, epoch, spk_flag=None):
+def clone_as_averaged_model(model, ema):
+    assert ema is not None
+    for name, param in model.named_parameters():
+        if name in ema.shadow:
+            param.data = ema.shadow[name].clone()
+    return model
+
+def save_checkpoint(model, optimizer, step, checkpoint_dir, epoch, spk_flag=None, ema=None):
     step = str(step).zfill(7)
     checkpoint_path = join(
         checkpoint_dir, "checkpoint_step{}.pth".format(step))
@@ -52,6 +59,19 @@ def save_checkpoint(model, optimizer, step, checkpoint_dir, epoch, spk_flag=None
     # Speaker Embedding
     if spk_flag:
        visualize_speaker_embeddings(model, checkpoint_dir, step)
+
+    # https://github.com/r9y9/wavenet_vocoder/blob/c4c148792c6263afbedb9f6bf11cd552668e26cb/train.py#L870
+    if ema is not None:
+        model = clone_as_averaged_model(model, ema)
+        checkpoint_path = join(
+                 checkpoint_dir, "checkpoint_step{}_ema.pth".format(step))
+        torch.save({
+         "state_dict": model.state_dict(),
+         "optimizer": optimizer.state_dict(),
+         "global_step": step,
+         "global_epoch": epoch,
+       }, checkpoint_path)
+    print("Saved checkpoint:", checkpoint_path)
 
 
 def save_states(global_step, mel_outputs, linear_outputs, attn, y,
