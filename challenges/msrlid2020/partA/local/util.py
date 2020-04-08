@@ -112,6 +112,7 @@ def return_classes(logits, dim=-1):
 
 
 def get_metrics(predicteds, targets):
+   print(confusion_matrix(targets, predicteds))
    print(classification_report(targets, predicteds))
    print("Accuracy is ", accuracy_score(targets, predicteds))
    fpr, tpr, threshold = roc_curve(targets, predicteds, pos_label=1)
@@ -119,3 +120,20 @@ def get_metrics(predicteds, targets):
    print("EER is ", EER)
    return recall_score(predicteds, targets,average='macro')
 
+
+
+# https://discuss.pytorch.org/t/how-to-apply-exponential-moving-average-decay-for-variables/10856/4
+# https://www.tensorflow.org/api_docs/python/tf/train/ExponentialMovingAverage
+# https://github.com/r9y9/wavenet_vocoder/blob/c4c148792c6263afbedb9f6bf11cd552668e26cb/train.py
+class ExponentialMovingAverage(object):
+    def __init__(self, decay):
+        self.decay = decay
+        self.shadow = {}
+
+    def register(self, name, val):
+        self.shadow[name] = val.clone()
+
+    def update(self, name, x):
+        assert name in self.shadow
+        update_delta = self.shadow[name] - x
+        self.shadow[name] -= (1.0 - self.decay) * update_delta

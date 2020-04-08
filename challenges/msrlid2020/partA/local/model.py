@@ -86,7 +86,7 @@ class LIDSeq2Seq(nn.Module):
 class LIDSeq2SeqMixtureofExperts_basic(nn.Module):
 
     def __init__(self, in_dim=80):
-        super(LIDSeq2SeqMixtureofExperts, self).__init__()
+        super(LIDSeq2SeqMixtureofExperts_basic, self).__init__()
 
         # Shared encoder
         self.encoder = Encoder_TacotronOne(in_dim)
