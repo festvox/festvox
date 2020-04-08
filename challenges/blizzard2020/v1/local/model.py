@@ -198,3 +198,225 @@ class WaveLSTM(TacotronOne):
         print("Shape of output: ", output.shape)
         return output.cpu().numpy()
 
+
+
+
+class WaveLSTM2(TacotronOne):
+
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False):
+        super(WaveLSTM2, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False)
+        self.decoder = Decoder_TacotronOneSeqwise(mel_dim, r)
+        self.upsample_scales = [2,4,5,5]
+        self.upsample_network = UpsampleNetwork(self.upsample_scales)
+
+        self.hidden2coarse_hidden = SequenceWise(nn.Linear(128, 64))
+        self.hidden2fine_hidden = SequenceWise(nn.Linear(128+1, 64))
+
+        self.coarse_hidden2logits_coarse = SequenceWise(nn.Linear(64, 256))
+        self.fine_hidden2logits_fine = SequenceWise(nn.Linear(64, 256))
+           
+        self.joint_encoder = nn.LSTM(82, 256, batch_first=True)
+
+    def forward(self, mels, coarse, coarse_float, fine, fine_float):
+        
+        B = mels.size(0)
+
+        mels = self.upsample_network(mels)
+        mels = mels[:,:-1,:]
+        coarse_float = coarse_float[:, :-1].unsqueeze(-1)
+        fine_float = fine_float[:, :-1].unsqueeze(-1)
+        coarse = coarse[:, 1:]
+        melsNcoarseNfine = torch.cat([mels, coarse_float, fine_float], dim=-1)
+
+        hidden,_ = self.joint_encoder(melsNcoarseNfine)
+        coarse_hidden, fine_hidden = hidden.split(128, dim=-1)
+
+        #print("Shape of coarse and fine_hidden: ", coarse.shape, fine_hidden.shape)
+        coarse_hidden = torch.relu(self.hidden2coarse_hidden(coarse_hidden))
+        fine_input = torch.cat([fine_hidden, coarse.unsqueeze(-1).float()], dim=-1)
+        fine_hidden = torch.relu(self.hidden2fine_hidden(fine_input))
+
+        coarse_logits = self.coarse_hidden2logits_coarse(coarse_hidden)
+        fine_logits = self.fine_hidden2logits_fine(fine_hidden)
+        
+        return coarse_logits, coarse, fine_logits, fine[:, 1:]
+
+
+          
+    def forward_eval(self, mels):
+          
+        B = mels.size(0)
+           
+        mels = self.upsample_network(mels)
+        T = mels.size(1)
+
+        coarse_float = torch.zeros(mels.shape[0], 1).cuda() #+ 3.4
+        fine_float = torch.zeros(mels.shape[0], 1).cuda()
+        output = []
+        hidden = None
+           
+        for i in range(T):
+
+           #print("Processing ", i, " of ", T, "Shape of coarse_float: ", coarse_float.shape)
+           
+           # Concatenate mel and coarse_float
+           m = mels[:, i,:]
+           inp = torch.cat([m , coarse_float, fine_float], dim=-1).unsqueeze(1)
+
+           # Get coarse and fine logits
+           mels_encoded, hidden = self.joint_encoder(inp, hidden)
+           coarse_hidden, fine_hidden = mels_encoded.split(128, dim=-1)
+
+           # Estimate the coarse categorical
+           coarse_hidden = torch.relu(self.hidden2coarse_hidden(coarse_hidden))
+           coarse_logits = self.coarse_hidden2logits_coarse(coarse_hidden)
+           posterior_coarse = F.softmax(coarse_logits.float(), dim=-1).squeeze(0).squeeze(0)
+           distribution_coarse = torch.distributions.Categorical(probs=posterior_coarse)
+           categorical_coarse = distribution_coarse.sample().float()
+
+
+           cc = categorical_coarse.unsqueeze(0).unsqueeze(0).unsqueeze(0)
+           #print("Shape of fine_hidden and categorical_coarse: ", fine_hidden.shape, cc.shape, cc)
+           fine_input = torch.cat([fine_hidden, cc.float()], dim=-1)
+           fine_hidden = torch.relu(self.hidden2fine_hidden(fine_input))
+           fine_logits = self.fine_hidden2logits_fine(fine_hidden)
+
+           # Estimate the fine categorical
+           posterior_fine = F.softmax(fine_logits.float(), dim=-1).squeeze(0).squeeze(0)
+           distribution_fine = torch.distributions.Categorical(probs=posterior_fine)
+           categorical_fine = distribution_fine.sample().float()
+
+
+           if i%10000 == 1:
+              print("  Predicted coarse class at timestep ", i, "is :", categorical_coarse, " and fine class is ", categorical_fine, " Number of steps: ", T)
+
+           # Generate sample at current time step
+           sample = (categorical_coarse * 256 + categorical_fine) / 32767.5  - 1.0
+           output.append(sample)
+
+           # Estimate the input for next time step
+           coarse_float = categorical_coarse / 127.5 - 1.0
+           coarse_float = coarse_float.unsqueeze(0).unsqueeze(0)
+           fine_float = categorical_fine / 127.5 - 1.0
+           fine_float = fine_float.unsqueeze(0).unsqueeze(0)
+
+
+        output = torch.stack(output, dim=0)
+        print("Shape of output: ", output.shape)
+        return output.cpu().numpy()
+
+
+
+
+
+class WaveLSTM3(TacotronOne):
+
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False):
+        super(WaveLSTM3, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False)
+        self.decoder = Decoder_TacotronOneSeqwise(mel_dim, r)
+        self.upsample_scales = [2,4,5,5]
+        self.upsample_network = UpsampleNetwork(self.upsample_scales)
+
+        self.hidden2coarse_hidden = SequenceWise(nn.Linear(128, 64))
+        self.hidden2fine_hidden = SequenceWise(nn.Linear(128, 64))
+
+        self.coarse_hidden2logits_coarse = SequenceWise(nn.Linear(64, 256))
+        self.fine_hidden2logits_fine = SequenceWise(nn.Linear(64, 256))
+           
+        self.joint_encoder = nn.LSTM(82, 256, batch_first=True)
+        self.fine_encoder = nn.LSTM(129, 128, batch_first=True)
+
+    def forward(self, mels, coarse, coarse_float, fine, fine_float):
+        
+        B = mels.size(0)
+
+        mels = self.upsample_network(mels)
+        mels = mels[:,:-1,:]
+        coarse_float = coarse_float[:, :-1].unsqueeze(-1)
+        fine_float = fine_float[:, :-1].unsqueeze(-1)
+        coarse = coarse[:, 1:]
+        melsNcoarseNfine = torch.cat([mels, coarse_float, fine_float], dim=-1)
+
+        hidden,_ = self.joint_encoder(melsNcoarseNfine)
+        coarse_hidden, fine_hidden = hidden.split(128, dim=-1)
+
+        #print("Shape of coarse and fine_hidden: ", coarse.shape, fine_hidden.shape)
+        coarse_hidden = torch.relu(self.hidden2coarse_hidden(coarse_hidden))
+        fine_input = torch.cat([fine_hidden, coarse.unsqueeze(-1).float()], dim=-1)
+
+        fine_hidden, _ = self.fine_encoder(fine_input)
+        fine_hidden = torch.relu(self.hidden2fine_hidden(fine_hidden))
+
+        coarse_logits = self.coarse_hidden2logits_coarse(coarse_hidden)
+        fine_logits = self.fine_hidden2logits_fine(fine_hidden)
+        
+        return coarse_logits, coarse, fine_logits, fine[:, 1:]
+
+
+          
+    def forward_eval(self, mels):
+          
+        B = mels.size(0)
+           
+        mels = self.upsample_network(mels)
+        T = mels.size(1)
+
+        coarse_float = torch.zeros(mels.shape[0], 1).cuda() #+ 3.4
+        fine_float = torch.zeros(mels.shape[0], 1).cuda()
+        output = []
+        hidden = None
+        hidden_fine = None           
+        for i in range(T):
+
+           #print("Processing ", i, " of ", T, "Shape of coarse_float: ", coarse_float.shape)
+           
+           # Concatenate mel and coarse_float
+           m = mels[:, i,:]
+           inp = torch.cat([m , coarse_float, fine_float], dim=-1).unsqueeze(1)
+
+           # Get coarse and fine logits
+           mels_encoded, hidden = self.joint_encoder(inp, hidden)
+           coarse_hidden, fine_hidden = mels_encoded.split(128, dim=-1)
+
+           # Estimate the coarse categorical
+           coarse_hidden = torch.relu(self.hidden2coarse_hidden(coarse_hidden))
+           coarse_logits = self.coarse_hidden2logits_coarse(coarse_hidden)
+           posterior_coarse = F.softmax(coarse_logits.float(), dim=-1).squeeze(0).squeeze(0)
+           distribution_coarse = torch.distributions.Categorical(probs=posterior_coarse)
+           categorical_coarse = distribution_coarse.sample().float()
+
+
+           cc = categorical_coarse.unsqueeze(0).unsqueeze(0).unsqueeze(0)
+           fine_input = torch.cat([fine_hidden, cc.float()], dim=-1)
+           fine_hidden, hidden_fine = self.fine_encoder(fine_input, hidden_fine)
+           fine_hidden = torch.relu(self.hidden2fine_hidden(fine_hidden))
+           fine_logits = self.fine_hidden2logits_fine(fine_hidden)
+
+           # Estimate the fine categorical
+           posterior_fine = F.softmax(fine_logits.float(), dim=-1).squeeze(0).squeeze(0)
+           distribution_fine = torch.distributions.Categorical(probs=posterior_fine)
+           categorical_fine = distribution_fine.sample().float()
+
+
+           if i%10000 == 1:
+              print("  Predicted coarse class at timestep ", i, "is :", categorical_coarse, " and fine class is ", categorical_fine, " Number of steps: ", T)
+
+           # Generate sample at current time step
+           sample = (categorical_coarse * 256 + categorical_fine) / 32767.5  - 1.0
+           output.append(sample)
+
+           # Estimate the input for next time step
+           coarse_float = categorical_coarse / 127.5 - 1.0
+           coarse_float = coarse_float.unsqueeze(0).unsqueeze(0)
+           fine_float = categorical_fine / 127.5 - 1.0
+           fine_float = fine_float.unsqueeze(0).unsqueeze(0)
+
+
+        output = torch.stack(output, dim=0)
+        print("Shape of output: ", output.shape)
+        return output.cpu().numpy()
+

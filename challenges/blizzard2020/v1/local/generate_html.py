@@ -56,7 +56,7 @@ def write_html(fnames, original_dir, samples_dir, exp_name, out_file, link=None,
        path = os.path.basename(original_dir)
        if link:
           path = link + path
-       source = ET.Element('source', src = path + '/' + fname.zfill(8) + '.wav')
+       source = ET.Element('source', src = path + '/' + fname.zfill(8) + '_original.wav')
        audio.append(source)
        div.append(audio)
 
@@ -65,7 +65,7 @@ def write_html(fnames, original_dir, samples_dir, exp_name, out_file, link=None,
        path = os.path.basename(samples_dir)
        if link:
           path = link + path
-       source = ET.Element('source', src = path + '/' + fname.zfill(8)  + '.wav')
+       source = ET.Element('source', src = path + '/' + fname.zfill(8)  + '_generated.wav')
        audio.append(source)
        div.append(audio)
 

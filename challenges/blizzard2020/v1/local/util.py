@@ -228,7 +228,7 @@ def _pad_2d(x, max_len):
 def collate_fn_mspecNquant(batch):
     """Create batch"""
     r = hparams.outputs_per_step
-    seq_len = 8
+    seq_len = 4
     max_offsets = [x[1].shape[0] - seq_len for x in batch]
     mel_lengths = [x[1].shape[0] for x in batch]
     #print("Shortest utterance in this batch: ", min(mel_lengths))
@@ -280,3 +280,19 @@ def collate_fn_tacotron(batch):
     y_batch = torch.FloatTensor(c)
     return x_batch, input_lengths, mel_batch, y_batch
 
+
+# https://discuss.pytorch.org/t/how-to-apply-exponential-moving-average-decay-for-variables/10856/4
+# https://www.tensorflow.org/api_docs/python/tf/train/ExponentialMovingAverage
+# https://github.com/r9y9/wavenet_vocoder/blob/c4c148792c6263afbedb9f6bf11cd552668e26cb/train.py
+class ExponentialMovingAverage(object):
+    def __init__(self, decay):
+        self.decay = decay
+        self.shadow = {}
+
+    def register(self, name, val):
+        self.shadow[name] = val.clone()
+
+    def update(self, name, x):
+        assert name in self.shadow
+        update_delta = self.shadow[name] - x
+        self.shadow[name] -= (1.0 - self.decay) * update_delta
