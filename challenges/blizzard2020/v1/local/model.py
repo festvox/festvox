@@ -694,3 +694,103 @@ class WaveLSTM6(TacotronOne):
         return output.cpu().numpy()
  
 
+# Lets add dropout
+class WaveLSTM7(TacotronOne):
+    
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,logits_dim=30,
+                 r=5, padding_idx=None, use_memory_mask=False):
+        super(WaveLSTM7, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False)
+
+        self.upsample_scales = [2,4,5,5]
+        self.upsample_network = UpsampleNetwork(self.upsample_scales)
+
+        self.melsNx2inputs = SequenceWise(nn.Linear(81,128))
+
+        self.num_layers = 2
+        self.rnns = [nn.LSTM(input_size=128 if l == 0 else 128,
+             hidden_size=128, num_layers=1, batch_first=True,
+             ) for l in range(self.num_layers)]
+
+        self.joint_encoders = nn.ModuleList(self.rnns)
+
+        self.hidden2linear =  SequenceWise(nn.Linear(128, 64))
+        self.logits_dim = logits_dim
+        self.linear2logits =  SequenceWise(nn.Linear(64, logits_dim))
+
+        self.highways = nn.ModuleList(
+            [Highway(128, 128) for _ in range(4)])
+
+        self.dropout = nn.Dropout(0.3)
+
+    def forward(self, mels, x):
+
+        B = mels.size(0)
+
+        # Mel Encoding
+        mels = self.upsample_network(mels)
+        mels = mels[:,:-1,:]
+        inp = x[:, :-1].unsqueeze(-1)
+        melsNx = torch.cat([mels, inp], dim=-1)
+        inputs = torch.tanh(self.melsNx2inputs(melsNx))
+        #inputs = self.dropout(inputs)
+
+        # LSTM
+        for enc in self.joint_encoders:
+            enc.flatten_parameters()
+            inputs, hidden = enc(inputs)
+
+        # Logits
+        logits = torch.tanh(self.hidden2linear(inputs))
+        logits = self.dropout(logits)
+        return self.linear2logits(logits), x[:,1:].unsqueeze(-1)
+
+
+    def forward_eval(self, mels, log_scale_min=-50.0):
+
+        B = mels.size(0)
+ 
+        mels = self.upsample_network(mels)
+        T = mels.size(1)
+ 
+        current_input = torch.zeros(mels.shape[0], 1).cuda()
+        hiddens = [None, None, None]
+        output = []
+ 
+ 
+        for i in range(T):
+ 
+           # Concatenate mel and coarse_float
+           m = mels[:, i,:]
+           melsNx = torch.cat([m , current_input], dim=-1).unsqueeze(1)
+           inputs = torch.tanh(self.melsNx2inputs(melsNx))
+ 
+           # Get logits
+           for k in range(self.num_layers):
+               inputs, hidden = self.joint_encoders[k](inputs, hiddens[k])
+               hiddens[k] = hidden
+
+           # Highway Connection
+           #for highway in self.highways:
+           #    inputs = highway(inputs)
+
+           logits = torch.tanh(self.hidden2linear(inputs))
+           logits = self.linear2logits(logits)
+    
+           # Sample the next input
+           sample = sample_from_discretized_mix_logistic(
+                        logits.view(B, -1, 1), log_scale_min=log_scale_min)
+ 
+           output.append(sample.data)
+           current_input = sample
+
+ 
+           if i%10000 == 1:
+              print("  Predicted sampxle at timestep ", i, "is :", sample, " Number of steps: ", T)
+ 
+ 
+        output = torch.stack(output, dim=0)
+        print("Shape of output: ", output.shape)
+        return output.cpu().numpy()
+ 
+
