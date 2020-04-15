@@ -152,3 +152,24 @@ def denormalize(S):
 def _denormalize_tensorflow(S):
   return (tf.clip_by_value(S, 0, 1) * -hparams.min_level_db) + hparams.min_level_db
 
+
+
+def low_cut_filter(x, fs, cutoff=70):
+    """APPLY LOW CUT FILTER.
+    https://github.com/kan-bayashi/PytorchWaveNetVocoder
+    Args:
+        x (ndarray): Waveform sequence.
+        fs (int): Sampling frequency.
+        cutoff (float): Cutoff frequency of low cut filter.
+    Return:
+        ndarray: Low cut filtered waveform sequence.
+    """
+    nyquist = fs // 2
+    norm_cutoff = cutoff / nyquist
+    from scipy.signal import firwin, lfilter
+
+    # low cut filter
+    fil = firwin(255, norm_cutoff, pass_zero=False)
+    lcf_x = lfilter(fil, 1, x)
+
+    return lcf_x

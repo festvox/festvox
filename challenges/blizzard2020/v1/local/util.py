@@ -58,7 +58,7 @@ class categorical_datasource(CategoricalDataSource):
         super(categorical_datasource, self).__init__(fnames_file, desc_file, feat_name, feats_dir, feats_dict)
 
     def __getitem__(self, idx):
-
+        #print("Feat type is ", self.feat_type, " and the feat name is ", self.feat_name)
         assert self.feat_type == 'categorical'
         fname =  str(self.filenames_array[idx])
         #fname = ''.join(k for k in fname[2:])
@@ -71,6 +71,9 @@ class categorical_datasource(CategoricalDataSource):
         elif self.feat_name == 'quants':
             fname += '.npy'
             return populate_quantsarray(fname, self.feats_dir)
+        elif self.feat_name == 'r9y9inputmol':
+            fname += '.npy'
+            return np.load(fname)
         else:
             print("Unknown feature type: ", self.feat_name)
             sys.exit()
@@ -96,6 +99,11 @@ class float_datasource(FloatDataSource):
             return np.load(fname)
 
         elif self.feat_name == 'lspec':
+            fname =  str(self.filenames_array[idx]).zfill(8)
+            fname = self.feats_dir + '/' + fname.strip() + '.feats.npy'
+            return np.load(fname)
+
+        elif self.feat_name == 'r9y9outputmel':
             fname =  str(self.filenames_array[idx]).zfill(8)
             fname = self.feats_dir + '/' + fname.strip() + '.feats.npy'
             return np.load(fname)
@@ -229,6 +237,24 @@ def _pad_2d(x, max_len):
     return x
 
 
+def collate_fn_r9y9melNmol(batch):
+    """Create batch"""
+
+    r = hparams.outputs_per_step
+    seq_len = 4
+    max_offsets = [x[1].shape[0] - seq_len for x in batch]
+    mel_lengths = [x[1].shape[0] for x in batch]
+
+    mel_offsets = [np.random.randint(0, offset) for offset in max_offsets]
+    sig_offsets = [int(offset * hparams.frame_shift_ms * hparams.sample_rate / 1000) for offset in mel_offsets]
+    sig_lengths = [x[0].shape[0] for x in batch]
+    sig_length = int(seq_len * hparams.frame_shift_ms * hparams.sample_rate / 1000)
+
+    mels = torch.FloatTensor([x[1][mel_offsets[i]:mel_offsets[i] + seq_len] for i, x in enumerate(batch)])
+    x = torch.FloatTensor([x[0][sig_offsets[i]:int(sig_offsets[i] + sig_length)] for i, x in enumerate(batch)])
+
+    return mels, x
+
 
 
 def collate_fn_mspecNquant(batch):
@@ -311,22 +337,24 @@ class DiscretizedMixturelogisticLoss(nn.Module):
         super(DiscretizedMixturelogisticLoss, self).__init__()
 
     def forward(self, input, target, lengths=None, mask=None, max_len=None):
-        if lengths is None and mask is None:
-            raise RuntimeError("Should provide either lengths or mask")
+        #if lengths is None and mask is None:
+        #    raise RuntimeError("Should provide either lengths or mask")
 
         # (B, T, 1)
-        if mask is None:
-            mask = sequence_mask(lengths, max_len).unsqueeze(-1)
+        #if mask is None:
+        #    mask = sequence_mask(lengths, max_len).unsqueeze(-1)
 
         # (B, T, 1)
-        print("Shape of mask and target: ", mask.shape, target.shape)
-        mask_ = mask.expand_as(target)
+        #print("Shape of mask and target: ", mask.shape, target.shape)
+        #mask_ = mask.expand_as(target)
 
         losses = discretized_mix_logistic_loss(
             input, target, num_classes=256,
             log_scale_min=-16.0, reduce=False)
         assert losses.size() == target.size()
-        return ((losses * mask_).sum()) / mask_.sum()
+        return losses.mean()
+
+        #return ((losses * mask_).sum()) / mask_.sum()
 
 
 
@@ -353,6 +381,7 @@ def discretized_mix_logistic_loss(y_hat, y, num_classes=256,
     Returns
         Tensor: loss
     """
+    #print("Shapes of y and y_hat: ", y.shape, y_hat.shape)
     assert y_hat.dim() == 3
     assert y_hat.size(1) % 3 == 0
     nr_mix = y_hat.size(1) // 3

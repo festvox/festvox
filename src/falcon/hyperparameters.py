@@ -40,7 +40,7 @@ hparams = tf.contrib.training.HParams(
     clip_thresh=1.0,
 
     # Save
-    checkpoint_interval=1000,
+    checkpoint_interval=10000,
     save_states_interval=1000,
 
     # Eval:
@@ -51,6 +51,13 @@ hparams = tf.contrib.training.HParams(
     # Enhancements
     exponential_moving_average=None,
     ema_decay=0.9999,
+
+    # Vocoder
+    highpass_cutoff=70.0,
+    global_gain_scale=1.0,
+ 
+ 
+
 )
 
 

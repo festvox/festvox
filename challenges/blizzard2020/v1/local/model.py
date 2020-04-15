@@ -3,6 +3,7 @@ import os, sys
 FALCON_DIR = os.environ.get('FALCONDIR')
 sys.path.append(FALCON_DIR)
 from models import *
+from util import *
 
 class Decoder_TacotronOneSeqwise(Decoder_TacotronOne):
     def __init__(self, in_dim, r):
@@ -501,7 +502,7 @@ class WaveLSTM4(WaveLSTM3):
               print("  Predicted coarse class at timestep ", i, "is :", categorical_coarse, " and fine class is ", categorical_fine, " Number of steps: ", T)
 
            # Generate sample at current time step
-           sample = (categorical_coarse * 256 + categorical_fine) / 32767.5  - 1.0
+           sample = (categorical_coarse * 256 + categorical_fine) / 65536 #/ 32767.5  - 1.0
            output.append(sample)
 
            # Estimate the input for next time step
@@ -514,3 +515,141 @@ class WaveLSTM4(WaveLSTM3):
         output = torch.stack(output, dim=0)
         print("Shape of output: ", output.shape)
         return output.cpu().numpy()
+
+
+
+class WaveLSTM5(TacotronOne):
+
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025, logits_dim=30,
+                 r=5, padding_idx=None, use_memory_mask=False):
+        super(WaveLSTM5, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False)
+
+        self.upsample_scales = [2,4,5,5]
+        self.upsample_network = UpsampleNetwork(self.upsample_scales)
+
+        self.logits_dim = logits_dim
+        self.joint_encoder = nn.LSTM(81, 256, batch_first=True)
+        self.hidden2linear =  SequenceWise(nn.Linear(256, 64))
+        self.linear2logits =  SequenceWise(nn.Linear(64, self.logits_dim))
+
+    def forward(self, mels, x):
+
+        B = mels.size(0)
+
+        mels = self.upsample_network(mels)
+        mels = mels[:,:-1,:]
+        inp = x[:, :-1].unsqueeze(-1)
+
+        melsNx = torch.cat([mels, inp], dim=-1)
+        outputs, hidden = self.joint_encoder(melsNx)
+
+        logits = torch.tanh(self.hidden2linear(outputs))
+        return self.linear2logits(logits), x[:,1:].unsqueeze(-1)
+
+    def forward_eval(self, mels, log_scale_min=-50.0):
+
+        B = mels.size(0)
+
+        mels = self.upsample_network(mels)
+        T = mels.size(1)
+
+        current_input = torch.zeros(mels.shape[0], 1).cuda()
+        hidden = None
+        output = []
+
+
+        for i in range(T):
+
+           # Concatenate mel and coarse_float
+           m = mels[:, i,:]
+           inp = torch.cat([m , current_input], dim=-1).unsqueeze(1)
+
+           # Get logits
+           outputs, hidden = self.joint_encoder(inp, hidden)
+           logits = torch.tanh(self.hidden2linear(outputs))
+           logits = self.linear2logits(logits)
+
+           # Sample the next input
+           sample = sample_from_discretized_mix_logistic(
+                        logits.view(B, -1, 1), log_scale_min=log_scale_min)
+
+           output.append(sample.data)
+           current_input = sample
+
+           if i%10000 == 1:
+              print("  Predicted sample at timestep ", i, "is :", sample, " Number of steps: ", T)
+
+
+        output = torch.stack(output, dim=0)
+        print("Shape of output: ", output.shape)
+        return output.cpu().numpy()
+
+
+class WaveLSTM6(TacotronOne):
+
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False):
+        super(WaveLSTM6, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False)
+ 
+        self.upsample_scales = [2,4,5,5]
+        self.upsample_network = UpsampleNetwork(self.upsample_scales)
+
+        self.joint_encoder1 = nn.LSTM(81, 256, batch_first=True)
+        self.hidden2linear =  SequenceWise(nn.Linear(256, 64))
+        self.linear2logits =  SequenceWise(nn.Linear(64, 30))
+
+    def forward(self, mels, x):
+ 
+        B = mels.size(0)
+
+        mels = self.upsample_network(mels)
+        mels = mels[:,:-1,:]
+        inp = x[:, :-1].unsqueeze(-1)
+ 
+        melsNx = torch.cat([mels, inp], dim=-1)
+        outputs, hidden = self.joint_encoder(melsNx)
+
+        logits = torch.tanh(self.hidden2linear(outputs))
+        return self.linear2logits(logits), x[:,1:].unsqueeze(-1)
+ 
+    def forward_eval(self, mels, log_scale_min=-50.0):
+ 
+        B = mels.size(0)
+ 
+        mels = self.upsample_network(mels)
+        T = mels.size(1)
+ 
+        current_input = torch.zeros(mels.shape[0], 1).cuda()
+        hidden = None
+        output = []
+ 
+ 
+        for i in range(T):
+ 
+           # Concatenate mel and coarse_float
+           m = mels[:, i,:]
+           inp = torch.cat([m , current_input], dim=-1).unsqueeze(1)
+ 
+           # Get logits
+           outputs, hidden = self.joint_encoder(inp, hidden)
+           logits = torch.tanh(self.hidden2linear(outputs))
+           logits = self.linear2logits(logits)
+ 
+           # Sample the next input
+           sample = sample_from_discretized_mix_logistic(
+                        logits.view(B, -1, 1), log_scale_min=log_scale_min)
+ 
+           output.append(sample.data)
+           current_input = sample
+ 
+           if i%10000 == 1:
+              print("  Predicted sample at timestep ", i, "is :", sample, " Number of steps: ", T)
+ 
+ 
+        output = torch.stack(output, dim=0)
+        print("Shape of output: ", output.shape)
+        return output.cpu().numpy()
+ 
+
