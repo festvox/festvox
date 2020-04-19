@@ -1,9 +1,9 @@
 source path.sh
 
-#mkdir vox
-#cd vox 
-#$FESTVOXDIR/src/clustergen/setup_cg cmu us multispeaker
-#cd ..
+mkdir -p vox
+cd vox 
+$FESTVOXDIR/src/clustergen/setup_cg cmu us multispeaker
+cd ..
 
 mkdir -p vox/ehmm/etc
 rm -r vox/ehmm/etc/txt.phseq.data

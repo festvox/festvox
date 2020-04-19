@@ -2,7 +2,7 @@ import torch
 from torch.autograd import Variable
 from torch import nn
 import torch.nn.functional as F
-
+import os
 from layers import *
 '''Excerpts from the following sources
 # https://github.com/r9y9/tacotron_pytorch/blob/master/tacotron_pytorch/tacotron.py
@@ -10,6 +10,8 @@ from layers import *
 '''
 
 print_flag = 0
+
+cuda_version = float(os.environ.get('CUDAVERSION'))
 
 # Type: Acquisition_CodeBorrowed Source: https://github.com/r9y9/tacotron_pytorch/blob/62db7217c10da3edb34f67b185cc0e2b04cdf77e/tacotron_pytorch/attention.py#L7
 class BahdanauAttention(nn.Module):
@@ -44,8 +46,12 @@ def get_mask_from_lengths(memory, memory_lengths):
         memory: (batch, max_time, dim)
         memory_lengths: array like
     """
-    # Changing based on https://github.com/jiesutd/NCRFpp/issues/137
-    mask = memory.data.new(memory.size(0), memory.size(1)).bool().zero_()
+    # Changing based on https://github.com/jiesutd/NCRFpp/issues/137 This is not currently handled neatly. Will revisit
+    if cuda_version >= 9.2:
+       mask = memory.data.new(memory.size(0), memory.size(1)).bool().zero_()
+    else:
+       mask = memory.data.new(memory.size(0), memory.size(1)).byte().zero_()
+
     for idx, l in enumerate(memory_lengths):
         mask[idx][:l] = 1
     return ~mask

@@ -1,4 +1,4 @@
-"""Trainining script for Tacotron speech synthesis model.
+"""Trainining script for Tacotron speech synthesis model using GAN. Test only discriminator
 
 usage: train.py [options]
 
@@ -125,22 +125,22 @@ def train(model, model_discriminator, train_loader, val_loader, optimizer,
                  model_discriminator.parameters(), clip_thresh)
             optimizer_discriminator.step()
 
-
+            
             # Update generator
-            optimizer.zero_grad()
-            mel_outputs, linear_outputs, attn = model(x, mel, input_lengths=sorted_lengths)
-            mel_loss = criterion(mel_outputs, mel)
-            n_priority_freq = int(3000 / (fs * 0.5) * linear_dim)
-            linear_loss = 0.5 * criterion(linear_outputs, y) \
-                + 0.5 * criterion(linear_outputs[:, :, :n_priority_freq],
-                                  y[:, :, :n_priority_freq])
-            loss_generator = mel_loss + linear_loss
-            loss = loss_discriminator + loss_generator
+            #optimizer.zero_grad()
+            #mel_outputs, linear_outputs, attn = model(x, mel, input_lengths=sorted_lengths)
+            #mel_loss = criterion(mel_outputs, mel)
+            #n_priority_freq = int(3000 / (fs * 0.5) * linear_dim)
+            #linear_loss = 0.5 * criterion(linear_outputs, y) \
+            #    + 0.5 * criterion(linear_outputs[:, :, :n_priority_freq],
+            #                      y[:, :, :n_priority_freq])
+            #loss_generator = mel_loss + linear_loss
+            loss = loss_discriminator #+ loss_generator
 
-            loss_generator.backward()
-            grad_norm = torch.nn.utils.clip_grad_norm_(
-                 model.parameters(), clip_thresh)
-            optimizer.step()
+            #loss_generator.backward()
+            #grad_norm = torch.nn.utils.clip_grad_norm_(
+            #     model.parameters(), clip_thresh)
+            #optimizer.step()
 
 
             # Tracking and logs
@@ -157,14 +157,14 @@ def train(model, model_discriminator, train_loader, val_loader, optimizer,
 
             log_value("loss", float(loss.item()), global_step)
             log_value("loss_discriminator", float(loss_discriminator.item()), global_step)
-            log_value("loss_generator", float(loss_generator.item()), global_step)
+            #log_value("loss_generator", float(loss_generator.item()), global_step)
             log_value("loss_discriminator_real", float(loss_discriminator.item()), global_step)
             log_value("loss_discriminator_fake", float(loss_discriminator.item()), global_step)
-            log_value("mel loss", float(mel_loss.item()), global_step)
-            log_value("linear loss", float(linear_loss.item()), global_step)
+            #log_value("mel loss", float(mel_loss.item()), global_step)
+            #log_value("linear loss", float(linear_loss.item()), global_step)
             log_value("gradient norm", grad_norm, global_step)
             log_value("learning rate", current_lr, global_step)
-            log_histogram("Last Linear Weights", model.last_linear.weight.detach().cpu(), global_step)
+            #log_histogram("Last Linear Weights", model.last_linear.weight.detach().cpu(), global_step)
             global_step += 1
             running_loss += loss.item()
 

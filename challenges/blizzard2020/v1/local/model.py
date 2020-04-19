@@ -1090,3 +1090,49 @@ class WaveLSTM8c(TacotronOne):
         print("Shape of output: ", output.shape)
         return output.cpu().numpy()
 
+
+# MoL for fine
+class WaveLSTM10(nn.Module):
+
+    def __init__(self, logits_dim=30):
+        super(WaveLSTM10, self).__init__()
+
+        self.logits_dim = logits_dim
+
+        self.upsample_scales = [2,4,5,5]
+        self.upsample_network = UpsampleNetwork(self.upsample_scales)
+
+        self.hidden2coarse_hidden = SequenceWise(nn.Linear(128, 64))
+        self.hidden2fine_hidden = SequenceWise(nn.Linear(128, 64))
+
+        self.coarse_hidden2logits_coarse = SequenceWise(nn.Linear(64, 256))
+        self.fine_hidden2logits_fine = SequenceWise(nn.Linear(64, self.logits_dim))
+
+        self.joint_encoder = nn.LSTM(81, 256, batch_first=True)
+        self.fine_encoder = nn.LSTM(129, 128, batch_first=True)
+
+    def forward(self, mels, coarse, coarse_float, fine, fine_float):
+
+        B = mels.size(0)
+
+        mels = self.upsample_network(mels)
+        mels = mels[:,:-1,:]
+        coarse_float = coarse_float[:, :-1].unsqueeze(-1)
+        coarse = coarse[:, 1:]
+        melsNcoarse = torch.cat([mels, coarse_float], dim=-1)
+
+        self.joint_encoder.flatten_parameters()
+        hidden,_ = self.joint_encoder(melsNcoarse)
+        coarse_hidden, fine_hidden = hidden.split(128, dim=-1)
+
+        coarse_hidden = torch.relu(self.hidden2coarse_hidden(coarse_hidden))
+        fine_input = torch.cat([fine_hidden, coarse.unsqueeze(-1).float()], dim=-1)
+
+        self.fine_encoder.flatten_parameters()
+        fine_hidden, _ = self.fine_encoder(fine_input)
+        fine_hidden = torch.relu(self.hidden2fine_hidden(fine_hidden))
+
+        coarse_logits = self.coarse_hidden2logits_coarse(coarse_hidden)
+        fine_logits = self.fine_hidden2logits_fine(fine_hidden)
+
+        return coarse_logits, coarse, fine_logits, fine_float[:, 1:]

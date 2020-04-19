@@ -1,1 +1,1 @@
-data_dir=/home1/srallaba/data
+data_dir=/home2/srallaba/data
