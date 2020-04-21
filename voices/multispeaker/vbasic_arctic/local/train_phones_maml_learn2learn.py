@@ -20,7 +20,7 @@ gpu_id = args['--gpu-id']
 print("Using GPU ", gpu_id)
 os.environ["CUDA_VISIBLE_DEVICES"]=gpu_id
 import copy
-
+import learn2learn
 from collections import defaultdict
 
 ### This is not supposed to be hardcoded #####
@@ -102,7 +102,7 @@ def finetune(model, train_loader, val_loader, optimizer,
             sorted_lengths = sorted_lengths.long().numpy()
 
             x, spk, mel, y = x[indices], spk[indices], mel[indices], y[indices]
-           
+
             # Feed data
             x, spk, mel, y = Variable(x), Variable(spk), Variable(mel), Variable(y)
             if use_cuda:
@@ -130,7 +130,7 @@ def finetune(model, train_loader, val_loader, optimizer,
                     model, optimizer, global_step, checkpoint_dir, global_epoch)
 
             # Update
-            loss.backward(retain_graph=False)
+            loss.backward()
             grad_norm = torch.nn.utils.clip_grad_norm_(
                  model.parameters(), clip_thresh)
             optimizer.step()
@@ -155,6 +155,7 @@ def finetune(model, train_loader, val_loader, optimizer,
 
 
 def phi_eval(loader, model):
+    #model.eval()
     criterion = nn.L1Loss()
     linear_dim = model.linear_dim
     for (x, spk, input_lengths, mel, y) in loader:
@@ -182,10 +183,10 @@ def phi_eval(loader, model):
             loss = mel_loss + linear_loss
 
             # You prolly should not return here
-            return loss, model
+            return loss, model #.train()
 
 
-def train(theta_model, phi_model, theta_loader, phi_loader, optimizer_main, optimizer_maml,
+def train(theta_model, phi_model, theta_loader, phi_loader, optimizer_main,
           init_lr=0.002,
           checkpoint_dir=None, checkpoint_interval=None, nepochs=None,
           clip_thresh=1.0):
@@ -209,9 +210,6 @@ def train(theta_model, phi_model, theta_loader, phi_loader, optimizer_main, opti
             for param_group in optimizer_main.param_groups:
                 param_group['lr'] = current_lr
 
-            ### Clone model. Now we have three models. theta_model, thetamodel_clone, phi_model
-            thetamodel_clone = copy.deepcopy(theta_model)
-
             # Sort by length
             sorted_lengths, indices = torch.sort(
                 input_lengths.view(-1), dim=0, descending=True)
@@ -223,8 +221,12 @@ def train(theta_model, phi_model, theta_loader, phi_loader, optimizer_main, opti
             if use_cuda:
                 x, spk, mel, y = x.cuda(), spk.cuda(), mel.cuda(), y.cuda()
 
-            ### Get outputs from theta_model
-            mel_outputs, linear_outputs, attn = theta_model(x, spk, mel, input_lengths=sorted_lengths)
+
+            ### Clone model. Now we have three models. theta_model, thetamodel_clone, phi_model
+            thetamodel_clone = theta_model.clone()
+
+            ### Get outputs from cloned model
+            mel_outputs, linear_outputs, attn = thetamodel_clone(x, spk, mel, input_lengths=sorted_lengths)
 
             # Loss
             mel_loss = criterion(mel_outputs, mel)
@@ -235,14 +237,13 @@ def train(theta_model, phi_model, theta_loader, phi_loader, optimizer_main, opti
             loss = mel_loss + linear_loss
 
 
-            ### Update theta_model
-            loss.backward()
-            grad_norm = torch.nn.utils.clip_grad_norm_(
-                 thetamodel_clone.parameters(), clip_thresh)
-            optimizer_maml.step()
+            ### Update thetamodel_clone
+            thetamodel_clone.adapt(loss)
+            #sys.exit()
+
 
             ### Derive phi_model from theta_model
-            phi_model.last_linear = theta_model.last_linear
+            phi_model.last_linear = thetamodel_clone.last_linear
 
             ### Get phi loss and gradients
             phi_loss, phi_model = phi_eval(phi_loader, phi_model)
@@ -251,7 +252,6 @@ def train(theta_model, phi_model, theta_loader, phi_loader, optimizer_main, opti
                  phi_model.parameters(), clip_thresh)
 
             ### Update theta_model with gradients of phi_loss
-            theta_model = copy.deepcopy(thetamodel_clone)
             optimizer_main.step()
 
             # Logs
@@ -271,6 +271,7 @@ def train(theta_model, phi_model, theta_loader, phi_loader, optimizer_main, opti
         #sys.exit()
 
         global_epoch_meta += 1
+        return theta_model, phi_model
 
 
 if __name__ == "__main__":
@@ -371,7 +372,7 @@ if __name__ == "__main__":
 
 
     # Model
-    theta_model = Tacotron(n_vocab=1+ len(ph_ids),
+    theta_model = learn2learn.algorithms.MAML(Tacotron(n_vocab=1+ len(ph_ids),
                      num_spk=2,
                      embedding_dim=256,
                      mel_dim=hparams.num_mels,
@@ -379,7 +380,7 @@ if __name__ == "__main__":
                      r=hparams.outputs_per_step,
                      padding_idx=hparams.padding_idx,
                      use_memory_mask=hparams.use_memory_mask,
-                     )
+                     ), lr=0.01, allow_unused=True)
     theta_model = theta_model.cuda()
 
     phi_model = Tacotron(n_vocab=1+ len(ph_ids),
@@ -396,12 +397,10 @@ if __name__ == "__main__":
 
     #model = DataParallelFix(model)
 
-    optimizer_main = optim.Adam(theta_model.parameters(),
+    optimizer_theta = optim.Adam(theta_model.parameters(),
                            lr=hparams.initial_learning_rate, betas=(
                                hparams.adam_beta1, hparams.adam_beta2),
                            weight_decay=hparams.weight_decay)
-    optimizer_maml = optim.SGD(phi_model.parameters(),
-                           lr=hparams.initial_learning_rate)
 
     optimizer_phi = optim.Adam(phi_model.parameters(),
                            lr=hparams.initial_learning_rate, betas=(
@@ -429,13 +428,16 @@ if __name__ == "__main__":
 
     # Train!
     try:
-        train(theta_model, phi_model, theta_loader, phi_loader, optimizer_main, optimizer_maml,
+        theta_model, phi_model = train(theta_model, phi_model, theta_loader, phi_loader, optimizer_theta,
               init_lr=hparams.initial_learning_rate,
               checkpoint_dir=checkpoint_dir,
               checkpoint_interval=hparams.checkpoint_interval,
-              nepochs=5,
+              nepochs=10,
               clip_thresh=hparams.clip_thresh)
-        finetune(phi_model, train_loader = phi_loader, val_loader = phi_loader, optimizer = optimizer_phi,
+
+        ### Derive phi_model from theta_model
+        phi_model.last_linear = theta_model.last_linear
+        finetune(phi_model, phi_loader, phi_loader, optimizer_phi,
               init_lr=hparams.initial_learning_rate,
               checkpoint_dir=checkpoint_dir,
               checkpoint_interval=hparams.checkpoint_interval,

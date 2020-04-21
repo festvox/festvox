@@ -433,7 +433,7 @@ if __name__ == "__main__":
               init_lr=hparams.initial_learning_rate,
               checkpoint_dir=checkpoint_dir,
               checkpoint_interval=hparams.checkpoint_interval,
-              nepochs=5,
+              nepochs=0,
               clip_thresh=hparams.clip_thresh)
         finetune(phi_model, train_loader = phi_loader, val_loader = phi_loader, optimizer = optimizer_phi,
               init_lr=hparams.initial_learning_rate,

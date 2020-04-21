@@ -251,6 +251,7 @@ class CBHG(nn.Module):
                 x, input_lengths, batch_first=True)
 
         # (B, T_in, in_dim*2)
+        self.gru.flatten_parameters()
         outputs, _ = self.gru(x)
 
         if input_lengths is not None:
