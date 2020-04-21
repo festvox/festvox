@@ -1,5 +1,6 @@
 """Trainining script for Tacotron speech synthesis model. Trains MAML using learn2learn 
-This variant is inspired by ANIL (https://openreview.net/pdf?id=rkgMkCEtPB) courtesy @sanketvmehta
+courtesy @sanketvmehta
+This variant is inspired by ANIL (https://openreview.net/pdf?id=rkgMkCEtPB)
 This implementation does not replicate the paper in terms of optimization, but is to investigate if using only head is useful to metatrain
 
 usage: train.py [options]
@@ -125,7 +126,7 @@ def finetune(model, train_loader, val_loader, optimizer,
                 save_states(
                     global_step, mel_outputs, linear_outputs, attn, y,
                     None, checkpoint_dir)
-                visualize_phone_embeddings(model, checkpoint_dir, global_step)
+                #visualize_phone_embeddings(model, checkpoint_dir, global_step)
 
             if global_step > 0 and global_step % checkpoint_interval == 0:
                 save_checkpoint(
@@ -273,7 +274,7 @@ def train(theta_model, phi_model, theta_loader, phi_loader, optimizer_main,
         #sys.exit()
 
         global_epoch_meta += 1
-        return theta_model, phi_model
+    return theta_model, phi_model
 
 
 if __name__ == "__main__":
