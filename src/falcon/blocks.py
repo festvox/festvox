@@ -945,13 +945,16 @@ class LSTMDiscriminator(nn.Module):
         self.hidden_dim = hidden_dim
         self.out_dim = out_dim
 
-        self.lstm = nn.LSTM(self.in_dim, self.hidden_dim, bidirectional=True, batch_first=True)
-
-        self.output_linear = SequenceWise(nn.Linear(self.hidden_dim*2, self.out_dim))
+        self.lstm = nn.LSTM(self.in_dim*2, self.hidden_dim, batch_first=True)
+        self.cbhg = CBHG(self.in_dim, K=16, projections=[128, 128])
+        self.output_linear = SequenceWise(nn.Linear(self.hidden_dim, self.out_dim))
+        self.drop = nn.Dropout(0.5)
 
     def forward(self,x):
-
+        x = self.cbhg(x)
+        #x = self.drop(x)
         x, _ = self.lstm(x)
+        #x = self.drop(x)
         x = self.output_linear(x)
         return x[:,-1,:]
 

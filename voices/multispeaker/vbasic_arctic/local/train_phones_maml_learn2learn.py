@@ -59,6 +59,9 @@ vox_dir ='vox'
 
 global_step = 0
 global_epoch = 0
+global_step_meta = 0
+global_epoch_meta = 0
+
 use_cuda = torch.cuda.is_available()
 if use_cuda:
     cudnn.benchmark = False
@@ -66,6 +69,89 @@ use_multigpu = None
 
 fs = hparams.sample_rate
 
+
+
+
+def finetune(model, train_loader, val_loader, optimizer,
+          init_lr=0.002,
+          checkpoint_dir=None, checkpoint_interval=None, nepochs=None,
+          clip_thresh=1.0):
+    model.train()
+    if use_cuda:
+        model = model.cuda()
+    linear_dim = model.linear_dim
+
+    criterion = nn.L1Loss()
+
+    global global_step, global_epoch
+    while global_epoch < nepochs:
+        h = open(logfile_name, 'a')
+        running_loss = 0.
+        for step, (x, spk, input_lengths, mel, y) in tqdm(enumerate(train_loader)):
+
+            # Decay learning rate
+            current_lr = learning_rate_decay(init_lr, global_step)
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = current_lr
+
+            optimizer.zero_grad()
+
+            # Sort by length
+            sorted_lengths, indices = torch.sort(
+                input_lengths.view(-1), dim=0, descending=True)
+            sorted_lengths = sorted_lengths.long().numpy()
+
+            x, spk, mel, y = x[indices], spk[indices], mel[indices], y[indices]
+           
+            # Feed data
+            x, spk, mel, y = Variable(x), Variable(spk), Variable(mel), Variable(y)
+            if use_cuda:
+                x, spk, mel, y = x.cuda(), spk.cuda(), mel.cuda(), y.cuda()
+
+            mel_outputs, linear_outputs, attn = model(x, spk, mel, input_lengths=sorted_lengths)
+
+            # Loss
+            mel_loss = criterion(mel_outputs, mel)
+            n_priority_freq = int(3000 / (fs * 0.5) * linear_dim)
+            linear_loss = 0.5 * criterion(linear_outputs, y) \
+                + 0.5 * criterion(linear_outputs[:, :, :n_priority_freq],
+                                  y[:, :, :n_priority_freq])
+            loss = mel_loss + linear_loss
+
+
+            if global_step > 0 and global_step % hparams.save_states_interval == 0:
+                save_states(
+                    global_step, mel_outputs, linear_outputs, attn, y,
+                    None, checkpoint_dir)
+                visualize_phone_embeddings(model, checkpoint_dir, global_step)
+
+            if global_step > 0 and global_step % checkpoint_interval == 0:
+                save_checkpoint(
+                    model, optimizer, global_step, checkpoint_dir, global_epoch)
+
+            # Update
+            loss.backward(retain_graph=False)
+            grad_norm = torch.nn.utils.clip_grad_norm_(
+                 model.parameters(), clip_thresh)
+            optimizer.step()
+
+            # Logs
+            log_value("loss", float(loss.item()), global_step)
+            log_value("mel loss", float(mel_loss.item()), global_step)
+            log_value("linear loss", float(linear_loss.item()), global_step)
+            log_value("gradient norm", grad_norm, global_step)
+            log_value("learning rate", current_lr, global_step)
+            log_histogram("Last Linear Weights", model.last_linear.weight.detach().cpu(), global_step)
+            global_step += 1
+            running_loss += loss.item()
+
+        averaged_loss = running_loss / (len(train_loader))
+        log_value("loss (per epoch)", averaged_loss, global_epoch)
+        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
+        h.close() 
+        #sys.exit()
+
+        global_epoch += 1
 
 
 def phi_eval(loader, model):
@@ -96,43 +182,40 @@ def phi_eval(loader, model):
             loss = mel_loss + linear_loss
 
             # You prolly should not return here
-            return loss 
+            return loss, model
 
 
-def train(model, model_copy, theta_loader, phi_loader, optimizer, optimizer_maml,
+def train(theta_model, phi_model, theta_loader, phi_loader, optimizer_main, optimizer_maml,
           init_lr=0.002,
           checkpoint_dir=None, checkpoint_interval=None, nepochs=None,
           clip_thresh=1.0):
-    model.train()
+    theta_model.train()
+    phi_model.train()
     if use_cuda:
-        model = model.cuda()
-    linear_dim = model.linear_dim
+        theta_model = theta_model.cuda()
+        phi_model = phi_model.cuda()
+    linear_dim = theta_model.linear_dim
 
     criterion = nn.L1Loss()
 
-    global global_step, global_epoch
-    while global_epoch < nepochs:
+    global global_step_meta, global_epoch_meta
+    while global_epoch_meta < nepochs:
         h = open(logfile_name, 'a')
         running_loss = 0.
         for step, (x, spk, input_lengths, mel, y) in tqdm(enumerate(theta_loader)):
-          #print("At update number ", step)       
-          #with autograd.detect_anomaly(): 
           
-            # Decay learning rate
+            # Decay Learning rate
             current_lr = learning_rate_decay(init_lr, global_step)
-            for param_group in optimizer.param_groups:
+            for param_group in optimizer_main.param_groups:
                 param_group['lr'] = current_lr
 
-            model_clone = copy.deepcopy(model)
-            optimizer_maml = optim.SGD(params = model_clone.parameters(), lr=0.01)
-            optimizer_maml.zero_grad()
-            optimizer.zero_grad()
+            ### Clone model. Now we have three models. theta_model, thetamodel_clone, phi_model
+            thetamodel_clone = copy.deepcopy(theta_model)
 
             # Sort by length
             sorted_lengths, indices = torch.sort(
                 input_lengths.view(-1), dim=0, descending=True)
             sorted_lengths = sorted_lengths.long().numpy()
-
             x, spk, mel, y = x[indices], spk[indices], mel[indices], y[indices]
 
             # Feed data
@@ -140,13 +223,8 @@ def train(model, model_copy, theta_loader, phi_loader, optimizer, optimizer_maml
             if use_cuda:
                 x, spk, mel, y = x.cuda(), spk.cuda(), mel.cuda(), y.cuda()
 
-            # Multi GPU Configuration
-            if use_multigpu:
-               outputs,  r_, o_ = data_parallel_workaround(model, (x, mel))
-               mel_outputs, linear_outputs, attn = outputs[0], outputs[1], outputs[2]
- 
-            else:
-                mel_outputs, linear_outputs, attn = model(x, spk, mel, input_lengths=sorted_lengths)
+            ### Get outputs from theta_model
+            mel_outputs, linear_outputs, attn = theta_model(x, spk, mel, input_lengths=sorted_lengths)
 
             # Loss
             mel_loss = criterion(mel_outputs, mel)
@@ -156,63 +234,43 @@ def train(model, model_copy, theta_loader, phi_loader, optimizer, optimizer_maml
                                   y[:, :, :n_priority_freq])
             loss = mel_loss + linear_loss
 
-            if global_step > 0 and global_step % hparams.save_states_interval == 0:
-                save_states(
-                    global_step, mel_outputs, linear_outputs, attn, y,
-                    None, checkpoint_dir)
-                #visualize_phone_embeddings(model, checkpoint_dir, global_step)
 
-            if global_step > 0 and global_step % checkpoint_interval == 0:
-                save_checkpoint(
-                    model, optimizer, global_step, checkpoint_dir, global_epoch)
-
-            # Update
-            #grad = torch.autograd.grad(loss, model.parameters())
-            #fast_weights = list(map(lambda p: p[1] - current_lr * p[0], zip(grad, model.parameters())))
-            #print(fast_weights)
-            #sys.exit()
+            ### Update theta_model
             loss.backward()
             grad_norm = torch.nn.utils.clip_grad_norm_(
-                 model.parameters(), clip_thresh)
+                 thetamodel_clone.parameters(), clip_thresh)
             optimizer_maml.step()
-            
-            #fast_weights = optimizer_maml.step_maml()
-            #for (fwg, mg) in list(zip(fast_weights, model.parameters())):
-            #    for (fwp, mp) in list(zip(fwg, mg)):
-                    #print("FWP: ", fwp.shape)
-                    #print("MP: ", mp.shape) 
-            #        assert mp.shape == fwp.shape
-            #        mp.data = fwp.data 
-            #for i in range(len(fast_weights_params)):
-            #    model_copy[i].data[:] = fast_weights_params[i].data[:]
-            #print("Copied the model")
-            #sys.exit()
 
-            optimizer.zero_grad()
-            model.last_linear = model_clone.last_linear
-            phi_loss = phi_eval(phi_loader, model_clone)
+            ### Derive phi_model from theta_model
+            phi_model.last_linear = theta_model.last_linear
+
+            ### Get phi loss and gradients
+            phi_loss, phi_model = phi_eval(phi_loader, phi_model)
             phi_loss.backward()
             grad_norm = torch.nn.utils.clip_grad_norm_(
-                 model.parameters(), clip_thresh)
-            optimizer.step()
+                 phi_model.parameters(), clip_thresh)
+
+            ### Update theta_model with gradients of phi_loss
+            theta_model = copy.deepcopy(thetamodel_clone)
+            optimizer_main.step()
 
             # Logs
-            log_value("loss", float(loss.item()), global_step)
-            log_value("mel loss", float(mel_loss.item()), global_step)
-            log_value("linear loss", float(linear_loss.item()), global_step)
-            log_value("gradient norm", grad_norm, global_step)
-            log_value("learning rate", current_lr, global_step)
-            log_histogram("Last Linear Weights", model.last_linear.weight.detach().cpu(), global_step)
-            global_step += 1
+            log_value("meta loss", float(loss.item()), global_step_meta)
+            log_value("meta mel loss", float(mel_loss.item()), global_step_meta)
+            log_value("meta linear loss", float(linear_loss.item()), global_step_meta)
+            log_value("meta gradient norm", grad_norm, global_step_meta)
+            log_value("meta learning rate", current_lr, global_step_meta)
+            log_histogram("Last Linear Weights from meta ", theta_model.last_linear.weight.detach().cpu(), global_step_meta)
+            global_step_meta += 1
             running_loss += loss.item()
 
         averaged_loss = running_loss / (len(theta_loader))
-        log_value("loss (per epoch)", averaged_loss, global_epoch)
-        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(theta_loader))) + '\n')
-        h.close() 
+        log_value("meta loss (per epoch)", averaged_loss, global_epoch_meta)
+        h.write("Meta Loss after epoch " + str(global_epoch_meta) + ': '  + format(running_loss / (len(theta_loader))) + '\n')
+        h.close()
         #sys.exit()
 
-        global_epoch += 1
+        global_epoch_meta += 1
 
 
 if __name__ == "__main__":
@@ -313,7 +371,7 @@ if __name__ == "__main__":
 
 
     # Model
-    model = Tacotron(n_vocab=1+ len(ph_ids),
+    theta_model = Tacotron(n_vocab=1+ len(ph_ids),
                      num_spk=2,
                      embedding_dim=256,
                      mel_dim=hparams.num_mels,
@@ -322,21 +380,34 @@ if __name__ == "__main__":
                      padding_idx=hparams.padding_idx,
                      use_memory_mask=hparams.use_memory_mask,
                      )
-    model = model.cuda()
+    theta_model = theta_model.cuda()
 
-    model_copy = copy.deepcopy(model)
+    phi_model = Tacotron(n_vocab=1+ len(ph_ids),
+                     num_spk=2,
+                     embedding_dim=256,
+                     mel_dim=hparams.num_mels,
+                     linear_dim=hparams.num_freq,
+                     r=hparams.outputs_per_step,
+                     padding_idx=hparams.padding_idx,
+                     use_memory_mask=hparams.use_memory_mask,
+                     )
+    phi_model = phi_model.cuda()
+
 
     #model = DataParallelFix(model)
-    print(model)
-    print(list(model.parameters()))
-    for name, module in model.named_children():
-        print(name)
 
-    optimizer = optim.Adam(model.parameters(),
+    optimizer_main = optim.Adam(theta_model.parameters(),
                            lr=hparams.initial_learning_rate, betas=(
                                hparams.adam_beta1, hparams.adam_beta2),
                            weight_decay=hparams.weight_decay)
-    optimizer_maml = sgd_maml(params = model.parameters(), lr=0.01)
+    optimizer_maml = optim.SGD(phi_model.parameters(),
+                           lr=hparams.initial_learning_rate)
+
+    optimizer_phi = optim.Adam(phi_model.parameters(),
+                           lr=hparams.initial_learning_rate, betas=(
+                               hparams.adam_beta1, hparams.adam_beta2),
+                           weight_decay=hparams.weight_decay)
+
 
     # Load checkpoint
     if checkpoint_path:
@@ -358,12 +429,19 @@ if __name__ == "__main__":
 
     # Train!
     try:
-        train(model, model_copy, theta_loader, phi_loader, optimizer, optimizer_maml,
+        train(theta_model, phi_model, theta_loader, phi_loader, optimizer_main, optimizer_maml,
+              init_lr=hparams.initial_learning_rate,
+              checkpoint_dir=checkpoint_dir,
+              checkpoint_interval=hparams.checkpoint_interval,
+              nepochs=5,
+              clip_thresh=hparams.clip_thresh)
+        finetune(phi_model, train_loader = phi_loader, val_loader = phi_loader, optimizer = optimizer_phi,
               init_lr=hparams.initial_learning_rate,
               checkpoint_dir=checkpoint_dir,
               checkpoint_interval=hparams.checkpoint_interval,
               nepochs=hparams.nepochs,
               clip_thresh=hparams.clip_thresh)
+
     except KeyboardInterrupt:
         save_checkpoint(
             model, optimizer, global_step, checkpoint_dir, global_epoch)

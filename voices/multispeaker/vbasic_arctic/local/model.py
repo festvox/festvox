@@ -5,8 +5,10 @@ sys.path.append(FALCON_DIR)
 
 from models import *
 from layers import *
+from util import *
 
 from torch.optim import SGD
+import torch.nn.functional as F
 
 class Decoder_TacotronOneSeqwise(Decoder_TacotronOne):
     def __init__(self, in_dim, r):
@@ -116,3 +118,134 @@ class sgd_maml(SGD):
                 p.add_(d_p, alpha=-group['lr'])
                 parameters.append(p)
         return parameters
+
+
+# https://github.com/r9y9/wavenet_vocoder/blob/master/wavenet_vocoder/upsample.py
+class UpsampleNetwork(nn.Module):
+    def __init__(self, upsample_scales, upsample_activation="none",
+                 upsample_activation_params={}, mode="nearest",
+                 freq_axis_kernel_size=1, cin_pad=0, cin_channels=80):
+        super(UpsampleNetwork, self).__init__()
+        self.up_layers = nn.ModuleList()
+        total_scale = np.prod(upsample_scales)
+        self.indent = cin_pad * total_scale
+        for scale in upsample_scales:
+            freq_axis_padding = (freq_axis_kernel_size - 1) // 2
+            k_size = (freq_axis_kernel_size, scale * 2 + 1)
+            padding = (freq_axis_padding, scale)
+            stretch = Stretch2d(scale, 1, mode)
+            conv = nn.Conv2d(1, 1, kernel_size=k_size, padding=padding, bias=False)
+            conv.weight.data.fill_(1. / np.prod(k_size))
+            conv = nn.utils.weight_norm(conv)
+            self.up_layers.append(stretch)
+            self.up_layers.append(conv)
+            if upsample_activation != "none":
+                nonlinear = _get_activation(upsample_activation)
+                self.up_layers.append(nonlinear(**upsample_activation_params))
+
+    def forward(self, c):
+   
+        c = c.transpose(1,2)
+
+        # B x 1 x C x T
+        c = c.unsqueeze(1)
+        for f in self.up_layers:
+            c = f(c)
+        # B x C x T
+        c = c.squeeze(1)
+
+        if self.indent > 0:
+            c = c[:, :, self.indent:-self.indent]
+        return c.transpose(1,2)
+
+
+class Stretch2d(nn.Module):
+    def __init__(self, x_scale, y_scale, mode="nearest"):
+        super(Stretch2d, self).__init__()
+        self.x_scale = x_scale
+        self.y_scale = y_scale
+        self.mode = mode
+
+    def forward(self, x):
+        return F.interpolate(
+            x, scale_factor=(self.y_scale, self.x_scale), mode=self.mode)
+
+
+def _get_activation(upsample_activation):
+    nonlinear = getattr(nn, upsample_activation)
+    return nonlinear
+
+
+
+
+class WaveLSTM5(nn.Module):
+
+    def __init__(self):
+        super(WaveLSTM5, self).__init__()
+
+        self.upsample_scales = [2,4,5,5]
+        self.upsample_network = UpsampleNetwork(self.upsample_scales)
+
+        self.logits_dim = 30
+        self.joint_encoder = nn.LSTM(97, 256, batch_first=True)
+        self.hidden2linear =  SequenceWise(nn.Linear(256, 64))
+        self.linear2logits =  SequenceWise(nn.Linear(64, self.logits_dim))
+
+        self.spk_embedding = nn.Embedding(2, 16)
+
+    def forward(self, mels, spk, x):
+
+        B = mels.size(0)
+
+        mels = self.upsample_network(mels)
+        mels = mels[:,:-1,:]
+        inp = x[:, :-1].unsqueeze(-1)
+
+        spk = self.spk_embedding(spk.long()).unsqueeze(1).expand(-1, mels.size(1), -1)
+
+        melsNxNspk = torch.cat([mels, inp, spk], dim=-1)
+        outputs, hidden = self.joint_encoder(melsNxNspk)
+
+        logits = torch.tanh(self.hidden2linear(outputs))
+        return self.linear2logits(logits), x[:,1:].unsqueeze(-1)
+
+    def forward_eval(self, mels, spk, log_scale_min=-50.0):
+
+        B = mels.size(0)
+
+        mels = self.upsample_network(mels)
+        T = mels.size(1)
+
+        current_input = torch.zeros(mels.shape[0], 1).cuda()
+        hidden = None
+        output = []
+
+        spk = self.spk_embedding(spk.long()).squeeze(0)
+
+        for i in range(T):
+
+           # Concatenate mel and coarse_float
+           m = mels[:, i,:]
+           #print("Shape of m and spk ", m.shape, spk.shape)
+           inp = torch.cat([m , current_input, spk], dim=-1).unsqueeze(1)
+
+           # Get logits
+           outputs, hidden = self.joint_encoder(inp, hidden)
+           logits = torch.tanh(self.hidden2linear(outputs))
+           logits = self.linear2logits(logits)
+
+           # Sample the next input
+           sample = sample_from_discretized_mix_logistic(
+                        logits.view(B, -1, 1), log_scale_min=log_scale_min)
+
+           output.append(sample.data)
+           current_input = sample
+
+           if i%10000 == 1:
+              print("  Predicted sample at timestep ", i, "is :", sample, " Number of steps: ", T)
+
+
+        output = torch.stack(output, dim=0)
+        print("Shape of output: ", output.shape)
+        return output.cpu().numpy()
+

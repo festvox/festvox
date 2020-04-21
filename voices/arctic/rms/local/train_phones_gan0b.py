@@ -1,4 +1,4 @@
-"""Trainining script for Tacotron speech synthesis model using GAN. Test only discriminator
+"""Trainining script for Tacotron speech synthesis model using GAN. Discriminator only after 7K steps.
 
 usage: train.py [options]
 
@@ -72,6 +72,7 @@ def validate_discriminator(val_loader, model_discriminator, model):
      y_true = []
      y_pred= []
      criterion = nn.L1Loss()
+     val_loss = 0.
      with torch.no_grad():
 
         for step, (x, input_lengths, mel, y) in enumerate(val_loader):
@@ -101,9 +102,6 @@ def validate_discriminator(val_loader, model_discriminator, model):
 
      recall = get_metrics(y_pred, y_true)
      print("Unweighted Recall for the validation set:  ", recall)
-     print("Validation Loss:  ", val_loss/ len(val_loader))
-
-     print('\n')
      model_discriminator.train()
      model.train()
      return recall, model_discriminator, model
@@ -120,7 +118,7 @@ def train(model, model_discriminator, train_loader, val_loader, optimizer,
     linear_dim = model.linear_dim
 
     criterion = nn.L1Loss()
-    criterion_discriminator = nn.CrossEntropyLoss(ignore_index=0)
+    criterion_discriminator = nn.CrossEntropyLoss()
 
     global global_step, global_epoch
     while global_epoch < nepochs:
@@ -129,6 +127,8 @@ def train(model, model_discriminator, train_loader, val_loader, optimizer,
 
         h = open(logfile_name, 'a')
         running_loss = 0.
+        running_loss_discriminator = 0.
+
         for step, (x, input_lengths, mel, y) in tqdm(enumerate(train_loader)):
 
             # Decay learning rate
@@ -175,6 +175,13 @@ def train(model, model_discriminator, train_loader, val_loader, optimizer,
                model_discriminator.parameters(), clip_thresh)
                optimizer_discriminator.step()
 
+
+            if global_step > 0 and global_step % hparams.save_states_interval == 0:
+                save_states(
+                    global_step, mel_outputs, linear_outputs, attn, y,
+                    None, checkpoint_dir)
+
+
             # Update generator
             optimizer.zero_grad()
             mel_outputs, linear_outputs, attn = model(x, mel, input_lengths=sorted_lengths)
@@ -186,6 +193,7 @@ def train(model, model_discriminator, train_loader, val_loader, optimizer,
             loss_generator = mel_loss + linear_loss
             if global_step > 7000:
                loss = loss_discriminator + loss_generator
+               running_loss_discriminator += loss_discriminator.item()
             else:
                loss = loss_generator
 
@@ -198,10 +206,10 @@ def train(model, model_discriminator, train_loader, val_loader, optimizer,
             # Tracking and logs
 
             log_value("loss", float(loss.item()), global_step)
-            log_value("loss_discriminator", float(loss_discriminator.item()), global_step)
+            #log_value("loss_discriminator", float(loss_discriminator.item()), global_step)
             #log_value("loss_generator", float(loss_generator.item()), global_step)
-            log_value("loss_discriminator_real", float(loss_discriminator.item()), global_step)
-            log_value("loss_discriminator_fake", float(loss_discriminator.item()), global_step)
+            #log_value("loss_discriminator_real", float(loss_discriminator.item()), global_step)
+            #log_value("loss_discriminator_fake", float(loss_discriminator.item()), global_step)
             #log_value("mel loss", float(mel_loss.item()), global_step)
             #log_value("linear loss", float(linear_loss.item()), global_step)
             log_value("gradient norm", grad_norm, global_step)
@@ -212,7 +220,9 @@ def train(model, model_discriminator, train_loader, val_loader, optimizer,
 
         averaged_loss = running_loss / (len(train_loader))
         log_value("loss (per epoch)", averaged_loss, global_epoch)
-        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
+        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) 
+                + " Discriminator loss: " + format(running_loss_discriminator / (len(train_loader)))
+                + '\n')
         h.close()
 
         global_epoch += 1

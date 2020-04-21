@@ -13,6 +13,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
+from sklearn.metrics import *
 
 def assure_path_exists(path):
     if not os.path.exists(path):
@@ -371,4 +372,22 @@ def tts(model, text):
     waveform = audio.inv_spectrogram(linear_output.T)
 
     return waveform, alignment, spectrogram
+
+
+
+
+# Utility to return predictions
+def return_classes(logits, dim=-1):
+   _, predicted = torch.max(logits,dim)
+   return predicted.view(-1).cpu().numpy()
+
+# Utility to get metrics
+def get_metrics(predicteds, targets):
+   print(confusion_matrix(targets, predicteds))
+   print(classification_report(targets, predicteds))
+   print("Accuracy is ", accuracy_score(targets, predicteds))
+   fpr, tpr, threshold = roc_curve(targets, predicteds, pos_label=1)
+   EER = threshold[np.argmin(np.absolute(tpr-fpr))]
+   print("EER is ", EER)
+   return recall_score(targets, predicteds, average='macro')
 

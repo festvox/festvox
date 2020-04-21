@@ -295,18 +295,6 @@ class AudiosearchDataset(object):
 
 
 
-def return_classes(logits, dim=-1):
-   #print(logits.shape)
-   _, predicted = torch.max(logits,dim)    
-   #print(predicted.shape)
-   return predicted 
-
-
-def get_metrics(predicteds, targets):
-   print(classification_report(targets, predicteds))
-   print(confusion_matrix(targets, predicteds)) 
-
-
 class CPCDataset(object):
     def __init__(self, X):
         self.X = X
