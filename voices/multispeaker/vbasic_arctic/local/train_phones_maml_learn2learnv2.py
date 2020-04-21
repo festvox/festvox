@@ -74,6 +74,7 @@ fs = hparams.sample_rate
 
 
 
+
 def finetune(model, train_loader, val_loader, optimizer,
           init_lr=0.002,
           checkpoint_dir=None, checkpoint_interval=None, nepochs=None,
@@ -161,7 +162,7 @@ def phi_eval(loader, model):
     criterion = nn.L1Loss()
     linear_dim = model.linear_dim
     phi_loss = None
-    for step, (x, spk, input_lengths, mel, y) in enumerate(loader):
+    for (x, spk, input_lengths, mel, y) in loader:
 
             # Sort by length
             sorted_lengths, indices = torch.sort(
@@ -190,9 +191,8 @@ def phi_eval(loader, model):
             else:
                phi_loss += loss
 
-            # You prolly should not return here
-            if step == 2:
-               return phi_loss, model #.train()
+    # You prolly should not return here
+    return loss, model #.train()
 
 
 def train(theta_model, phi_model, theta_loader, phi_loader, optimizer_main,
@@ -248,22 +248,27 @@ def train(theta_model, phi_model, theta_loader, phi_loader, optimizer_main,
 
             ### Update thetamodel_clone
             thetamodel_clone.adapt(loss)
-            #sys.exit()
 
-            if global_step_meta % 20 == 1:
 
-               ### Derive phi_model from theta_model
-               phi_model.last_linear.weight.data = thetamodel_clone.last_linear.weight.data
-               phi_model.last_linear.bias.data = thetamodel_clone.last_linear.bias.data
+            ### Derive phi_model from theta_model
+            phi_model.last_linear = thetamodel_clone.last_linear
 
-               ### Get phi loss and gradients
-               phi_loss, phi_model = phi_eval(phi_loader, phi_model)
-               phi_loss.backward()
-               grad_norm = torch.nn.utils.clip_grad_norm_(
-                    phi_model.parameters(), clip_thresh)
+            ### Get phi loss and gradients
+            mel_outputs, linear_outputs, attn = phi_model(x, spk, mel, input_lengths=sorted_lengths)
 
-               ### Update theta_model with gradients of phi_loss
-               optimizer_main.step()
+            # Loss
+            mel_loss = criterion(mel_outputs, mel)
+            n_priority_freq = int(3000 / (fs * 0.5) * linear_dim)
+            linear_loss = 0.5 * criterion(linear_outputs, y) \
+                + 0.5 * criterion(linear_outputs[:, :, :n_priority_freq],
+                                  y[:, :, :n_priority_freq])
+            phi_loss = mel_loss + linear_loss
+
+            ### Update theta_model with gradients of phi_loss
+            phi_loss.backward()
+            grad_norm = torch.nn.utils.clip_grad_norm_(
+                 theta_model.parameters(), clip_thresh)
+            optimizer_main.step()
 
             # Logs
             log_value("meta loss", float(loss.item()), global_step_meta)
@@ -447,9 +452,7 @@ if __name__ == "__main__":
               clip_thresh=hparams.clip_thresh)
 
         ### Derive phi_model from theta_model
-        phi_model.last_linear.weight.data = theta_model.last_linear.weight.data
-        phi_model.last_linear.bias.data = theta_model.last_linear.bias.data
-
+        phi_model.last_linear = theta_model.last_linear
         finetune(phi_model, phi_loader, phi_loader, optimizer_phi,
               init_lr=hparams.initial_learning_rate,
               checkpoint_dir=checkpoint_dir,
