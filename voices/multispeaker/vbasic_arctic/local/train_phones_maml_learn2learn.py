@@ -1,4 +1,6 @@
-"""Trainining script for Tacotron speech synthesis model.
+"""Trainining script for Tacotron speech synthesis model. Trains MAML using learn2learn 
+This variant is inspired by ANIL (https://openreview.net/pdf?id=rkgMkCEtPB) courtesy @sanketvmehta
+This implementation does not replicate the paper in terms of optimization, but is to investigate if using only head is useful to metatrain
 
 usage: train.py [options]
 
