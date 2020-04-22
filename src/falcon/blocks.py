@@ -533,6 +533,17 @@ class Encoder_TacotronOne(nn.Module):
         return self.cbhg(inputs, input_lengths)
 
 # Type: Indigenous
+class Encoder_TacotronOne_nocudnn(nn.Module):
+    def __init__(self, in_dim):
+        super(Encoder_TacotronOne_nocudnn, self).__init__()
+        self.prenet = Prenet(in_dim, sizes=[256, 128])
+        self.cbhg = CBHG(128, K=16, projections=[128, 128])
+
+    def forward(self, inputs, input_lengths=None):
+        inputs = self.prenet(inputs)
+        return self.cbhg(inputs)
+
+# Type: Indigenous
 class Encoder_TacotronOne_Tones(nn.Module):
     def __init__(self, in_dim):
         super(Encoder_TacotronOne, self).__init__()

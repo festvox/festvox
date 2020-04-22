@@ -1,7 +1,5 @@
 """Trainining script for Tacotron speech synthesis model. Trains MAML using learn2learn 
-courtesy @sanketvmehta
-This variant is inspired by ANIL (https://openreview.net/pdf?id=rkgMkCEtPB)
-This implementation does not replicate the paper in terms of optimization, but is to investigate if using only head is useful to metatrain
+Uses same model
 
 usage: train.py [options]
 
@@ -35,7 +33,7 @@ from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 from util import *
-from model import TacotronOneSeqwiseMultispeaker as Tacotron
+from model import TacotronOneSeqwise as Tacotron
 from model import sgd_maml
 
 import json
@@ -71,7 +69,6 @@ if use_cuda:
 use_multigpu = None
 
 fs = hparams.sample_rate
-
 
 
 
@@ -111,7 +108,8 @@ def finetune(model, train_loader, val_loader, optimizer,
             if use_cuda:
                 x, spk, mel, y = x.cuda(), spk.cuda(), mel.cuda(), y.cuda()
 
-            mel_outputs, linear_outputs, attn = model(x, spk, mel, input_lengths=sorted_lengths)
+            #mel_outputs, linear_outputs, attn = model(x, spk, mel, input_lengths=sorted_lengths)
+            mel_outputs, linear_outputs, attn = model(x, mel, input_lengths=sorted_lengths)
 
             # Loss
             mel_loss = criterion(mel_outputs, mel)
@@ -158,11 +156,10 @@ def finetune(model, train_loader, val_loader, optimizer,
 
 
 def phi_eval(loader, model):
-    #model.eval()
     criterion = nn.L1Loss()
     linear_dim = model.linear_dim
     phi_loss = None
-    for (x, spk, input_lengths, mel, y) in loader:
+    for step, (x, spk, input_lengths, mel, y) in enumerate(loader):
 
             # Sort by length
             sorted_lengths, indices = torch.sort(
@@ -176,7 +173,8 @@ def phi_eval(loader, model):
             if use_cuda:
                 x, spk, mel, y = x.cuda(), spk.cuda(), mel.cuda(), y.cuda()
              
-            mel_outputs, linear_outputs, attn = model(x, spk, mel, input_lengths=sorted_lengths)
+            #mel_outputs, linear_outputs, attn = model(x, spk, mel, input_lengths=sorted_lengths)
+            mel_outputs, linear_outputs, attn = model(x, mel, input_lengths=sorted_lengths)
 
             # Loss
             mel_loss = criterion(mel_outputs, mel)
@@ -185,25 +183,24 @@ def phi_eval(loader, model):
                 + 0.5 * criterion(linear_outputs[:, :, :n_priority_freq],
                                   y[:, :, :n_priority_freq])
             loss = mel_loss + linear_loss
- 
+            #print("Phi loss is ", loss) 
             if phi_loss is None:
                phi_loss = loss
             else:
                phi_loss += loss
 
-    # You prolly should not return here
-    return loss, model #.train()
+            # You prolly should not return here
+            #if step == 2:
+            return phi_loss
 
 
-def train(theta_model, phi_model, theta_loader, phi_loader, optimizer_main,
+def train(theta_model, theta_loader, phi_loader, optimizer_main,
           init_lr=0.002,
           checkpoint_dir=None, checkpoint_interval=None, nepochs=None,
           clip_thresh=1.0):
     theta_model.train()
-    phi_model.train()
     if use_cuda:
         theta_model = theta_model.cuda()
-        phi_model = phi_model.cuda()
     linear_dim = theta_model.linear_dim
     grad_norm = 0
     criterion = nn.L1Loss()
@@ -213,7 +210,7 @@ def train(theta_model, phi_model, theta_loader, phi_loader, optimizer_main,
         h = open(logfile_name, 'a')
         running_loss = 0.
         for step, (x, spk, input_lengths, mel, y) in tqdm(enumerate(theta_loader)):
-          
+
             # Decay Learning rate
             current_lr = learning_rate_decay(init_lr, global_step)
             for param_group in optimizer_main.param_groups:
@@ -235,7 +232,8 @@ def train(theta_model, phi_model, theta_loader, phi_loader, optimizer_main,
             thetamodel_clone = theta_model.clone()
 
             ### Get outputs from cloned model
-            mel_outputs, linear_outputs, attn = thetamodel_clone(x, spk, mel, input_lengths=sorted_lengths)
+            #mel_outputs, linear_outputs, attn = thetamodel_clone(x, spk, mel, input_lengths=sorted_lengths)
+            mel_outputs, linear_outputs, attn = thetamodel_clone(x, mel, input_lengths=sorted_lengths)
 
             # Loss
             mel_loss = criterion(mel_outputs, mel)
@@ -248,27 +246,18 @@ def train(theta_model, phi_model, theta_loader, phi_loader, optimizer_main,
 
             ### Update thetamodel_clone
             thetamodel_clone.adapt(loss)
+            #sys.exit()
 
+            if global_step_meta % 3 == 1:
 
-            ### Derive phi_model from theta_model
-            phi_model.last_linear = thetamodel_clone.last_linear
+               ### Get phi loss and gradients
+               phi_loss = phi_eval(phi_loader, thetamodel_clone)
+               phi_loss.backward()
+               grad_norm = torch.nn.utils.clip_grad_norm_(
+                    theta_model.parameters(), clip_thresh)
 
-            ### Get phi loss and gradients
-            mel_outputs, linear_outputs, attn = phi_model(x, spk, mel, input_lengths=sorted_lengths)
-
-            # Loss
-            mel_loss = criterion(mel_outputs, mel)
-            n_priority_freq = int(3000 / (fs * 0.5) * linear_dim)
-            linear_loss = 0.5 * criterion(linear_outputs, y) \
-                + 0.5 * criterion(linear_outputs[:, :, :n_priority_freq],
-                                  y[:, :, :n_priority_freq])
-            phi_loss = mel_loss + linear_loss
-
-            ### Update theta_model with gradients of phi_loss
-            phi_loss.backward()
-            grad_norm = torch.nn.utils.clip_grad_norm_(
-                 theta_model.parameters(), clip_thresh)
-            optimizer_main.step()
+               ### Update theta_model with gradients of phi_loss
+               optimizer_main.step()
 
             # Logs
             log_value("meta loss", float(loss.item()), global_step_meta)
@@ -287,7 +276,7 @@ def train(theta_model, phi_model, theta_loader, phi_loader, optimizer_main,
         #sys.exit()
 
         global_epoch_meta += 1
-    return theta_model, phi_model
+    return theta_model
 
 
 if __name__ == "__main__":
@@ -377,48 +366,30 @@ if __name__ == "__main__":
     phiset = MultispeakerDataset(phi_X_train, phi_spk_train, phi_Mel_train, phi_Y_train)
 
     theta_loader = data_utils.DataLoader(
-        thetaset, batch_size=hparams.batch_size,
+        thetaset, batch_size=int(hparams.batch_size),
         num_workers=hparams.num_workers, shuffle=True,
         collate_fn=collate_fn_spk, pin_memory=hparams.pin_memory)
 
     phi_loader = data_utils.DataLoader(
-        phiset, batch_size=hparams.batch_size,
+        phiset, batch_size=int(hparams.batch_size),
         num_workers=hparams.num_workers, shuffle=True,
         collate_fn=collate_fn_spk, pin_memory=hparams.pin_memory)
 
 
     # Model
     theta_model = learn2learn.algorithms.MAML(Tacotron(n_vocab=1+ len(ph_ids),
-                     num_spk=2,
                      embedding_dim=256,
                      mel_dim=hparams.num_mels,
                      linear_dim=hparams.num_freq,
                      r=hparams.outputs_per_step,
                      padding_idx=hparams.padding_idx,
                      use_memory_mask=hparams.use_memory_mask,
-                     ), lr=0.01, allow_unused=True)
+                     ), lr=0.01, allow_unused=True, first_order=True)
     theta_model = theta_model.cuda()
-
-    phi_model = Tacotron(n_vocab=1+ len(ph_ids),
-                     num_spk=2,
-                     embedding_dim=256,
-                     mel_dim=hparams.num_mels,
-                     linear_dim=hparams.num_freq,
-                     r=hparams.outputs_per_step,
-                     padding_idx=hparams.padding_idx,
-                     use_memory_mask=hparams.use_memory_mask,
-                     )
-    phi_model = phi_model.cuda()
-
 
     #model = DataParallelFix(model)
 
     optimizer_theta = optim.Adam(theta_model.parameters(),
-                           lr=hparams.initial_learning_rate, betas=(
-                               hparams.adam_beta1, hparams.adam_beta2),
-                           weight_decay=hparams.weight_decay)
-
-    optimizer_phi = optim.Adam(phi_model.parameters(),
                            lr=hparams.initial_learning_rate, betas=(
                                hparams.adam_beta1, hparams.adam_beta2),
                            weight_decay=hparams.weight_decay)
@@ -444,7 +415,7 @@ if __name__ == "__main__":
 
     # Train!
     try:
-        theta_model, phi_model = train(theta_model, phi_model, theta_loader, phi_loader, optimizer_theta,
+        theta_model = train(theta_model, theta_loader, phi_loader, optimizer_theta,
               init_lr=hparams.initial_learning_rate,
               checkpoint_dir=checkpoint_dir,
               checkpoint_interval=hparams.checkpoint_interval,
@@ -452,7 +423,14 @@ if __name__ == "__main__":
               clip_thresh=hparams.clip_thresh)
 
         ### Derive phi_model from theta_model
-        phi_model.last_linear = theta_model.last_linear
+        #phi_model.last_linear.weight.data = theta_model.last_linear.weight.data
+        #phi_model.last_linear.bias.data = theta_model.last_linear.bias.data
+        phi_model = copy.deepcopy(theta_model)
+        optimizer_phi = optim.Adam(phi_model.parameters(),
+                           lr=hparams.initial_learning_rate, betas=(
+                               hparams.adam_beta1, hparams.adam_beta2),
+                           weight_decay=hparams.weight_decay)
+
         finetune(phi_model, phi_loader, phi_loader, optimizer_phi,
               init_lr=hparams.initial_learning_rate,
               checkpoint_dir=checkpoint_dir,

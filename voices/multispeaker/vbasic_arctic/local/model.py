@@ -33,7 +33,7 @@ class TacotronOneSeqwiseMultispeaker(TacotronOneSeqwise):
 
         self.num_spk = num_spk
         self.spk_embedding = nn.Embedding(self.num_spk, 128)
-
+        #self.encoder = Encoder_TacotronOne_nocudnn(embedding_dim)
         self.embedding = nn.Embedding(n_vocab, embedding_dim)
         self.phonesNspk2embedding = SequenceWise(nn.Linear(embedding_dim + 128, embedding_dim)) 
 
