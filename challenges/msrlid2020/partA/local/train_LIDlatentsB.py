@@ -254,7 +254,7 @@ if __name__ == "__main__":
         collate_fn=collate_fn_lidlatents, pin_memory=hparams.pin_memory)
 
     # Model
-    model = LIDlatents(n_vocab=201)
+    model = LIDlatentsB(n_vocab=201)
     model = model.cuda()
 
     optimizer = optim.Adam(model.parameters(),

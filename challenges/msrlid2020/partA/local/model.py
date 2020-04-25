@@ -894,3 +894,42 @@ class LIDlatents(TacotronOne):
         attention = attention.squeeze(1)
 
         return self.linear2logits(attention)
+
+
+class LIDlatentsB(TacotronOne):
+
+    def __init__(self, n_vocab):
+       super(LIDlatentsB, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                r=5, padding_idx=None, use_memory_mask=False)
+
+       self.decoder_lstm = nn.LSTM(256, 64, bidirectional=True, batch_first=True)
+       self.linear2logits = nn.Linear(128, 2)
+
+       self.attention_fc = nn.Linear(128, 1)
+       self.relu = nn.ReLU()
+       self.conv1x1 = BatchNormConv1d(128,128, kernel_size=1, stride=1, padding=0, activation = self.relu)
+
+    def forward(self, latents, lengths=None):
+
+        B = latents.size(0)
+        T = latents.size(1)
+
+        latents = self.embedding(latents)
+        encoder_outputs = self.encoder(latents, lengths)
+
+        self.decoder_lstm.flatten_parameters()
+        decoded, _ = self.decoder_lstm(encoder_outputs)
+        decoded = self.conv1x1(decoded.transpose(1,2)).transpose(1,2)
+
+        # Attention pooling
+        #mask = get_mask_from_lengths(decoded, lengths)
+        processed = torch.tanh(self.attention_fc(decoded))
+        #mask = mask.view(processed.size(0), -1, 1)
+        #processed.data.masked_fill_(mask, -float("inf"))
+
+        alignment = F.softmax(processed,dim=-1)
+        attention = torch.bmm(alignment.transpose(1,2), decoded)
+        attention = attention.squeeze(1)
+
+        return self.linear2logits(attention)
+
