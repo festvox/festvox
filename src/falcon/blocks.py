@@ -4,6 +4,9 @@ from torch import nn
 import torch.nn.functional as F
 import os
 from layers import *
+import random
+from torch.nn import init
+
 '''Excerpts from the following sources
 # https://github.com/r9y9/tacotron_pytorch/blob/master/tacotron_pytorch/tacotron.py
 
@@ -994,17 +997,23 @@ class LSTMDiscriminator(nn.Module):
 # Type Acquisition_IdeaBorrowed Source: https://arxiv.org/abs/1807.03039
 class ActNorm1d(nn.BatchNorm1d):
     def __init__(self, num_features, eps=1e-5, momentum=0.1,
-                 affine=True, track_running_stats=True):
+                 affine=True, track_running_stats=True, choice=True):
         super(ActNorm1d, self).__init__(
             num_features, eps, momentum, affine, track_running_stats)
 
-        self.mean = nn.Parameter(torch.zeros(num_features, requires_grad=True))
-        self.var =  nn.Parameter(torch.zeros(num_features, requires_grad=True))
+        self.scale = nn.Parameter(torch.Tensor(num_features, num_features))
+        self.bias =  nn.Parameter(torch.Tensor(num_features))
         self.num_features = num_features
 
-        self.register_parameter('mean', self.mean)
-        self.register_parameter('var', self.var)
+        self.register_parameter('scale', self.scale)
+        self.register_parameter('bias', self.bias)
 
+        self.choice = choice
+
+        init.kaiming_uniform_(self.scale, a=math.sqrt(5))
+        fan_in, _ = init._calculate_fan_in_and_fan_out(self.scale)
+        bound = 1 / math.sqrt(fan_in)
+        init.uniform_(self.bias, -bound, bound)
 
     def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
                               missing_keys, unexpected_keys, error_msgs):
@@ -1017,9 +1026,9 @@ class ActNorm1d(nn.BatchNorm1d):
             if num_batches_tracked_key not in state_dict:
                 state_dict[num_batches_tracked_key] = torch.tensor(0, dtype=torch.long)
 
-        if 'mean' not in state_dict:
-            state_dict['mean'] = self.mean
-            state_dict['var'] = self.var
+        if 'scale' not in state_dict:
+            state_dict['scale'] = self.scale
+            state_dict['bias'] = self.bias
 
         super(ActNorm1d, self)._load_from_state_dict(
             state_dict, prefix, local_metadata, strict,
@@ -1027,46 +1036,57 @@ class ActNorm1d(nn.BatchNorm1d):
 
 
     def forward(self, input):
+
         self._check_input_dim(input)
 
-        exponential_average_factor = 0.0
+        #exponential_average_factor = 0.0
 
-        if self.training and self.track_running_stats:
-            if self.num_batches_tracked is not None:
-                self.num_batches_tracked += 1
-                if self.momentum is None:  # use cumulative moving average
-                    exponential_average_factor = 1.0 / float(self.num_batches_tracked)
-                else:  # use exponential moving average
-                    exponential_average_factor = self.momentum
+        #if self.training and self.track_running_stats:
+        #    if self.num_batches_tracked is not None:
+        #        self.num_batches_tracked += 1
+        #        if self.momentum is None:  # use cumulative moving average
+        #            exponential_average_factor = 1.0 / float(self.num_batches_tracked)
+        #        else:  # use exponential moving average
+        #            exponential_average_factor = self.momentum
 
         # calculate running estimates
-        if self.training:
+        #if self.training:
+        #    mean = input.mean([0, 2])
+        #    var = input.var([0, 2], unbiased=False)
+        #    n = input.numel() / input.size(1)
+
+        #    # Initialize with mean and var of initial minibatch 
+        #    if self.running_mean.sum().item() == 0 and self.running_var.sum().item() == self.num_features:
+        #       self.mean.data = mean
+        #       self.var.data = var
+        #    else:
+        #        if self.choice:
+        #          mean = random.choice([mean, mean])
+        #          var = random.choice([var, var])
+        #        else:
+        #          mean = self.mean
+        #          var = self.var
+        #    with torch.no_grad():
+        #        self.running_mean = exponential_average_factor * mean\
+        #            + (1 - exponential_average_factor) * self.running_mean
+        #        # update running_var with unbiased var
+        #        self.running_var = exponential_average_factor * var * n / (n - 1)\
+        #            + (1 - exponential_average_factor) * self.running_var
+        #else:
+        #    mean = self.running_mean
+        #    var = self.running_var#
+        #
+        # This is batchnorm
+        #input = (input - mean[None, :,  None]) / (torch.sqrt(var[None, :, None] + self.eps))
+        #mean = mean. 
+        #if self.affine:
+        #    input = input * self.weight[None, :, None] + self.bias[None, :, None]
  
-            # Initialize with mean and var of initial minibatch 
-            if self.running_mean.sum().item() == 0 and self.running_var.sum().item() == self.num_features:
-               mean = input.mean([0, 2])
-               var = input.var([0, 2], unbiased=False)
-               self.mean.data = mean
-               self.var.data = var         
-            else:
-               mean = self.mean
-               var = self.var
-            n = input.numel() / input.size(1)
-            with torch.no_grad():
-                self.running_mean = exponential_average_factor * mean\
-                    + (1 - exponential_average_factor) * self.running_mean
-                # update running_var with unbiased var
-                self.running_var = exponential_average_factor * var * n / (n - 1)\
-                    + (1 - exponential_average_factor) * self.running_var
-        else:
-            mean = self.running_mean
-            var = self.running_var
+        #print("Shapes of input, self.scale and self.bias: ", input.shape, self.scale.shape, self.bias.shape)
+        #input = input * self.scale[None,:,None] + self.bias[None,:,None] 
+        input = F.linear(input.transpose(1,2), self.scale, self.bias)
 
-        input = (input - mean[None, :,  None]) / (torch.sqrt(var[None, :, None] + self.eps))
-        if self.affine:
-            input = input * self.weight[None, :, None] + self.bias[None, :, None]
-
-        return input
+        return input.transpose(1,2)
 
 # Type Indigenous
 class ActNormConv1d(nn.Module):

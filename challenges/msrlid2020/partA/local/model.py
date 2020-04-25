@@ -919,7 +919,7 @@ class LIDlatentsB(TacotronOne):
 
         self.decoder_lstm.flatten_parameters()
         decoded, _ = self.decoder_lstm(encoder_outputs)
-        decoded = self.conv1x1(decoded.transpose(1,2)).transpose(1,2)
+        #decoded = self.conv1x1(decoded.transpose(1,2)).transpose(1,2)
 
         # Attention pooling
         #mask = get_mask_from_lengths(decoded, lengths)
@@ -929,6 +929,7 @@ class LIDlatentsB(TacotronOne):
 
         alignment = F.softmax(processed,dim=-1)
         attention = torch.bmm(alignment.transpose(1,2), decoded)
+        attention = self.conv1x1(attention.transpose(1,2)).transpose(1,2)
         attention = attention.squeeze(1)
 
         return self.linear2logits(attention)
