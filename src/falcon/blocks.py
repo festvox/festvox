@@ -1045,8 +1045,9 @@ class ActNorm1d(nn.BatchNorm1d):
             # Initialize with mean and var of initial minibatch 
             if self.running_mean.sum().item() == 0 and self.running_var.sum().item() == self.num_features:
                mean = input.mean([0, 2])
-               # use biased var in train
                var = input.var([0, 2], unbiased=False)
+               self.mean.data = mean
+               self.var.data = var         
             else:
                mean = self.mean
                var = self.var
