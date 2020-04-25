@@ -991,4 +991,127 @@ class LSTMDiscriminator(nn.Module):
 
 
 
+# Type Acquisition_IdeaBorrowed Source: https://arxiv.org/abs/1807.03039
+class ActNorm1d(nn.BatchNorm1d):
+    def __init__(self, num_features, eps=1e-5, momentum=0.1,
+                 affine=True, track_running_stats=True):
+        super(ActNorm1d, self).__init__(
+            num_features, eps, momentum, affine, track_running_stats)
+
+        self.mean = nn.Parameter(torch.zeros(num_features, requires_grad=True))
+        self.var =  nn.Parameter(torch.zeros(num_features, requires_grad=True))
+        self.num_features = num_features
+
+        self.register_parameter('mean', self.mean)
+        self.register_parameter('var', self.var)
+
+
+    def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
+                              missing_keys, unexpected_keys, error_msgs):
+        version = local_metadata.get('version', None)
+
+        if (version is None or version < 2) and self.track_running_stats:
+            # at version 2: added num_batches_tracked buffer
+            #               this should have a default value of 0
+            num_batches_tracked_key = prefix + 'num_batches_tracked'
+            if num_batches_tracked_key not in state_dict:
+                state_dict[num_batches_tracked_key] = torch.tensor(0, dtype=torch.long)
+
+        if 'mean' not in state_dict:
+            state_dict['mean'] = self.mean
+            state_dict['var'] = self.var
+
+        super(ActNorm1d, self)._load_from_state_dict(
+            state_dict, prefix, local_metadata, strict,
+            missing_keys, unexpected_keys, error_msgs)
+
+
+    def forward(self, input):
+        self._check_input_dim(input)
+
+        exponential_average_factor = 0.0
+
+        if self.training and self.track_running_stats:
+            if self.num_batches_tracked is not None:
+                self.num_batches_tracked += 1
+                if self.momentum is None:  # use cumulative moving average
+                    exponential_average_factor = 1.0 / float(self.num_batches_tracked)
+                else:  # use exponential moving average
+                    exponential_average_factor = self.momentum
+
+        # calculate running estimates
+        if self.training:
+ 
+            # Initialize with mean and var of initial minibatch 
+            if self.running_mean.sum().item() == 0 and self.running_var.sum().item() == self.num_features:
+               mean = input.mean([0, 2])
+               # use biased var in train
+               var = input.var([0, 2], unbiased=False)
+            else:
+               mean = self.mean
+               var = self.var
+            n = input.numel() / input.size(1)
+            with torch.no_grad():
+                self.running_mean = exponential_average_factor * mean\
+                    + (1 - exponential_average_factor) * self.running_mean
+                # update running_var with unbiased var
+                self.running_var = exponential_average_factor * var * n / (n - 1)\
+                    + (1 - exponential_average_factor) * self.running_var
+        else:
+            mean = self.running_mean
+            var = self.running_var
+
+        input = (input - mean[None, :,  None]) / (torch.sqrt(var[None, :, None] + self.eps))
+        if self.affine:
+            input = input * self.weight[None, :, None] + self.bias[None, :, None]
+
+        return input
+
+# Type Indigenous
+class ActNormConv1d(nn.Module):
+    def __init__(self, in_dim, out_dim, kernel_size, stride, padding,
+                 activation=None):
+        super(ActNormConv1d, self).__init__()
+        self.conv1d = nn.Conv1d(in_dim, out_dim,
+                                kernel_size=kernel_size,
+                                stride=stride, padding=padding, bias=False)
+        # Following tensorflow's default parameters
+        self.an = ActNorm1d(out_dim, momentum=0.99, eps=1e-3)
+        self.activation = activation
+
+    def forward(self, x):
+        x = self.conv1d(x)
+        if self.activation is not None:
+            x = self.activation(x)
+        return self.an(x)
+
+# Type: Indigenous
+class CBHGActNorm(CBHG):
+
+    def __init__(self, in_dim, K=16, projections=[128, 128]):
+        super(CBHGActNorm, self).__init__(in_dim, K, projections)
+        self.conv1d_banks = nn.ModuleList(
+            [ActNormConv1d(in_dim, in_dim, kernel_size=k, stride=1,
+                             padding=k // 2, activation=self.relu)
+             for k in range(1, K + 1)])
+        in_sizes = [K * in_dim] + projections[:-1]
+        activations = [self.relu] * (len(projections) - 1) + [None]
+
+        self.conv1d_projections = nn.ModuleList(
+            [ActNormConv1d(in_size, out_size, kernel_size=3, stride=1,
+                             padding=1, activation=ac)
+             for (in_size, out_size, ac) in zip(
+                 in_sizes, projections, activations)])
+
+
+# Type: Indigenous
+class Encoder_TacotronOne_ActNorm(nn.Module):
+    def __init__(self, in_dim):
+        super(Encoder_TacotronOne_ActNorm, self).__init__()
+        self.prenet = Prenet(in_dim, sizes=[256, 128])
+        self.cbhg = CBHGActNorm(128, K=16, projections=[128, 128])
+
+    def forward(self, inputs, input_lengths=None):
+        inputs = self.prenet(inputs)
+        return self.cbhg(inputs, input_lengths)
 

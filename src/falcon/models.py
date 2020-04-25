@@ -142,3 +142,16 @@ class TacotronOneVQ(TacotronOneSeqwise):
         linear_outputs = self.last_linear(linear_outputs)
 
         return mel_outputs, linear_outputs, alignments, vq_penalty.mean(), encoder_penalty.mean(), entropy
+
+
+# Type: Indigenous
+class TacotronOneActNorm(TacotronOne):
+
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False):
+        super(TacotronOneActNorm, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False)
+
+        self.encoder = Encoder_TacotronOne_ActNorm(embedding_dim)
+        self.postnet = CBHGActNorm(mel_dim, K=8, projections=[256, mel_dim])
+
