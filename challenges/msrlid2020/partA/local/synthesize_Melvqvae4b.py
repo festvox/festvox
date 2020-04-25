@@ -55,7 +55,7 @@ def vocoder(model, mel):
         sequence = sequence.cuda()
 
     with torch.no_grad():
-       #waveform, entropy = model.forward_eval(sequence)
+       waveform, entropy = model.forward_eval(sequence)
        latents, entropy = model.quantizer.get_quantizedindices(sequence.unsqueeze(2)) 
        print(latents)
 

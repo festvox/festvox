@@ -1004,16 +1004,16 @@ class ActNorm1d(nn.BatchNorm1d):
         self.scale = nn.Parameter(torch.Tensor(num_features, num_features))
         self.bias =  nn.Parameter(torch.Tensor(num_features))
         self.num_features = num_features
-
+        self.initialized = None
         self.register_parameter('scale', self.scale)
         self.register_parameter('bias', self.bias)
 
         self.choice = choice
 
         init.kaiming_uniform_(self.scale, a=math.sqrt(5))
-        fan_in, _ = init._calculate_fan_in_and_fan_out(self.scale)
-        bound = 1 / math.sqrt(fan_in)
-        init.uniform_(self.bias, -bound, bound)
+        #fan_in, _ = init._calculate_fan_in_and_fan_out(self.scale)
+        #bound = 1 / math.sqrt(fan_in)
+        #init.uniform_(self.bias, -bound, bound)
 
     def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
                               missing_keys, unexpected_keys, error_msgs):
@@ -1084,9 +1084,18 @@ class ActNorm1d(nn.BatchNorm1d):
  
         #print("Shapes of input, self.scale and self.bias: ", input.shape, self.scale.shape, self.bias.shape)
         #input = input * self.scale[None,:,None] + self.bias[None,:,None] 
-        input = F.linear(input.transpose(1,2), self.scale, self.bias)
+        if self.initialized is None:
+             input = F.linear(input.transpose(1,2), self.scale).transpose(1,2)
+             mean = input.mean([0, 2])
+             #print("Shape of input and mean: ", input.shape, mean.shape)
+             input = input - mean[None,:,None]
+             self.bias.data = mean
+             self.initialized = 1
+        else:
+          input = F.linear(input.transpose(1,2), self.scale, self.bias)
+          input = input.transpose(1,2)
 
-        return input.transpose(1,2)
+        return input
 
 # Type Indigenous
 class ActNormConv1d(nn.Module):
