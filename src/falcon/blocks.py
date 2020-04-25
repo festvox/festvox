@@ -516,9 +516,28 @@ class quantizer_kotha(nn.Module):
         for x1_chunk in x1.split(512, dim=0):
             index_chunks.append((x1_chunk - embedding).norm(dim=3).argmin(dim=2))
         index = torch.cat(index_chunks, dim=0)
-        entropy = 0
-        print("Predicted quantized Indices are: ", (index.squeeze(1) + self.offset).cpu().numpy())
-        print('\n')
+        hist = index.float().cpu().histc(bins=self.n_classes, min=-0.5, max=self.n_classes - 0.5)
+        prob = hist.masked_select(hist > 0) / len(index)
+        entropy = - (prob * prob.log()).sum().item()
+        arr = (index.squeeze(1) + self.offset).cpu().numpy().tolist()
+        #print("Predicted quantized Indices are: ", (index.squeeze(1) + self.offset).cpu().numpy())
+        #print('\n')
+        return self.deduplicate(arr), entropy
+
+    # Remove repeated entries
+    def deduplicate(self, arr):
+       arr_new = []
+       current_element = None
+       for element in arr:
+          if current_element is None:
+            current_element = element
+            arr_new.append(element)
+          elif element == current_element:
+            continue
+          else:
+            current_element = element
+            arr_new.append(element)
+       return arr_new
 
 
 # Type: Acquisition_CodeBorrowed Source: https://github.com/r9y9/tacotron_pytorch/blob/62db7217c10da3edb34f67b185cc0e2b04cdf77e/tacotron_pytorch/tacotron.py#L139

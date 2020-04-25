@@ -5,6 +5,7 @@ sys.path.append(FALCON_DIR)
 
 from models import *
 from layers import *
+from util import *
 
 class Decoder_TacotronOneSeqwise(Decoder_TacotronOne):
     def __init__(self, in_dim, r):
@@ -283,7 +284,7 @@ class DownsamplingEncoder(nn.Module):
         self.convs_wide = nn.ModuleList()
         self.convs_1x1 = nn.ModuleList()
         self.layer_specs = layer_specs
-        prev_channels = 1
+        prev_channels = channels
         total_scale = 1
         pad_left = 0
         self.skips = []
@@ -316,7 +317,7 @@ class DownsamplingEncoder(nn.Module):
         for i, stuff in enumerate(zip(self.convs_wide, self.convs_1x1, self.layer_specs, self.skips)):
             conv_wide, conv_1x1, layer_spec, skip = stuff
             stride, ksz, dilation_factor = layer_spec
-            #print(i)
+            #print(i, "Stride, ksz, DF and shape of input: ", stride, ksz, dilation_factor, x.shape)
             x1 = conv_wide(x)
             x1_a, x1_b = x1.split(x1.size(1) // 2, dim=1)
             x2 = torch.tanh(x1_a) * torch.sigmoid(x1_b)
@@ -368,6 +369,382 @@ class CPCBaseline(TacotronOne):
         nce_loss = torch.sum(torch.diag(self.lsoftmax(total)))
         return -1 * nce_loss
 
-   
 
+# https://github.com/r9y9/wavenet_vocoder/blob/master/wavenet_vocoder/upsample.py
+class UpsampleNetwork(nn.Module):
+    def __init__(self, upsample_scales, upsample_activation="none",
+                 upsample_activation_params={}, mode="nearest",
+                 freq_axis_kernel_size=1, cin_pad=0, cin_channels=80):
+        super(UpsampleNetwork, self).__init__()
+        self.up_layers = nn.ModuleList()
+        total_scale = np.prod(upsample_scales)
+        self.indent = cin_pad * total_scale
+        for scale in upsample_scales:
+            freq_axis_padding = (freq_axis_kernel_size - 1) // 2
+            k_size = (freq_axis_kernel_size, scale * 2 + 1)
+            padding = (freq_axis_padding, scale)
+            stretch = Stretch2d(scale, 1, mode)
+            conv = nn.Conv2d(1, 1, kernel_size=k_size, padding=padding, bias=False)
+            conv.weight.data.fill_(1. / np.prod(k_size))
+            conv = nn.utils.weight_norm(conv)
+            self.up_layers.append(stretch)
+            self.up_layers.append(conv)
+            if upsample_activation != "none":
+                nonlinear = _get_activation(upsample_activation)
+                self.up_layers.append(nonlinear(**upsample_activation_params))
+
+    def forward(self, c):
+   
+        c = c.transpose(1,2)
+
+        # B x 1 x C x T
+        c = c.unsqueeze(1)
+        for f in self.up_layers:
+            c = f(c)
+        # B x C x T
+        c = c.squeeze(1)
+
+        if self.indent > 0:
+            c = c[:, :, self.indent:-self.indent]
+        return c.transpose(1,2)
+
+
+class Stretch2d(nn.Module):
+    def __init__(self, x_scale, y_scale, mode="nearest"):
+        super(Stretch2d, self).__init__()
+        self.x_scale = x_scale
+        self.y_scale = y_scale
+        self.mode = mode
+
+    def forward(self, x):
+        return F.interpolate(
+            x, scale_factor=(self.y_scale, self.x_scale), mode=self.mode)
+
+
+def _get_activation(upsample_activation):
+    nonlinear = getattr(nn, upsample_activation)
+    return nonlinear
+
+
+# https://github.com/mkotha/WaveRNN/blob/master/layers/upsample.py
+class UpsampleNetwork_kotha(nn.Module):
+    """
+    Input: (N, C, L) numeric tensor
+    Output: (N, C, L1) numeric tensor
+    """
+    def __init__(self, feat_dims, upsample_scales):
+        super().__init__()
+        self.up_layers = nn.ModuleList()
+        self.scales = upsample_scales
+        for scale in upsample_scales:
+            conv = nn.Conv2d(1, 1,
+                    kernel_size = (1, 2 * scale - 1))
+            conv.bias.data.zero_()
+            self.up_layers.append(conv)
+
+    def forward(self, mels):
+        n = mels.size(0)
+        feat_dims = mels.size(1)
+        x = mels.unsqueeze(1)
+        for (scale, up) in zip(self.scales, self.up_layers):
+            x = up(x.unsqueeze(-1).expand(-1, -1, -1, -1, scale).reshape(n, 1, feat_dims, -1))
+        return x.squeeze(1)[:, :, 1:-1]
+
+
+class MelVQVAEBaseline(TacotronOne):
+
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False):
+        super(MelVQVAEBaseline, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False)
+
+        # Stride, KernelSize, DilationFactor
+        encoder_layers = [
+            (2, 4, 1),
+            (2, 4, 1),
+            (2, 4, 1),
+            (1, 4, 1),
+            (2, 4, 1),
+            (1, 4, 1),
+            #(2, 4, 1),
+            #(1, 4, 1),
+            #(2, 4, 1),
+            #(1, 4, 1),
+            ]
+        self.encoder = DownsamplingEncoder(mel_dim, encoder_layers)
+        self.quantizer = quantizer_kotha(n_channels=1, n_classes=200, vec_len=80)
+        self.upsample_scales = [2,4,2,4]
+        self.upsample_network = UpsampleNetwork(self.upsample_scales)
+
+        self.decoder_lstm = nn.LSTM(80, 128, bidirectional=True, batch_first=True)
+        self.decoder_fc = nn.Linear(80,256)
+        self.mel_dim = mel_dim  
+        self.decoder = Decoder_TacotronOneSeqwise(mel_dim, r)
+
+    def forward(self, mel):
+        B = mel.shape[0]
+        encoded = self.encoder(mel)
+        #print("Shape of encoded: ", encoded.shape)
+        quantized, vq_penalty, encoder_penalty, entropy = self.quantizer(encoded.unsqueeze(2))
+        #print("Shape of quantized: ", quantized.shape)
+        quantized = quantized.squeeze(2)
+        #upsampled = self.upsample_network(quantized)
+        #outputs, hidden = self.decoder_lstm(upsampled)
+        #outputs =  self.decoder_fc(outputs)
+        decoder_input = torch.tanh(self.decoder_fc(quantized))
+        mel_outputs, alignments = self.decoder(decoder_input, mel)
+        mel_outputs = mel_outputs.view(B, -1, self.mel_dim)
+        #print("Shape of outputs: ", mel_outputs.shape)
+
+        return mel_outputs, alignments, vq_penalty.mean(), encoder_penalty.mean(), entropy
+
+
+
+class MelVQVAEv2(TacotronOne):
+
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False):
+        super(MelVQVAEv2, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False)
+
+        # Stride, KernelSize, DilationFactor
+        encoder_layers = [
+            (2, 4, 1),
+            (2, 4, 1),
+            (2, 4, 1),
+            (1, 4, 1),
+            (2, 4, 1),
+            (1, 4, 1),
+            ]
+        self.encoder = DownsamplingEncoder(mel_dim, encoder_layers)
+        self.quantizer = quantizer_kotha(n_channels=1, n_classes=200, vec_len=80, normalize=True)
+        self.upsample_scales = [2,4,2,4]
+        self.upsample_network = UpsampleNetwork(self.upsample_scales)
+
+        self.decoder_lstm = nn.LSTM(80, 128, bidirectional=True, batch_first=True)
+        self.decoder_fc = nn.Linear(80,256)
+        self.mel_dim = mel_dim  
+        self.decoder = Decoder_TacotronOneSeqwise(mel_dim, r)
+
+    def forward(self, mel, input_lengths = None):
+        B = mel.shape[0]
+        encoded = self.encoder(mel)
+        quantized, vq_penalty, encoder_penalty, entropy = self.quantizer(encoded.unsqueeze(2))
+        quantized = quantized.squeeze(2)
+
+        decoder_input = torch.tanh(self.decoder_fc(quantized))
+        mel_outputs, alignments = self.decoder(decoder_input, mel, memory_lengths=input_lengths)
+        mel_outputs = mel_outputs.view(B, -1, self.mel_dim)
+
+        linear_outputs = self.postnet(mel_outputs)
+        linear_outputs = self.last_linear(linear_outputs)
+
+        return mel_outputs, linear_outputs, alignments, vq_penalty.mean(), encoder_penalty.mean(), entropy
+
+    def forward_eval(self, mel, input_lengths = None):
+        B = mel.shape[0]
+        encoded = self.encoder(mel)
+        print("Shape of encoded: ", encoded.shape)
+        quantized, vq_penalty, encoder_penalty, entropy = self.quantizer(encoded.unsqueeze(2))
+        print("Shape of quantized: ", quantized.shape)
+        quantized = quantized.squeeze(2)
+        decoder_input = torch.tanh(self.decoder_fc(quantized))
+        mel = None
+        mel_outputs, alignments = self.decoder(decoder_input, mel, memory_lengths=input_lengths)
+        print("Shape of mel outputs: ", mel_outputs.shape)
+        mel_outputs = mel_outputs.view(B, -1, self.mel_dim)
+
+        linear_outputs = self.postnet(mel_outputs)
+        linear_outputs = self.last_linear(linear_outputs)
+
+        return mel_outputs, linear_outputs, alignments, vq_penalty.mean(), encoder_penalty.mean(), entropy
+
+
+class MelVQVAEv3(TacotronOne):
+
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False):
+        super(MelVQVAEv3, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False)
+        
+        # Stride, KernelSize, DilationFactor
+        encoder_layers = [
+            (2, 4, 1),
+            (2, 4, 1),
+            (2, 4, 1),
+            (1, 4, 1),
+            (2, 4, 1),
+            (1, 4, 1),
+            ]
+        self.encoder_d = DownsamplingEncoder(mel_dim, encoder_layers)
+        self.quantizer = quantizer_kotha(n_channels=1, n_classes=200, vec_len=80, normalize=True)
+        self.upsample_scales = [2,4,2,4]
+        self.upsample_network = UpsampleNetwork(self.upsample_scales)
+        
+        self.decoder_lstm = nn.LSTM(256, 128, bidirectional=True, batch_first=True)
+        #self.decoder_fc = nn.Linear(80,256)
+        self.mel_dim = mel_dim  
+        self.decoder = Decoder_TacotronOneSeqwise(mel_dim, r)
+
+        self.quantized2encoder = nn.Linear(80, 256)
+        
+    def forward(self, mel, input_lengths = None):
+        B = mel.shape[0]
+        encoded = self.encoder_d(mel)
+        quantized, vq_penalty, encoder_penalty, entropy = self.quantizer(encoded.unsqueeze(2))
+        quantized = quantized.squeeze(2)
+        quantized = torch.tanh(self.quantized2encoder(quantized))
+        decoder_input = self.encoder(quantized)         
+
+        #decoder_input = torch.tanh(self.decoder_fc(quantized))
+        mel_outputs, alignments = self.decoder(decoder_input, mel, memory_lengths=input_lengths)
+        mel_outputs = mel_outputs.view(B, -1, self.mel_dim)
+
+        linear_outputs = self.postnet(mel_outputs)
+        linear_outputs = self.last_linear(linear_outputs)
+       
+        return mel_outputs, linear_outputs, alignments, vq_penalty.mean(), encoder_penalty.mean(), entropy
+
+    def forward_eval(self, mel, input_lengths = None):
+        B = mel.shape[0]
+        encoded = self.encoder_d(mel)
+        print("Shape of encoded: ", encoded.shape)
+        quantized, vq_penalty, encoder_penalty, entropy = self.quantizer(encoded.unsqueeze(2))
+        print("Shape of quantized: ", quantized.shape)
+        quantized = quantized.squeeze(2)
+        quantized = torch.tanh(self.quantized2encoder(quantized))
+        decoder_input = self.encoder(quantized)         
+
+        mel = None
+        mel_outputs, alignments = self.decoder(decoder_input, mel, memory_lengths=input_lengths)
+        print("Shape of mel outputs: ", mel_outputs.shape)
+        mel_outputs = mel_outputs.view(B, -1, self.mel_dim)
+        
+        linear_outputs = self.postnet(mel_outputs)
+        linear_outputs = self.last_linear(linear_outputs)
+
+        return mel_outputs, linear_outputs, alignments, vq_penalty.mean(), encoder_penalty.mean(), entropy
+
+
+
+# Lets add 1x1 convlution before LSTM
+class WaveLSTM12b(TacotronOne):
+
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025, logits_dim=30,
+                 r=5, padding_idx=None, use_memory_mask=False):
+        super(WaveLSTM12b, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False)
+
+        self.upsample_scales = [2,4,5,5]
+        self.upsample_network = UpsampleNetwork(self.upsample_scales)
+
+        self.logits_dim = logits_dim
+        self.joint_encoder = nn.LSTM(81, 256, batch_first=True)
+        self.hidden2linear =  SequenceWise(nn.Linear(256, 64))
+        self.mels2conv = nn.Linear(81,81)
+        self.conv_1x1 = nn.Conv1d(81, 81, 1)
+        self.conv_1x1.bias.data.zero_()
+        self.linear2logits =  SequenceWise(nn.Linear(64, self.logits_dim))
+
+    def forward(self, mels, x):
+
+        B = mels.size(0)
+
+        mels = self.upsample_network(mels)
+        mels = mels[:,:-1,:]
+        inp = x[:, :-1].unsqueeze(-1)
+
+        melsNx = torch.cat([mels, inp], dim=-1)
+        melsNx = torch.tanh(self.mels2conv(melsNx))
+        melsNx = self.conv_1x1(melsNx.transpose(1,2)).transpose(1,2)
+        self.joint_encoder.flatten_parameters()
+        outputs, hidden = self.joint_encoder(melsNx)
+
+        logits = torch.tanh(self.hidden2linear(outputs))
+        return self.linear2logits(logits), x[:,1:].unsqueeze(-1)
+
+
+
+# Lets add 1x1 convlution before LSTM
+class MelVQVAEv4(WaveLSTM12b):
+
+    def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025, logits_dim=30,
+                 r=5, padding_idx=None, use_memory_mask=False):
+        super(MelVQVAEv4, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                 r=5, padding_idx=None, use_memory_mask=False)
+
+        self.quantizer = quantizer_kotha(n_channels=1, n_classes=200, vec_len=80, normalize=True)
+
+    def forward(self, mels, x):
+
+        B = mels.size(0)
+
+        mels = self.upsample_network(mels)
+
+        quantized, vq_penalty, encoder_penalty, entropy = self.quantizer(mels.unsqueeze(2))
+        quantized = quantized.squeeze(2)
+
+        mels = mels[:,:-1,:]
+        inp = x[:, :-1].unsqueeze(-1)
+
+        melsNx = torch.cat([mels, inp], dim=-1)
+
+        melsNx = torch.tanh(self.mels2conv(melsNx))
+        melsNx = self.conv_1x1(melsNx.transpose(1,2)).transpose(1,2)
+
+        self.joint_encoder.flatten_parameters()
+        outputs, hidden = self.joint_encoder(melsNx)
+
+        logits = torch.tanh(self.hidden2linear(outputs))
+        return self.linear2logits(logits), x[:,1:].unsqueeze(-1), vq_penalty.mean(), encoder_penalty.mean(), entropy
+
+
+    def forward_eval(self, mels, log_scale_min=-50.0):
+          
+        B = mels.size(0) 
+ 
+        mels = self.upsample_network(mels)
+
+        quantized, vq_penalty, encoder_penalty, entropy = self.quantizer(mels.unsqueeze(2))
+        quantized = quantized.squeeze(2)
+
+        T = mels.size(1)
+
+        current_input = torch.zeros(mels.shape[0], 1).cuda()
+        hidden = None
+        output = []
+ 
+ 
+        for i in range(T):
+
+           # Concatenate mel and coarse_float
+           m = mels[:, i,:]
+           inp = torch.cat([m , current_input], dim=-1).unsqueeze(1)
+
+           inp = torch.tanh(self.mels2conv(inp))
+           inp = self.conv_1x1(inp.transpose(1,2)).transpose(1,2)
+
+           # Get logits
+           self.joint_encoder.flatten_parameters()
+           outputs, hidden = self.joint_encoder(inp, hidden)
+ 
+           logits = torch.tanh(self.hidden2linear(outputs))
+           logits = self.linear2logits(logits)
+
+           # Sample the next input
+           sample = sample_from_discretized_mix_logistic(
+                        logits.view(B, -1, 1), log_scale_min=log_scale_min)
+ 
+           output.append(sample.data)
+           current_input = sample
+ 
+           if i%10000 == 1:
+              print("  Predicted sample at timestep ", i, "is :", sample, " Number of steps: ", T)
+ 
+    
+        output = torch.stack(output, dim=0)
+        print("Shape of output: ", output.shape)
+        return output.cpu().numpy(), entropy
+ 
+ 
 
