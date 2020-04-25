@@ -1,4 +1,5 @@
 import os, sys
+import numpy as np
 
 # Lets get the distributions for Telugu first
 
@@ -27,14 +28,13 @@ def print_distribution(labels_file, fnames_file):
       arr = list(set(arr))
       if len(arr) == 1:
          mono_array.append(fname)
-         lid = 'mono'
+         lid = 0  # mono
       elif len(arr) == 2:
          multi_array.append(fname)
-         lid = 'multi'
+         lid = 1 # 'multi'
 
-      f = open(vox_dir + '/festival/falcon_lid/' + fname + '.txt', 'w')
-      f.write(lid + '\n')
-      ftrain.write(fname + '\n')
+      fname = vox_dir + '/festival/falcon_lid/' + fname + '.feats'
+      np.save(fname, lid)
 
    print(len(mono_array), len(multi_array))
    print('\n')

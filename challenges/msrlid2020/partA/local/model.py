@@ -780,7 +780,7 @@ class MelVQVAEv4b(WaveLSTM12b):
         spk_hidden, _ = self.speaker_lstm(speaker_stuff)
         spk_hidden = spk_hidden[:,-1,:]
 
-        # Upsample This is wrong
+        # Upsample 
         quantized = self.upsample_network(mels)
 
         # Adjust inputs
@@ -802,5 +802,95 @@ class MelVQVAEv4b(WaveLSTM12b):
         #return self.linear2logits(logits), x[:,1:].unsqueeze(-1), logits.new(1).zero_(), logits.new(1).zero_(), 0
 
         return self.linear2logits(logits), x[:,1:].unsqueeze(-1), vq_penalty.mean(), encoder_penalty.mean(), entropy
-           
 
+
+    def forward_eval(self, mels, log_scale_min=-50.0):
+
+        B = mels.size(0) 
+        
+        # Get phones
+        quantized, vq_penalty, encoder_penalty, entropy = self.quantizer(mels.unsqueeze(2))
+        quantized = quantized.squeeze(2)
+        quantized = torch.tanh(self.mels2conv(quantized))
+        quantized = self.conv_1x1(quantized.transpose(1,2)) #.transpose(1,2)
+        quantized = self.bn(quantized).transpose(1,2)
+
+    
+        # Get speaker
+        speaker_stuff = torch.tanh(self.speaker_fc(mels))
+        spk_hidden, _ = self.speaker_lstm(speaker_stuff)
+        spk_hidden = spk_hidden[:,-1,:]
+        
+        mels = self.upsample_network(mels)
+        T = mels.size(1)
+
+        current_input = torch.zeros(mels.shape[0], 1).cuda()
+        hidden = None
+        output = []
+        
+ 
+        for i in range(T):
+
+           # Concatenate mel and coarse_float
+           m = mels[:, i,:]
+           inp = torch.cat([m , current_input, spk_hidden], dim=-1).unsqueeze(1)
+                
+           inp = torch.tanh(self.mels2encoderinput(inp))
+        
+           # Get logits
+           self.joint_encoder.flatten_parameters()
+           outputs, hidden = self.joint_encoder(inp, hidden)
+        
+           logits = torch.tanh(self.hidden2linear(outputs))
+           logits = self.linear2logits(logits)
+    
+           # Sample the next input
+           sample = sample_from_discretized_mix_logistic(
+                        logits.view(B, -1, 1), log_scale_min=log_scale_min)
+    
+           output.append(sample.data)
+           current_input = sample
+ 
+           if i%10000 == 1:
+              print("  Predicted sample at timestep ", i, "is :", sample, " Number of steps: ", T)
+ 
+        
+        output = torch.stack(output, dim=0)
+        print("Shape of output: ", output.shape)
+        return output.cpu().numpy(), entropy
+
+
+class LIDlatents(TacotronOne):
+
+    def __init__(self, n_vocab):
+       super(LIDlatents, self).__init__(n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
+                r=5, padding_idx=None, use_memory_mask=False)
+
+       self.decoder_lstm = nn.LSTM(256, 64, bidirectional=True, batch_first=True)
+       self.linear2logits = nn.Linear(128, 2)
+
+       self.attention_fc = nn.Linear(128, 1)
+
+    def forward(self, latents, lengths=None):
+
+        B = latents.size(0)
+        T = latents.size(1)
+
+        latents = self.embedding(latents)
+        encoder_outputs = self.encoder(latents, lengths)
+
+        self.decoder_lstm.flatten_parameters()
+        decoded, _ = self.decoder_lstm(encoder_outputs)
+
+        # Attention pooling
+        
+        #mask = get_mask_from_lengths(decoded, lengths)
+        processed = torch.tanh(self.attention_fc(decoded))
+        #mask = mask.view(processed.size(0), -1, 1)
+        #processed.data.masked_fill_(mask, -float("inf"))
+
+        alignment = F.softmax(processed,dim=-1)
+        attention = torch.bmm(alignment.transpose(1,2), decoded)
+        attention = attention.squeeze(1)
+
+        return self.linear2logits(attention)

@@ -72,7 +72,7 @@ class categorical_datasource(CategoricalDataSource):
         if self.feat_name == 'phones':
             return populate_phonesarray(fname, self.feats_dir, self.feats_dict)
         elif self.feat_name == 'quants':
-            return np.load(fname + '.npy')  
+            return np.load(fname + '.npy')
             return populate_quantsarray(fname +'.npy' , self.feats_dir, self.feats_dict)
         elif self.feat_name == 'phonesnossil':
             return populate_phonesarray(fname, self.feats_dir, self.feats_dict)
@@ -84,7 +84,14 @@ class categorical_datasource(CategoricalDataSource):
         elif self.feat_name == 'r9y9inputmol':
             fname += '.npy'
             return np.load(fname)
-
+        elif self.feat_name == 'melvqvae4alatents':
+            fname += '.npy'
+            return np.load(fname)
+        elif self.feat_name == 'fnames':
+            return fname.split('.feats')[0].split('/')[-1]
+        elif self.feat_name == 'lid':
+            fname += '.npy'
+            return np.load(fname)
         else:
             print("Unknown feature type: ", self.feat_name)
             sys.exit()
@@ -134,6 +141,13 @@ def _pad_2d(x, max_len):
                mode="constant", constant_values=0)
     return x
 
+def _pad(seq, max_len, val=0):
+    #print("Shape of seq: ", seq.shape, " and the max length: ", max_len)     
+    #assert len(seq) < max_len
+    if len(seq) == max_len:
+        return seq
+    return np.pad(seq, (0, max_len - len(seq)),
+                  mode='constant', constant_values=val)
 
 
 def collate_fn_phonesNqF0s(batch):
@@ -671,3 +685,35 @@ class ExponentialMovingAverage(object):
         update_delta = self.shadow[name] - x
         self.shadow[name] -= (1.0 - self.decay) * update_delta
 
+
+def collate_fn_lidlatents(batch):
+    """Create batch"""
+
+    latents = [x for (x,_,_) in batch]
+    lid = [x for (_,x,_) in batch]
+    fnames = [x for (_,_,x) in batch]
+
+    lengths = [len(x) for x in latents]
+    max_length = np.max(lengths) + 1
+
+    latents = [_pad(x, max_length,200) for x in latents]
+    latents = torch.LongTensor(latents)
+    #print(lid)
+    lid = torch.LongTensor(lid)
+    lengths = torch.FloatTensor(lengths)
+    #print("Shapes of lid and latents: ", lid.shape, latents.shape)
+    assert lid.shape[0] == latents.shape[0]
+
+    return latents, lid, lengths, fnames
+
+class LIDlatentsDatasets(object):
+    def __init__(self, latents, lids, fnames):
+        self.latents = latents 
+        self.lids = lids
+        self.fnames = fnames
+
+    def __getitem__(self, idx):
+        return self.latents[idx], self.lids[idx].tolist(), self.fnames[idx]
+
+    def __len__(self):
+        return len(self.latents)
