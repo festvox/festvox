@@ -1039,59 +1039,7 @@ class ActNorm1d(nn.BatchNorm1d):
 
         self._check_input_dim(input)
 
-        #exponential_average_factor = 0.0
-
-        #if self.training and self.track_running_stats:
-        #    if self.num_batches_tracked is not None:
-        #        self.num_batches_tracked += 1
-        #        if self.momentum is None:  # use cumulative moving average
-        #            exponential_average_factor = 1.0 / float(self.num_batches_tracked)
-        #        else:  # use exponential moving average
-        #            exponential_average_factor = self.momentum
-
-        # calculate running estimates
-        #if self.training:
-        #    mean = input.mean([0, 2])
-        #    var = input.var([0, 2], unbiased=False)
-        #    n = input.numel() / input.size(1)
-
-        #    # Initialize with mean and var of initial minibatch 
-        #    if self.running_mean.sum().item() == 0 and self.running_var.sum().item() == self.num_features:
-        #       self.mean.data = mean
-        #       self.var.data = var
-        #    else:
-        #        if self.choice:
-        #          mean = random.choice([mean, mean])
-        #          var = random.choice([var, var])
-        #        else:
-        #          mean = self.mean
-        #          var = self.var
-        #    with torch.no_grad():
-        #        self.running_mean = exponential_average_factor * mean\
-        #            + (1 - exponential_average_factor) * self.running_mean
-        #        # update running_var with unbiased var
-        #        self.running_var = exponential_average_factor * var * n / (n - 1)\
-        #            + (1 - exponential_average_factor) * self.running_var
-        #else:
-        #    mean = self.running_mean
-        #    var = self.running_var#
-        #
-        # This is batchnorm
-        #input = (input - mean[None, :,  None]) / (torch.sqrt(var[None, :, None] + self.eps))
-        #mean = mean. 
-        #if self.affine:
-        #    input = input * self.weight[None, :, None] + self.bias[None, :, None]
- 
-        #print("Shapes of input, self.scale and self.bias: ", input.shape, self.scale.shape, self.bias.shape)
-        #input = input * self.scale[None,:,None] + self.bias[None,:,None] 
         if self.initialized is None:
-             #input = F.linear(input.transpose(1,2), self.scale).transpose(1,2)
-             #mean = input.mean([0, 2])
-             #print("Shape of input and mean: ", input.shape, mean.shape)
-             #input = input - mean[None,:,None]
-             #self.bias.data = -1.0 * mean
-             #self.initialized = 1
-             #mean = input.mean([0, 2])
              std = input.std([0, 2]) # Not sure about unbiases vs biased
              self.scale.data = torch.pow(std, -1)
              input = input * self.scale[None,:,None]
@@ -1099,14 +1047,9 @@ class ActNorm1d(nn.BatchNorm1d):
              self.bias.data = -1.0 * mean
              input = input + self.bias[None,:,None]
              self.initialized = 1
-             #print("Current mean value is ", input.mean([0,2]).sum().item(), " Current var is ", input.var([0,2]).sum().item())
-             assert input.mean([0,2]).sum().item() < 0.1
-             #print("Initialized")
+             assert input.mean([0,2]).sum().item() < 0.1 # Zero mean and unit variance for initial minibatch
         else:
-          #input = F.linear(input.transpose(1,2), self.scale, self.bias)
-          #input = input.transpose(1,2)
-          #print("Shape of input, scale and bias: ", input.shape, self.scale.shape, self.bias.shape)
-          input = input * self.scale[None,:,None] + self.bias[None,:,None]
+             input = input * self.scale[None,:,None] + self.bias[None,:,None]
 
         return input
 
