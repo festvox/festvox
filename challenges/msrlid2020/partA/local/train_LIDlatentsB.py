@@ -151,7 +151,7 @@ def train(model, train_loader, val_loader, optimizer,
             logits = model(latents, lengths=sorted_lengths)
 
             # Loss
-            #print("Shape of logits and lid: ", logits.shape, lid.shape)
+            print("Shape of logits and lid: ", logits.shape, lid.shape)
             loss = criterion(logits, lid)
             #print(loss)
 

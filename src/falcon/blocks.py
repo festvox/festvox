@@ -1008,9 +1008,9 @@ class ActNorm1d(nn.BatchNorm1d):
         self.register_parameter('scale', self.scale)
         self.register_parameter('bias', self.bias)
 
-        self.choice = choice
+        #self.choice = choice
 
-        init.kaiming_uniform_(self.scale, a=math.sqrt(5))
+        #init.kaiming_uniform_(self.scale, a=math.sqrt(5))
         #fan_in, _ = init._calculate_fan_in_and_fan_out(self.scale)
         #bound = 1 / math.sqrt(fan_in)
         #init.uniform_(self.bias, -bound, bound)
@@ -1085,15 +1085,26 @@ class ActNorm1d(nn.BatchNorm1d):
         #print("Shapes of input, self.scale and self.bias: ", input.shape, self.scale.shape, self.bias.shape)
         #input = input * self.scale[None,:,None] + self.bias[None,:,None] 
         if self.initialized is None:
-             input = F.linear(input.transpose(1,2), self.scale).transpose(1,2)
-             mean = input.mean([0, 2])
+             #input = F.linear(input.transpose(1,2), self.scale).transpose(1,2)
+             #mean = input.mean([0, 2])
              #print("Shape of input and mean: ", input.shape, mean.shape)
-             input = input - mean[None,:,None]
-             self.bias.data = mean
+             #input = input - mean[None,:,None]
+             #self.bias.data = -1.0 * mean
+             #self.initialized = 1
+             #mean = input.mean([0, 2])
+             std = input.std([0, 2]) # Not sure about unbiases vs biased
+             self.scale.data = torch.pow(std, -1)
+             input = input * self.scale[None,:,None]
+             mean = input.mean([0, 2])
+             self.bias.data = -1.0 * mean
+             input = input + self.bias[None,:,None]
              self.initialized = 1
+             #print("Current mean value is ", input.mean([0,2]).sum().item(), " Current var is ", input.var([0,2]).sum().item())
+             assert input.mean([0,2]).sum().item() < 0.1
         else:
-          input = F.linear(input.transpose(1,2), self.scale, self.bias)
-          input = input.transpose(1,2)
+          #input = F.linear(input.transpose(1,2), self.scale, self.bias)
+          #input = input.transpose(1,2)
+          input = input * self.scale[None,:,None] + self.bias[None,:,None]
 
         return input
 
