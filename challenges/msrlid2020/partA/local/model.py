@@ -838,7 +838,6 @@ class MelVQVAEv4b(WaveLSTM12b):
            inp = torch.tanh(self.mels2encoderinput(inp))
         
            # Get logits
-           self.joint_encoder.flatten_parameters()
            outputs, hidden = self.joint_encoder(inp, hidden)
         
            logits = torch.tanh(self.hidden2linear(outputs))
@@ -860,6 +859,22 @@ class MelVQVAEv4b(WaveLSTM12b):
         return output.cpu().numpy(), entropy
 
 
+
+class Attention(nn.Module):
+
+    def __init__(self, dim):
+       super(Attention, self).__init__()
+       self.attention_fc = nn.Linear(dim, 1)
+
+    def forward(self, decoded):
+
+        processed = torch.tanh(self.attention_fc(decoded))
+        alignment = F.softmax(processed,dim=-1)
+        attention = torch.bmm(alignment.transpose(1,2), decoded)
+        attention = attention.squeeze(1)
+        return attention
+
+
 class LIDlatents(TacotronOne):
 
     def __init__(self, n_vocab):
@@ -867,33 +882,35 @@ class LIDlatents(TacotronOne):
                 r=5, padding_idx=None, use_memory_mask=False)
 
        self.decoder_lstm = nn.LSTM(256, 64, bidirectional=True, batch_first=True)
-       self.linear2logits = nn.Linear(128, 2)
+       self.linear2logits = nn.Linear(32, 2)
+       self.encoder = Encoder_TacotronOne_ActNorm(256)
+       self.attention = Attention(128)
+       self.attention2linear = nn.Linear(128, 32)
 
-       self.attention_fc = nn.Linear(128, 1)
+       self.drop = nn.Dropout(0.0)
 
     def forward(self, latents, lengths=None):
 
         B = latents.size(0)
         T = latents.size(1)
 
-        latents = self.embedding(latents)
+        latents = self.drop(self.embedding(latents))
         encoder_outputs = self.encoder(latents, lengths)
 
         self.decoder_lstm.flatten_parameters()
         decoded, _ = self.decoder_lstm(encoder_outputs)
 
         # Attention pooling
-        
+        attention = self.attention(decoded)
         #mask = get_mask_from_lengths(decoded, lengths)
-        processed = torch.tanh(self.attention_fc(decoded))
+        #processed = torch.tanh(self.attention_fc(decoded))
         #mask = mask.view(processed.size(0), -1, 1)
         #processed.data.masked_fill_(mask, -float("inf"))
-
-        alignment = F.softmax(processed,dim=-1)
-        attention = torch.bmm(alignment.transpose(1,2), decoded)
-        attention = attention.squeeze(1)
-
-        return self.linear2logits(attention)
+        #alignment = F.softmax(processed,dim=-1)
+        #attention = torch.bmm(alignment.transpose(1,2), decoded)
+        #attention = attention.squeeze(1)
+        logits = torch.tanh(self.attention2linear(attention))
+        return self.linear2logits(logits)
 
 
 class LIDlatentsB(TacotronOne):

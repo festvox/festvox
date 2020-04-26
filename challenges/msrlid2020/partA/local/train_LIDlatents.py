@@ -254,13 +254,15 @@ if __name__ == "__main__":
         collate_fn=collate_fn_lidlatents, pin_memory=hparams.pin_memory)
 
     # Model
-    model = LIDlatentsB(n_vocab=201)
+    model = LIDlatents(n_vocab=201)
     model = model.cuda()
 
     optimizer = optim.Adam(model.parameters(),
                            lr=hparams.initial_learning_rate, betas=(
                                hparams.adam_beta1, hparams.adam_beta2),
                            weight_decay=hparams.weight_decay)
+    #optimizer = optim.SGD(model.parameters(),
+    #                       lr=hparams.initial_learning_rate*10, momentum=0.9)
 
     # Load checkpoint
     if checkpoint_path:

@@ -1001,7 +1001,7 @@ class ActNorm1d(nn.BatchNorm1d):
         super(ActNorm1d, self).__init__(
             num_features, eps, momentum, affine, track_running_stats)
 
-        self.scale = nn.Parameter(torch.Tensor(num_features, num_features))
+        self.scale = nn.Parameter(torch.Tensor(num_features))
         self.bias =  nn.Parameter(torch.Tensor(num_features))
         self.num_features = num_features
         self.initialized = None
@@ -1101,9 +1101,11 @@ class ActNorm1d(nn.BatchNorm1d):
              self.initialized = 1
              #print("Current mean value is ", input.mean([0,2]).sum().item(), " Current var is ", input.var([0,2]).sum().item())
              assert input.mean([0,2]).sum().item() < 0.1
+             #print("Initialized")
         else:
           #input = F.linear(input.transpose(1,2), self.scale, self.bias)
           #input = input.transpose(1,2)
+          #print("Shape of input, scale and bias: ", input.shape, self.scale.shape, self.bias.shape)
           input = input * self.scale[None,:,None] + self.bias[None,:,None]
 
         return input
@@ -1131,12 +1133,14 @@ class CBHGActNorm(CBHG):
 
     def __init__(self, in_dim, K=16, projections=[128, 128]):
         super(CBHGActNorm, self).__init__(in_dim, K, projections)
+
+        self.tanh = nn.Tanh() 
         self.conv1d_banks = nn.ModuleList(
             [ActNormConv1d(in_dim, in_dim, kernel_size=k, stride=1,
-                             padding=k // 2, activation=self.relu)
+                             padding=k // 2, activation=self.tanh)
              for k in range(1, K + 1)])
         in_sizes = [K * in_dim] + projections[:-1]
-        activations = [self.relu] * (len(projections) - 1) + [None]
+        activations = [self.tanh] * (len(projections) - 1) + [None]
 
         self.conv1d_projections = nn.ModuleList(
             [ActNormConv1d(in_size, out_size, kernel_size=3, stride=1,
