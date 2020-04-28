@@ -1,8 +1,9 @@
 import os, sys
+import numpy as np
 
 # Lets get the distributions for Telugu first
 
-data_dir = '/home/srallaba/challenges/msrcodeswitch2020/data/'
+data_dir = '/home/srallaba_lid/challenges/msrlid2020/data/'
 vox_dir = 'vox'
 
 ftr = vox_dir + '/fnames.train'
@@ -27,13 +28,13 @@ def print_distribution(labels_file, fnames_file):
       arr = list(set(arr))
       if len(arr) == 1:
          mono_array.append(fname)
-         lid = 'mono'
+         lid = 0 #'mono'
       elif len(arr) == 2:
          multi_array.append(fname)
-         lid = 'multi'
+         lid = 1 #'multi'
 
-      f = open(vox_dir + '/festival/falcon_lid/' + fname + '.txt', 'w')
-      f.write(lid + '\n')
+      fn = vox_dir + '/festival/falcon_lid/' + fname + '.feats'
+      np.save(fn, lid)
       ft.write(fname + '\n')
 
    print(len(mono_array), len(multi_array))
