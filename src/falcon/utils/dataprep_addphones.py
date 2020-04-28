@@ -8,7 +8,19 @@ import re
 import json
 
 '''Syntax
-python3.5 $FALCONDIR/dataprep_addtext.py etc/tdd .
+python3.5 $FALCONDIR/dataprep_addphones.py vox.ehmm/etc/txt.phseq.data
+
+X -> typically this file is vox/ehmm/etc/txt.phseq.data but can be anything else as well
+It is a file with the filename and phone sequence in following format:
+
+filename1 ph1 ph2 ph3 ...
+filename2 ph1 ph2 ph3 ...
+filename3 ph1 ph2 ph3 ...
+
+Y -> this is typically 'vox' but can be anything else
+basically the script creates a directory vox/festival/falcon_phones and puts phones corresponding to each prompt as a separate file. 
+the script also creates a dictionary of phones so that we can use them in deep learning models. The name of this is ids_phones.json and it is placed in vox/etc/
+It also updates a file called vox/etc/falcon_feats.desc. This is a description file that models use later.
 
 '''
 

@@ -783,8 +783,8 @@ class LIDMixtureofExpertslatentsattentionconv(LIDMixtureofExpertslatentsattentio
         
         # Combine the experts
         combination = torch.tanh(exp1_logits) * torch.sigmoid(exp2_logits)
-        combination = F.tanh(self.conv_1x1(combination.transpose(1,2)))
-        combination = combination.transpose(1,2)
+        #combination = F.tanh(self.conv_1x1(combination.transpose(1,2)))
+        #combination = combination.transpose(1,2)
 
         # Pooling
         attention = self.attention(combination, lengths)
