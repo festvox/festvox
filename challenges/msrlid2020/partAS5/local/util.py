@@ -70,7 +70,7 @@ class categorical_datasource(CategoricalDataSource):
 
         assert self.feat_type == 'categorical'
         fname = self.filenames_array[idx]
-        fname = self.feats_dir + '/' + fname + '.feats'
+        fname = self.feats_dir + '/' + fname.strip() + '.feats'
         if self.feat_name == 'phones':
             return populate_phonesarray(fname, self.feats_dir, self.feats_dict)
         elif self.feat_name == 'quants':
@@ -92,6 +92,7 @@ class categorical_datasource(CategoricalDataSource):
         elif self.feat_name == 'fnames':
             return fname.split('.feats')[0].split('/')[-1]
         elif self.feat_name == 'lid':
+            #print(fname)
             fname += '.npy'
             return np.load(fname)
         else:
@@ -719,7 +720,7 @@ def collate_fn_lidlatents(batch):
 
     return latents, lid, lengths, fnames
 
-class LIDlatentsDatasets(object):
+class LIDlatentsDataset(object):
     def __init__(self, latents, lids, fnames):
         self.latents = latents 
         self.lids = lids

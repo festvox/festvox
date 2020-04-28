@@ -13,8 +13,10 @@ from torch.nn import init
 '''
 
 print_flag = 0
-
-cuda_version = float(os.environ.get('CUDAVERSION'))
+cuda_version = None
+if "CUDAVERSION" in os.environ:
+    cuda_version = float(os.environ.get('CUDAVERSION'))
+ 
 
 # Type: Acquisition_CodeBorrowed Source: https://github.com/r9y9/tacotron_pytorch/blob/62db7217c10da3edb34f67b185cc0e2b04cdf77e/tacotron_pytorch/attention.py#L7
 class BahdanauAttention(nn.Module):
@@ -50,10 +52,14 @@ def get_mask_from_lengths(memory, memory_lengths):
         memory_lengths: array like
     """
     # Changing based on https://github.com/jiesutd/NCRFpp/issues/137 This is not currently handled neatly. Will revisit
-    if cuda_version >= 9.2:
+    if cuda_version is not None and cuda_version >= 9.2:
        mask = memory.data.new(memory.size(0), memory.size(1)).bool().zero_()
     else:
-       mask = memory.data.new(memory.size(0), memory.size(1)).byte().zero_()
+       try:
+          mask = memory.data.new(memory.size(0), memory.size(1)).byte().zero_()
+       except Exception as e:
+          print("Think you should check cuda version. Mask calculation needs this to be specified explicitly. ")
+          sys.exit()
 
     for idx, l in enumerate(memory_lengths):
         mask[idx][:l] = 1

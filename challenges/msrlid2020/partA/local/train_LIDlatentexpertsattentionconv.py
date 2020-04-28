@@ -63,7 +63,7 @@ use_multigpu = None
 fs = hparams.sample_rate
 
 
-def validate_model(model, val_loader):
+def validate_model(model, val_loader, full=None):
      print("Validating the model")
      model.eval()
      y_true = []
@@ -94,13 +94,14 @@ def validate_model(model, val_loader):
           y_pred += predictions.tolist()
           fnames += fname
           #print(fname)
-     ff = open(exp_dir + '/eval' ,'a')
-     assert len(fnames) == len(y_pred)
-     for (f, yp, yt) in list(zip(fnames, y_pred, y_true)):
+     if full is not None:
+       ff = open(exp_dir + '/eval_' + str(full).zfill(3) ,'a')
+       assert len(fnames) == len(y_pred)
+       for (f, yp, yt) in list(zip(fnames, y_pred, y_true)):
           if yp == yt:
             continue
           ff.write( f + ' ' + str(yp) + ' ' + str(yt) + '\n')
-     ff.close()
+       ff.close()
 
      averaged_loss = running_loss / (len(val_loader))
      recall = get_metrics(y_pred, y_true)
@@ -129,7 +130,7 @@ def train(model, train_loader, val_loader, optimizer,
 	                ema.register(name, param.data)
     else:
         ema = None
-    recall, model = validate_model(model, val_loader)
+    #recall, model = validate_model(model, val_loader)
     while global_epoch < nepochs:
         model.train()
         h = open(logfile_name, 'a')
@@ -300,12 +301,12 @@ if __name__ == "__main__":
               checkpoint_interval=hparams.checkpoint_interval,
               nepochs=hparams.nepochs,
               clip_thresh=hparams.clip_thresh)
-        model = clone_as_averaged_model(model, ema)
-        recall, model = validate_model(model, val_loader)
+        #model = clone_as_averaged_model(model, ema)
+        recall, model = validate_model(model, val_loader, full=1)
         print("Final Recall: ", recall)
-        recall, model = validate_model(model, val_loader)
+        recall, model = validate_model(model, val_loader, full=2)
         print("Final Recall: ", recall)
-        recall, model = validate_model(model, val_loader)
+        recall, model = validate_model(model, val_loader, full=3)
         print("Final Recall: ", recall)
  
 

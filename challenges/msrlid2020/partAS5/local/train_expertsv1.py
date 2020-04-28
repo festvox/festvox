@@ -1,4 +1,4 @@
-"""Trainining script for Tacotron speech synthesis model.
+"""Trainining script for Tacotron speech synthesis model. Uses mfcc
 
 usage: train.py [options]
 
@@ -63,7 +63,7 @@ use_multigpu = None
 fs = hparams.sample_rate
 
 
-def validate_model(model, val_loader):
+def validate_model(model, val_loader, epoch):
      print("Validating the model")
      model.eval()
      y_true = []
@@ -72,16 +72,20 @@ def validate_model(model, val_loader):
      running_loss = 0.
      criterion = nn.CrossEntropyLoss()
      with torch.no_grad():
-       for step, (mfcc, mfcc_lengths, mel, mol, lid, fname) in enumerate(val_loader):
+       for step, (feats, lid, lengths, fname) in enumerate(val_loader):
 
-          # Sort by length
           sorted_lengths, indices = torch.sort(
-             mfcc_lengths.view(-1), dim=0, descending=True)
+               lengths.view(-1), dim=0, descending=True)
           sorted_lengths = sorted_lengths.long().numpy()
-  
-          mfcc, mel, mol, lid = mfcc[indices], mel[indices], mol[indices], lid[indices]
-          mfcc, mel, mol, lid = Variable(mfcc).cuda(), Variable(mel).cuda(), Variable(mol).cuda(), Variable(lid).cuda()
-          logits = model(mfcc,sorted_lengths)
+          feats, lid = feats[indices], lid[indices]
+          #print(indices, fname)
+          #fname = fname[indices.numpy()]
+          indices = indices.numpy().tolist()
+          fname = [f for index, f in sorted(zip(indices, fname))]
+
+          feats, lid = Variable(feats), Variable(lid)
+          feats, lid = feats.cuda(), lid.cuda().long()
+          logits = model(feats)
           loss = criterion(logits, lid.long())
           running_loss += loss.item()
           targets = lid.cpu().view(-1).numpy()
@@ -90,7 +94,7 @@ def validate_model(model, val_loader):
           y_pred += predictions.tolist()
           fnames += fname
           #print(fname)
-     ff = open(exp_dir + '/eval' ,'a')
+     ff = open(exp_dir + '/eval_' + str(epoch).zfill(3) ,'a')
      assert len(fnames) == len(y_pred)
      for (f, yp, yt) in list(zip(fnames, y_pred, y_true)):
           if yp == yt:
@@ -105,7 +109,7 @@ def validate_model(model, val_loader):
      print("Validation Loss: ", averaged_loss)
      print("Unweighted Recall for the validation set:  ", recall)
      print('\n')
-     return recall, model.train()
+     return recall, model
 
 def train(model, train_loader, val_loader, optimizer,
           init_lr=0.002,
@@ -115,8 +119,6 @@ def train(model, train_loader, val_loader, optimizer,
         model = model.cuda()
 
     criterion = nn.CrossEntropyLoss()
-    criterion_reconstruction = DiscretizedMixturelogisticLoss() 
-
     global global_step, global_epoch
 
     # https://github.com/r9y9/wavenet_vocoder/blob/c4c148792c6263afbedb9f6bf11cd552668e26cb/train.py#L793
@@ -127,18 +129,12 @@ def train(model, train_loader, val_loader, optimizer,
 	                ema.register(name, param.data)
     else:
         ema = None
-
+    #recall, model = validate_model(model, val_loader)
     while global_epoch < nepochs:
         model.train()
         h = open(logfile_name, 'a')
-        running_loss = 0. # mfcc, lengths, mel, mol, lid, fnames
-        running_loss_vq = 0.
-        running_loss_encoder = 0.
-        running_entropy = 0.
-        running_loss_lid = 0.
-        running_loss_reconstruction = 0.
-
-        for step, (mfcc, mfcc_lengths, mel, mol, lid, fnames) in tqdm(enumerate(train_loader)):
+        running_loss = 0.
+        for step, (feats, lid, lengths, fnames) in tqdm(enumerate(train_loader)):
 
             # Decay learning rate
             current_lr = learning_rate_decay(init_lr, global_step)
@@ -149,29 +145,23 @@ def train(model, train_loader, val_loader, optimizer,
 
             # Sort by length
             sorted_lengths, indices = torch.sort(
-                mfcc_lengths.view(-1), dim=0, descending=True)
+                lengths.view(-1), dim=0, descending=True)
             sorted_lengths = sorted_lengths.long().numpy()
 
-            mfcc = mfcc[indices]
-            mel = mel[indices]
-            mol = mol[indices]
-            lid = lid[indices]
-
+            feats, lid = feats[indices], lid[indices]
             #print(fnames, indices)
             #sys.exit()
 
             # Feed data
-            mfcc, mel, mol, lid = Variable(mfcc), Variable(mel), Variable(mol), Variable(lid)
+            feats, lid = Variable(feats), Variable(lid)
             if use_cuda:
-                mfcc, mel, mol, lid = mfcc.cuda(), mel.cuda(), mol.cuda(), lid.cuda().long()
+                feats, lid = feats.cuda(), lid.cuda().long()
 
-            logits = model(mfcc, mfcc_lengths=sorted_lengths)
+            logits = model(feats, lengths=sorted_lengths)
 
             # Loss
             #print("Shape of logits and lid: ", logits.shape, lid.shape)
-            lid_loss = criterion(logits, lid)
-            loss = lid_loss 
-
+            loss = criterion(logits, lid)
             #print(loss)
 
             # Update
@@ -179,7 +169,6 @@ def train(model, train_loader, val_loader, optimizer,
             grad_norm = torch.nn.utils.clip_grad_norm_(
                  model.parameters(), clip_thresh)
             optimizer.step()
-            model.quantizer.after_update()
 
             if ema is not None:
               for name, param in model.named_parameters():
@@ -187,6 +176,8 @@ def train(model, train_loader, val_loader, optimizer,
                     ema.update(name, param.data)
 
 
+            if step * 400 == 1:
+               recall, model = validate_model(model, val_loader)
             if global_step % checkpoint_interval == 0:
 
                save_checkpoint(
@@ -196,23 +187,18 @@ def train(model, train_loader, val_loader, optimizer,
             log_value("Training Loss", float(loss.item()), global_step)
             log_value("gradient norm", grad_norm, global_step)
             log_value("learning rate", current_lr, global_step)
-            log_value("VQ Penalty", vq_penalty, global_step)
-            log_value("Encoder Penalty", encoder_penalty, global_step)
-            log_value("Entropy", entropy, global_step)
-
             global_step += 1
             running_loss += loss.item()
 
-            #print(loss.item())
-
         averaged_loss = running_loss / (len(train_loader))
         log_value("loss (per epoch)", averaged_loss, global_epoch)
-        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) 
-                + '\n')
+        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
         h.close()
-        recall, model = validate_model(model, val_loader)
+        recall, model = validate_model(model, val_loader, global_epoch)
         log_value("Unweighted Recall per epoch", recall, global_epoch)
         global_epoch += 1
+        save_checkpoint(
+            model, optimizer, global_step, checkpoint_dir, global_epoch, ema=ema)
 
     return model, ema
 
@@ -238,58 +224,25 @@ if __name__ == "__main__":
     h = open(logfile_name, 'w')
     h.close()
 
-    ff = open(exp_dir + '/eval' ,'w')
-    ff.close()
+    lid_train, lid_val, _ = get_cat_feats('lid')
+    fnames_train, fnames_val, _ = get_cat_feats('fnames')
+    mfcc_train, mfcc_val = get_float_feats('mfcc')
 
-    # Vocab size
-    with open(vox_dir + '/' + 'etc/ids_latents.json') as  f:
-       latent_ids = json.load(f)
-
-    latent_ids = dict(latent_ids)
-    print(latent_ids)
-
-    idsdict_file = checkpoint_dir + '/ids_latents.json'
-
-    with open(idsdict_file, 'w') as outfile:
-       json.dump(latent_ids, outfile)
-
-    feats_name = 'mfcc'
-    mfcc_train = float_datasource( vox_dir + '/' + 'fnames.train', 
-                                   vox_dir + '/' + 'etc/falcon_feats.desc', 
-                                   feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name)
-    mfcc_val = float_datasource( vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name)
-
-    feats_name = 'lid'
-    X_train = categorical_datasource( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name)
-    X_val = categorical_datasource(vox_dir + '/' +  'fnames.val', vox_dir + '/' +  'etc/falcon_feats.desc', feats_name,  vox_dir + '/' +  'festival/falcon_' + feats_name)
-
-    feats_name = 'fnames'
-    fnames_train = categorical_datasource( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name)
-    fnames_val = categorical_datasource( vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name)
-
-    feats_name = 'r9y9inputmol'
-    mol_train = categorical_datasource( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name)
-    mol_val = categorical_datasource( vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name)
-
-    feats_name = 'r9y9outputmel'
-    mel_train = float_datasource(vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
-    mel_val = float_datasource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
-
-    # Dataset and Dataloader setup X, mfcc, mel, mol, fnames)
-    trainset =  LIDmfccmelmolDataset(X_train, mfcc_train, mel_train, mol_train, fnames_train)
+    # Dataset and Dataloader setup
+    trainset = LIDmfccsDataset(lid_train, mfcc_train, fnames_train)
     train_loader = data_utils.DataLoader(
         trainset, batch_size=hparams.batch_size,
         num_workers=hparams.num_workers, shuffle=True,
-        collate_fn=collate_fn_lidmfccmelmol, pin_memory=hparams.pin_memory)
+        collate_fn=collate_fn_lidmfcc, pin_memory=hparams.pin_memory)
 
-    valset =  LIDmfccmelmolDataset(X_val, mfcc_val, mel_val, mol_val, fnames_val)
+    valset = LIDmfccsDataset(lid_val, mfcc_val, fnames_val)
     val_loader = data_utils.DataLoader(
         valset, batch_size=hparams.batch_size,
-        num_workers=hparams.num_workers, shuffle=True,
-        collate_fn=collate_fn_lidmfccmelmol, pin_memory=hparams.pin_memory)
+        num_workers=hparams.num_workers, shuffle=False,
+        collate_fn=collate_fn_lidmfcc, pin_memory=hparams.pin_memory)
 
     # Model
-    model = LIDMixtureofExpertsmfccattention(39, 80)
+    model = LIDMixtureofExpertsmfccattention()
     model = model.cuda()
 
     optimizer = optim.Adam(model.parameters(),
@@ -304,8 +257,8 @@ if __name__ == "__main__":
         model.load_state_dict(checkpoint["state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer"])
         try:
-            global_step = checkpoint["global_step"]
-            global_epoch = checkpoint["global_epoch"]
+            global_step = int(checkpoint["global_step"])
+            global_epoch = int(checkpoint["global_epoch"])
         except:
             # TODO
             pass
@@ -324,11 +277,11 @@ if __name__ == "__main__":
               nepochs=hparams.nepochs,
               clip_thresh=hparams.clip_thresh)
         model = clone_as_averaged_model(model, ema)
-        recall, model = validate_model(model, val_loader)
+        recall, model = validate_model(model, val_loader, 100)
         print("Final Recall: ", recall)
-        recall, model = validate_model(model, val_loader)
+        recall, model = validate_model(model, val_loader,101)
         print("Final Recall: ", recall)
-        recall, model = validate_model(model, val_loader)
+        recall, model = validate_model(model, val_loader,102)
         print("Final Recall: ", recall)
  
 
