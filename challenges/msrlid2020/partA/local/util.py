@@ -125,6 +125,14 @@ class float_datasource(FloatDataSource):
             fname = self.feats_dir + '/' + fname.strip() + '.feats.npy'
             return np.load(fname)
 
+        elif self.feat_name == 'mfcc':
+            fname =  str(self.filenames_array[idx]).zfill(8)
+            fname = self.feats_dir + '/' + fname.strip() + '.feats.npy'
+            #print("I am looking for ", fname)
+            #A = np.load(fname)
+            #print("Shape of ", fname, " is ", A.shape)
+            return np.load(fname)
+
 ### Collate stuff
 
 def _pad(seq, max_len):
@@ -471,7 +479,7 @@ def collate_fn_r9y9melNmol(batch):
     """Create batch"""
     
     r = hparams.outputs_per_step
-    seq_len = 4
+    seq_len = 16
     max_offsets = [x[1].shape[0] - seq_len for x in batch]
     mel_lengths = [x[1].shape[0] for x in batch]
     
@@ -704,6 +712,8 @@ def collate_fn_lidlatents(batch):
     #print("Shapes of lid and latents: ", lid.shape, latents.shape)
     assert lid.shape[0] == latents.shape[0]
 
+    #fnames = torch.Tensor(fnames)
+
     return latents, lid, lengths, fnames
 
 class LIDlatentsDatasets(object):
@@ -717,3 +727,139 @@ class LIDlatentsDatasets(object):
 
     def __len__(self):
         return len(self.latents)
+
+class LIDmfccsDataset(object):
+
+    def __init__(self, X, Mel, fnames):
+        self.X = X
+        self.Mel = Mel
+        self.fnames = fnames
+
+    def __getitem__(self, idx):
+        return self.X[idx].tolist(), self.Mel[idx], self.fnames[idx]
+
+    def __len__(self):
+        return len(self.X)
+
+
+class LIDmfcclatentsDataset(object):
+
+    def __init__(self, X, Mel, latents, fnames):
+        self.X = X
+        self.Mel = Mel
+        self.fnames = fnames
+        self.latents = latents
+
+    def __getitem__(self, idx):
+        return self.X[idx].tolist(), self.Mel[idx], self.latents[idx], self.fnames[idx]
+
+    def __len__(self):
+        return len(self.X)
+
+
+class LIDmfccmelmolDataset(object):
+
+    def __init__(self, X, mfcc, mel, mol, fnames):
+        self.X = X
+        self.mfcc = mfcc
+        self.fnames = fnames
+        self.mel = mel
+        self.mol = mol
+
+    def __getitem__(self, idx):
+        state_dict = {}
+        state_dict['lid'] = self.X[idx].tolist()
+        state_dict['mel'] = self.mel[idx]
+        state_dict['mol'] = self.mol[idx]
+        state_dict['mfcc'] = self.mfcc[idx]
+        state_dict['fnames'] = self.fnames[idx]
+        return state_dict 
+
+    def __len__(self):
+        return len(self.X)
+
+# collate_fn_lidmfcclatents
+def collate_fn_lidmfcclatents(batch):
+    """Create batch"""
+    
+    lid = [x for (x,_,_,_) in batch]
+    mfcc = [x for (_,x,_,_) in batch]
+    latents = [x for (_,_,x,_) in batch]
+    fnames = [x for (_,_,_,x) in batch]
+
+    lengths = [x.shape[0] for x in mfcc]
+    max_length = np.max(lengths) + 1
+
+    mfcc = np.array([_pad_2d(x, max_length) for x in mfcc],
+                 dtype=np.float32)
+    
+    mfcc = torch.LongTensor(mfcc)
+    lid = torch.LongTensor(lid)
+    mfcc_lengths = torch.FloatTensor(lengths)
+
+    lengths = [len(x) for x in latents]
+    max_length = np.max(lengths) + 1
+    latents = [_pad(x, max_length,200) for x in latents]
+    latents = torch.LongTensor(latents)
+    latent_lengths = torch.FloatTensor(lengths)
+
+    return mfcc, lid, latents, mfcc_lengths, latent_lengths, fnames
+
+def collate_fn_lidmfccmelmol(batch):
+    """Create batch"""
+    
+    lid = [x['lid'] for x in batch]
+    mfcc = [x['mfcc'] for x in batch]
+    mel = [x['mel'] for x in batch]
+    fnames = [x['fnames'] for x in batch]
+    mol = [x['mol'] for x in batch]
+    
+    # MFCC
+    lengths = [x.shape[0] for x in mfcc]
+    max_length = np.max(lengths) + 1
+    max_length = 8000
+    mfcc = np.array([_pad_2d(x, max_length) for x in mfcc],
+                 dtype=np.float32)
+    mfcc = torch.FloatTensor(mfcc)
+    lengths = torch.LongTensor(lengths) 
+
+    # LID
+    lid = torch.LongTensor(lid)
+
+    # Mel and Mol
+    seq_len = 4
+    max_offsets = [x.shape[0] - seq_len for x in mel]
+    mel_lengths = [x.shape[0] for x in mel]
+    mel_offsets = [np.random.randint(0, offset) for offset in max_offsets]
+    sig_offsets = [int(offset * hparams.frame_shift_ms * hparams.sample_rate / 1000) for offset in mel_offsets]
+    sig_lengths = [x.shape[0] for x in mol]
+    sig_length = int(seq_len * hparams.frame_shift_ms * hparams.sample_rate / 1000)
+    mel = torch.FloatTensor([x[mel_offsets[i]:mel_offsets[i] + seq_len] for i, x in enumerate(mel)])
+    mol = torch.FloatTensor([x[sig_offsets[i]:int(sig_offsets[i] + sig_length)] for i, x in enumerate(mol)])
+
+    # fnames
+    fnames = fnames 
+
+    return mfcc, lengths, mel, mol, lid, fnames
+
+def collate_fn_lidmfcc(batch):
+    """Create batch"""
+
+    lid = [x for (x,_,_) in batch]
+    mfcc = [x for (_,x,_) in batch]
+    fnames = [x for (_,_,x) in batch]
+
+    lengths = [x.shape[0] for x in mfcc]
+    max_length = np.max(lengths) + 1
+
+    mfcc = np.array([_pad_2d(x, max_length) for x in mfcc],
+                 dtype=np.float32)
+
+    mfcc = torch.LongTensor(mfcc)
+    #print(lid)
+    lid = torch.LongTensor(lid)
+    lengths = torch.FloatTensor(lengths)
+    #print("Shapes of lid and latents: ", lid.shape, latents.shape)
+
+    return mfcc, lid, lengths, fnames
+

@@ -391,3 +391,5 @@ def get_metrics(predicteds, targets):
    print("EER is ", EER)
    return recall_score(targets, predicteds, average='macro')
 
+def isnan(x):
+    return (x != x).any()

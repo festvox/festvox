@@ -1,4 +1,4 @@
-"""Trainining script for Tacotron speech synthesis model.
+"""Trainining script for Tacotron speech synthesis model. Latents from MFCC
 
 usage: train.py [options]
 
@@ -63,7 +63,7 @@ use_multigpu = None
 fs = hparams.sample_rate
 
 
-def validate_model(model, val_loader, full=None):
+def validate_model(model, val_loader):
      print("Validating the model")
      model.eval()
      y_true = []
@@ -72,11 +72,16 @@ def validate_model(model, val_loader, full=None):
      running_loss = 0.
      criterion = nn.CrossEntropyLoss()
      with torch.no_grad():
-       for step, (latents, lid, lengths, fname) in enumerate(val_loader):
+       for step, (mfcc, mfcc_lengths, mel, mol, lid, fname) in enumerate(val_loader):
 
-          latents, lid = Variable(latents), Variable(lid)
-          latents, lid = latents.cuda().long(), lid.cuda().long()
-          logits = model(latents.long())
+          # Sort by length
+          sorted_lengths, indices = torch.sort(
+             mfcc_lengths.view(-1), dim=0, descending=True)
+          sorted_lengths = sorted_lengths.long().numpy()
+  
+          mfcc, mel, mol, lid = mfcc[indices], mel[indices], mol[indices], lid[indices]
+          mfcc, mel, mol, lid = Variable(mfcc).cuda(), Variable(mel).cuda(), Variable(mol).cuda(), Variable(lid).cuda()
+          logits, vq_penalty, encoder_penalty, entropy = model(mfcc, mel, mol)
           loss = criterion(logits, lid.long())
           running_loss += loss.item()
           targets = lid.cpu().view(-1).numpy()
@@ -85,14 +90,13 @@ def validate_model(model, val_loader, full=None):
           y_pred += predictions.tolist()
           fnames += fname
           #print(fname)
-     if full is not None:
-       ff = open(exp_dir + '/eval' ,'a')
-       assert len(fnames) == len(y_pred)
-       for (f, yp, yt) in list(zip(fnames, y_pred, y_true)):
+     ff = open(exp_dir + '/eval' ,'a')
+     assert len(fnames) == len(y_pred)
+     for (f, yp, yt) in list(zip(fnames, y_pred, y_true)):
           if yp == yt:
             continue
           ff.write( f + ' ' + str(yp) + ' ' + str(yt) + '\n')
-       ff.close()
+     ff.close()
 
      averaged_loss = running_loss / (len(val_loader))
      recall = get_metrics(y_pred, y_true)
@@ -101,7 +105,7 @@ def validate_model(model, val_loader, full=None):
      print("Validation Loss: ", averaged_loss)
      print("Unweighted Recall for the validation set:  ", recall)
      print('\n')
-     return recall, model
+     return recall, model.train()
 
 def train(model, train_loader, val_loader, optimizer,
           init_lr=0.002,
@@ -125,8 +129,13 @@ def train(model, train_loader, val_loader, optimizer,
     while global_epoch < nepochs:
         model.train()
         h = open(logfile_name, 'a')
-        running_loss = 0.
-        for step, (latents, lid, lengths, fnames) in tqdm(enumerate(train_loader)):
+        running_loss = 0. # mfcc, lengths, mel, mol, lid, fnames
+        running_loss_vq = 0.
+        running_loss_encoder = 0.
+        running_entropy = 0.
+        running_loss_lid = 0.
+
+        for step, (mfcc, mfcc_lengths, mel, mol, lid, fnames) in tqdm(enumerate(train_loader)):
 
             # Decay learning rate
             current_lr = learning_rate_decay(init_lr, global_step)
@@ -137,23 +146,30 @@ def train(model, train_loader, val_loader, optimizer,
 
             # Sort by length
             sorted_lengths, indices = torch.sort(
-                lengths.view(-1), dim=0, descending=True)
+                mfcc_lengths.view(-1), dim=0, descending=True)
             sorted_lengths = sorted_lengths.long().numpy()
 
-            latents, lid = latents[indices], lid[indices]
+            mfcc = mfcc[indices]
+            mel = mel[indices]
+            mol = mol[indices]
+            lid = lid[indices]
+
             #print(fnames, indices)
             #sys.exit()
 
             # Feed data
-            latents, lid = Variable(latents), Variable(lid)
+            mfcc, mel, mol, lid = Variable(mfcc), Variable(mel), Variable(mol), Variable(lid)
             if use_cuda:
-                latents, lid = latents.cuda().long(), lid.cuda().long()
+                mfcc, mel, mol, lid = mfcc.cuda(), mel.cuda(), mol.cuda(), lid.cuda().long()
 
-            logits = model(latents, lengths=sorted_lengths)
+            logits, vq_penalty, encoder_penalty, entropy = model(mfcc, mel, mol, mfcc_lengths=sorted_lengths)
 
             # Loss
             #print("Shape of logits and lid: ", logits.shape, lid.shape)
-            loss = criterion(logits, lid)
+            lid_loss = criterion(logits, lid)
+            encoder_weight = 0.01 * min(1, max(0.1, global_step / 1000 - 1)) # https://github.com/mkotha/W$
+            loss = lid_loss + vq_penalty + encoder_penalty * encoder_weight
+
             #print(loss)
 
             # Update
@@ -161,6 +177,7 @@ def train(model, train_loader, val_loader, optimizer,
             grad_norm = torch.nn.utils.clip_grad_norm_(
                  model.parameters(), clip_thresh)
             optimizer.step()
+            model.quantizer.after_update()
 
             if ema is not None:
               for name, param in model.named_parameters():
@@ -177,12 +194,27 @@ def train(model, train_loader, val_loader, optimizer,
             log_value("Training Loss", float(loss.item()), global_step)
             log_value("gradient norm", grad_norm, global_step)
             log_value("learning rate", current_lr, global_step)
+            log_value("VQ Penalty", vq_penalty, global_step)
+            log_value("Encoder Penalty", encoder_penalty, global_step)
+            log_value("Entropy", entropy, global_step)
+
             global_step += 1
             running_loss += loss.item()
+            running_loss_vq += vq_penalty.item()
+            running_loss_encoder += encoder_penalty.item()
+            running_entropy += entropy
+            running_loss_lid += lid_loss.item()
+
+            #print(loss.item())
 
         averaged_loss = running_loss / (len(train_loader))
         log_value("loss (per epoch)", averaged_loss, global_epoch)
-        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
+        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) 
+                + " LID Loss: " + format(running_loss_lid / (len(train_loader)))
+                + " VQ Penalty: " + format(running_loss_vq / (len(train_loader))) 
+                + " Encoder Penalty: " + format(running_loss_encoder / (len(train_loader))) 
+                + " Entropy: " + format(running_entropy / (len(train_loader)))
+                + '\n')
         h.close()
         recall, model = validate_model(model, val_loader)
         log_value("Unweighted Recall per epoch", recall, global_epoch)
@@ -227,10 +259,9 @@ if __name__ == "__main__":
     with open(idsdict_file, 'w') as outfile:
        json.dump(latent_ids, outfile)
 
-
-    feats_name = 'melvqvae4alatents'
-    latents_train = categorical_datasource( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name, latent_ids)
-    latents_val = categorical_datasource( vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name, latent_ids)
+    feats_name = 'mfcc'
+    mfcc_train = float_datasource( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name)
+    mfcc_val = float_datasource( vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name)
 
     feats_name = 'lid'
     X_train = categorical_datasource( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name)
@@ -240,30 +271,35 @@ if __name__ == "__main__":
     fnames_train = categorical_datasource( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name)
     fnames_val = categorical_datasource( vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name)
 
+    feats_name = 'r9y9inputmol'
+    mol_train = categorical_datasource( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name)
+    mol_val = categorical_datasource( vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name)
 
-    # Dataset and Dataloader setup
-    trainset = LIDlatentsDatasets(latents_train, X_train, fnames_train)
+    feats_name = 'r9y9outputmel'
+    mel_train = float_datasource(vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
+    mel_val = float_datasource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
+
+    # Dataset and Dataloader setup X, mfcc, mel, mol, fnames)
+    trainset =  LIDmfccmelmolDataset(X_train, mfcc_train, mel_train, mol_train, fnames_train)
     train_loader = data_utils.DataLoader(
         trainset, batch_size=hparams.batch_size,
         num_workers=hparams.num_workers, shuffle=True,
-        collate_fn=collate_fn_lidlatents, pin_memory=hparams.pin_memory)
+        collate_fn=collate_fn_lidmfccmelmol, pin_memory=hparams.pin_memory)
 
-    valset = LIDlatentsDatasets(latents_val, X_val,fnames_val)
+    valset =  LIDmfccmelmolDataset(X_val, mfcc_val, mel_val, mol_val, fnames_val)
     val_loader = data_utils.DataLoader(
         valset, batch_size=hparams.batch_size,
         num_workers=hparams.num_workers, shuffle=True,
-        collate_fn=collate_fn_lidlatents, pin_memory=hparams.pin_memory)
+        collate_fn=collate_fn_lidmfccmelmol, pin_memory=hparams.pin_memory)
 
     # Model
-    model = LIDlatents(n_vocab=201)
+    model = LIDmfccmelmol2(39, 80)
     model = model.cuda()
 
     optimizer = optim.Adam(model.parameters(),
                            lr=hparams.initial_learning_rate, betas=(
                                hparams.adam_beta1, hparams.adam_beta2),
                            weight_decay=hparams.weight_decay)
-    #optimizer = optim.SGD(model.parameters(),
-    #                       lr=hparams.initial_learning_rate*10, momentum=0.9)
 
     # Load checkpoint
     if checkpoint_path:
@@ -292,11 +328,11 @@ if __name__ == "__main__":
               nepochs=hparams.nepochs,
               clip_thresh=hparams.clip_thresh)
         model = clone_as_averaged_model(model, ema)
-        recall, model = validate_model(model, val_loader, 1)
+        recall, model = validate_model(model, val_loader)
         print("Final Recall: ", recall)
-        recall, model = validate_model(model, val_loader, 1)
+        recall, model = validate_model(model, val_loader)
         print("Final Recall: ", recall)
-        recall, model = validate_model(model, val_loader, 1)
+        recall, model = validate_model(model, val_loader)
         print("Final Recall: ", recall)
  
 

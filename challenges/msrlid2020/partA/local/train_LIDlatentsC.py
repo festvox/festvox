@@ -63,7 +63,7 @@ use_multigpu = None
 fs = hparams.sample_rate
 
 
-def validate_model(model, val_loader, full=None):
+def validate_model(model, val_loader):
      print("Validating the model")
      model.eval()
      y_true = []
@@ -85,14 +85,13 @@ def validate_model(model, val_loader, full=None):
           y_pred += predictions.tolist()
           fnames += fname
           #print(fname)
-     if full is not None:
-       ff = open(exp_dir + '/eval' ,'a')
-       assert len(fnames) == len(y_pred)
-       for (f, yp, yt) in list(zip(fnames, y_pred, y_true)):
+     ff = open(exp_dir + '/eval' ,'a')
+     assert len(fnames) == len(y_pred)
+     for (f, yp, yt) in list(zip(fnames, y_pred, y_true)):
           if yp == yt:
             continue
           ff.write( f + ' ' + str(yp) + ' ' + str(yt) + '\n')
-       ff.close()
+     ff.close()
 
      averaged_loss = running_loss / (len(val_loader))
      recall = get_metrics(y_pred, y_true)
@@ -255,15 +254,13 @@ if __name__ == "__main__":
         collate_fn=collate_fn_lidlatents, pin_memory=hparams.pin_memory)
 
     # Model
-    model = LIDlatents(n_vocab=201)
+    model = LIDlatentsB(n_vocab=201)
     model = model.cuda()
 
     optimizer = optim.Adam(model.parameters(),
                            lr=hparams.initial_learning_rate, betas=(
                                hparams.adam_beta1, hparams.adam_beta2),
                            weight_decay=hparams.weight_decay)
-    #optimizer = optim.SGD(model.parameters(),
-    #                       lr=hparams.initial_learning_rate*10, momentum=0.9)
 
     # Load checkpoint
     if checkpoint_path:
@@ -292,11 +289,11 @@ if __name__ == "__main__":
               nepochs=hparams.nepochs,
               clip_thresh=hparams.clip_thresh)
         model = clone_as_averaged_model(model, ema)
-        recall, model = validate_model(model, val_loader, 1)
+        recall, model = validate_model(model, val_loader)
         print("Final Recall: ", recall)
-        recall, model = validate_model(model, val_loader, 1)
+        recall, model = validate_model(model, val_loader)
         print("Final Recall: ", recall)
-        recall, model = validate_model(model, val_loader, 1)
+        recall, model = validate_model(model, val_loader)
         print("Final Recall: ", recall)
  
 

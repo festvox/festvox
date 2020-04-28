@@ -13,6 +13,8 @@ from docopt import docopt
 # Use text & audio modules from existing Tacotron implementation.
 import sys
 import os
+os.environ["CUDA_VISIBLE_DEVICES"]='2'
+
 from os.path import dirname, join
 
 ### This is not supposed to be hardcoded #####

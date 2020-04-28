@@ -59,6 +59,20 @@ def get_mask_from_lengths(memory, memory_lengths):
         mask[idx][:l] = 1
     return ~mask
 
+# Type: Indigenous Based on https://github.com/r9y9/tacotron_pytorch/blob/62db7217c10da3edb34f67b185cc0e2b04cdf77e/tacotron_pytorch/attention.py#L33
+def get_floatmask_from_lengths(memory, memory_lengths):
+    """Get mask tensor from list of length
+    Args:
+        memory: (batch, max_time, dim)
+        memory_lengths: array like
+    """
+    mask = memory.data.new(memory.size(0), memory.size(1)).zero_()
+
+    for idx, l in enumerate(memory_lengths):
+        mask[idx][:l] = 1
+    return mask
+
+
 # Type: Acquisition_CodeBorrowed Source: https://github.com/r9y9/tacotron_pytorch/blob/62db7217c10da3edb34f67b185cc0e2b04cdf77e/tacotron_pytorch/attention.py#L46 
 class AttentionWrapper(nn.Module):
     def __init__(self, rnn_cell, attention_mechanism,
@@ -1001,8 +1015,8 @@ class ActNorm1d(nn.BatchNorm1d):
         super(ActNorm1d, self).__init__(
             num_features, eps, momentum, affine, track_running_stats)
 
-        self.scale = nn.Parameter(torch.Tensor(num_features))
-        self.bias =  nn.Parameter(torch.Tensor(num_features))
+        self.scale = nn.Parameter(torch.Tensor(num_features), requires_grad=True)
+        self.bias =  nn.Parameter(torch.Tensor(num_features), requires_grad=True)
         self.num_features = num_features
         self.initialized = None
         self.register_parameter('scale', self.scale)

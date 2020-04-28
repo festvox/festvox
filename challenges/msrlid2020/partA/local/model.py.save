@@ -7,8 +7,6 @@ from models import *
 from layers import *
 from util import *
 
-import transformers
-
 class Decoder_TacotronOneSeqwise(Decoder_TacotronOne):
     def __init__(self, in_dim, r):
         super(Decoder_TacotronOneSeqwise, self).__init__(in_dim, r)
@@ -890,12 +888,9 @@ class MaskedAttention(Attention):
         processed = torch.tanh(self.attention_fc(encoder_outputs + self.attention_bias[None, None,:]))
         #print(processed)
         #sys.exit()
-
-        if lengths is not None:
-          mask = get_floatmask_from_lengths(encoder_outputs, lengths)
-          mask = mask.view(processed.size(0), -1, 1)
-          processed.data.masked_fill_(mask == 0.0, -2000.0)
-
+        mask = get_floatmask_from_lengths(encoder_outputs, lengths)
+        mask = mask.view(processed.size(0), -1, 1)
+        processed.data.masked_fill_(mask == 0.0, -2000.0)
         alignment = F.softmax(processed,dim=-1)
         if isnan(alignment):
            print("NANs in alignment")
@@ -1123,7 +1118,6 @@ class LIDmfccmelmol1(LIDmfccmelmol):
         return self.linear2logits(logits)
 
 
-# MFCC + latents from mel + combination
 class LIDmfccmelmol2(LIDmfccmelmol1):
         
     def __init__(self, mfcc_dim=39, mel_dim=80):
@@ -1134,6 +1128,7 @@ class LIDmfccmelmol2(LIDmfccmelmol1):
 
 
 
+#quantized, vq_penalty, encoder_penalty, entropy = self.quantizer(encoded.unsqueeze(2))
     def forward(self, mfcc, mel, mol, mfcc_lengths=None):
 
         # MFCC
@@ -1161,40 +1156,6 @@ class LIDmfccmelmol2(LIDmfccmelmol1):
         return logits, vq_penalty.mean(), encoder_penalty.mean(), entropy
 
 
-# MFCC + latents from mfcc + combination
-class LIDmfccmelmol2C(LIDmfccmelmol2):
-
-    def __init__(self, mfcc_dim=39, mel_dim=80):
-        super(LIDmfccmelmol2C, self).__init__(mfcc_dim, mel_dim)
-        
-        self.quantized_attention = Attention(256)
-        
-    
-    def forward(self, mfcc, mel, mol, mfcc_lengths=None):
-       
-        # MFCC
-        mfcc = self.mfcc_preencoder(mfcc)
-        mfcc = self.drop(self.mfcc_encoder(mfcc))
-        mfcc_attention = self.mfcc_attention(mfcc)
-
-        # Latents
-        quantized, vq_penalty, encoder_penalty, entropy = self.quantizer(mfcc.unsqueeze(2))
-        quantized = quantized.squeeze(2)
-        quantized_attention = self.quantized_attention(quantized)
-
-        # Pooling
-        attention = mfcc_attention + quantized_attention
-        attention = attention.unsqueeze(1)
-        attention = self.conv1x1(attention.transpose(1,2))
-        attention = self.bn(attention).transpose(1,2)
-        attention = attention.squeeze(1)
-
-        # Logits
-        logits = torch.tanh(self.attention2linear(attention))
-        logits = self.linear2logits(logits)
-
-        return logits, vq_penalty.mean(), encoder_penalty.mean(), entropy
-
 
 class LIDmfccmelmol3(LIDmfccmelmol2):
 
@@ -1205,14 +1166,13 @@ class LIDmfccmelmol3(LIDmfccmelmol2):
         self.upsample_network = UpsampleNetwork(self.upsample_scales)
     
         self.logits_dim = 60
-        self.joint_encoder = nn.LSTM(64, 256, batch_first=True)
+        self.joint_encoder = nn.LSTM(81, 256, batch_first=True)
         self.hidden2linear =  SequenceWise(nn.Linear(256, 64))
         self.mels2conv = nn.Linear(81,81)
         self.conv_1x1 = nn.Conv1d(81, 81, 1)
         self.conv_1x1.bias.data.zero_()
         self.linear2logits_reconstruction =  SequenceWise(nn.Linear(64, self.logits_dim))
 
-        self.mels2encoderinput = nn.Linear(257,64)
 
 
     def forward(self, mfcc, mel, mol, mfcc_lengths=None):
@@ -1255,10 +1215,8 @@ class LIDmfccmelmol3(LIDmfccmelmol2):
         outputs, hidden = self.joint_encoder(melsNx)
 
         # get logits
-        mol_logits = torch.tanh(self.hidden2linear(outputs))
-        mol_logits = self.linear2logits_reconstruction(mol_logits)
- 
-        return logits, vq_penalty.mean(), encoder_penalty.mean(), entropy, mol_logits, inp
+        mol_logits = torch.tanh(self.linear2logits_reconstruction(outputs))
+        return logits, vq_penalty.mean(), encoder_penalty.mean(), entropy, mol_logits, mol.unsqueeze(-1)
 
     def forward_eval(self, mfcc, mel, mol, mfcc_lengths=None):
 
@@ -1285,288 +1243,4 @@ class LIDmfccmelmol3(LIDmfccmelmol2):
         logits = self.linear2logits(logits)
 
         return logits, vq_penalty.mean(), encoder_penalty.mean(), entropy
-
-
-
-class LIDmfccmelmoltransformer(nn.Module):
-       
-    def __init__(self, mfcc_dim=39, mel_dim=80):
-        super(LIDmfccmelmoltransformer, self).__init__()
-
-        self.encoder_layers = [
-            (2, 4, 1),
-            (2, 4, 1),
-            (2, 4, 1),
-            (1, 4, 1),
-            (2, 4, 1),
-            (1, 4, 1),
-            (2, 4, 1),
-            (1, 4, 1),
-            ]
-        self.mfcc_preencoder = DownsamplingEncoder(mfcc_dim, self.encoder_layers)
-
-        self.transformer = nn.Transformer(nhead=4, num_encoder_layers=12)
-        self.mfcc_fc = nn.Linear(mfcc_dim, 512)
-        self.attention = Attention(512)
-        self.attention2linear = nn.Linear(512, 32)
-        self.linear2logits = nn.Linear(32, 2)
-
-    def forward(self, mfcc, mel, mol, mfcc_lengths=None):
- 
-        mfcc = self.mfcc_preencoder(mfcc)
-        mfcc = torch.tanh(self.mfcc_fc(mfcc))
-        #print("Shape of mfcc before transformer: ", mfcc.shape)
-        mfcc = self.transformer.encoder(mfcc)
-
-        #mfcc_attention = self.attention(mfcc)
-        attention = mfcc[:, 0,:]
-
-        logits = torch.tanh(self.attention2linear(attention))
-        return self.linear2logits(logits)
-
-
-class LIDmfccmelmoltransformer2(LIDmfccmelmoltransformer):
-
-    def __init__(self, mfcc_dim=39, mel_dim=80):
-        super(LIDmfccmelmoltransformer2, self).__init__()
-
-        self.quantizer = quantizer_kotha(n_channels=1, n_classes=200, vec_len=512)
-        self.transformer = nn.Transformer(nhead=4, num_encoder_layers=4)
-
-    def forward(self, mfcc, mel, mol, mfcc_lengths=None):
-
-        mfcc = self.mfcc_preencoder(mfcc)
-        mfcc = torch.tanh(self.mfcc_fc(mfcc))
-        quantized, vq_penalty, encoder_penalty, entropy = self.quantizer(mfcc.unsqueeze(2))
-        quantized = quantized.squeeze(2)
-        mfcc = self.transformer.encoder(mfcc)
-       
-        #mfcc_attention = self.attention(mfcc)
-        attention = mfcc[:, 0,:]
-        
-        logits = torch.tanh(self.attention2linear(attention))
-        return self.linear2logits(logits),  vq_penalty.mean(), encoder_penalty.mean(), entropy
-        
-
-class LIDlatentstransformer(nn.Module):
-
-    def __init__(self, n_vocab):
-        super(LIDlatentstransformer, self).__init__()
-
-        self.embedding = nn.Embedding(n_vocab, 128)
-        self.transformer = nn.Transformer(nhead=4, num_encoder_layers=4)
-        self.attention = MaskedAttention(128)
-        self.attention2linear = nn.Linear(128, 32)
-        self.linear2logits = nn.Linear(32, 2)
-        self.lstm = nn.LSTM(128,64, bidirectional=True, batch_first=True)
-
-        self.convmodules = nn.ModuleList() # nn.ModuleList 
-        self.tanh = nn.Tanh()
-        self.relu = nn.ReLU()
-        self.selu = nn.SELU() 
-        for i in range(30):
-          self.conv = BatchNormConv1d(128, 128, kernel_size=1, stride=1, padding=0, activation=self.selu)
-          #self.conv = nn.Conv1d(128,128,1)
-          self.convmodules.append(self.conv) 
-        self.conv_1x1 = nn.Conv1d(128,128,1)
-        self.conv_1x1.bias.data.zero_()
-        nn.init.orthogonal_(self.conv_1x1.weight)
-
-
-        self.drop = nn.Dropout(0.2)
-
-    def forward(self, latents, lengths=None):
-
-        latents = self.drop(self.embedding(latents))
-        #latents = self.transformer.encoder(latents)
-        self.lstm.flatten_parameters()
-        latents,_ = self.lstm(latents)
-
-        latents = latents.transpose(1,2)
-        for module in self.convmodules:
-            x = latents
-            latents = module(latents)
-            latents = x + latents
-        latents = self.conv_1x1(latents)
-        latents = latents.transpose(1,2)
-
-        latent_attention = self.attention(latents, lengths)
-        attention = latent_attention
-
-        logits = torch.tanh(self.attention2linear(attention))
-        #print("Shape of logits: ", logits.shape)
-        return self.linear2logits(logits)
-
-
-
-class LIDlatentstransformerhuggingface(nn.Module):
-        
-    def __init__(self, n_vocab):
-        super(LIDlatentstransformerhuggingface, self).__init__()
-
-        self.embedding = nn.Embedding(n_vocab, 768)
-        self.encoder_layers = [
-            (2, 4, 1),
-            (2, 4, 1),
-            (2, 4, 1),
-            (1, 4, 1),
-            ]
-        self.preencoder = DownsamplingEncoder(768, self.encoder_layers)
-
-        self.transformer = transformers.BertForSequenceClassification.from_pretrained('bert-base-uncased')
-         
-    def forward(self, latents, lengths=None):
-
-        latents = self.embedding(latents)
-        latents = self.preencoder(latents)
-        outputs = self.transformer(inputs_embeds=latents) 
-        #print("Shape of outputs: ", outputs[0].shape, len(outputs))
-        return outputs[0]
-
-
-class LIDMixtureofExpertslatents(nn.Module):
-
-    def __init__(self, n_vocab):
-        super(LIDMixtureofExpertslatents, self).__init__()
- 
-        # Embedding 
-        self.embedding = nn.Embedding(201, 256)
-
-        # Shared encoder
-        self.encoder = Encoder_TacotronOne(256)
-
-        # Expert 01
-        self.exp1_fc_a = SequenceWise(nn.Linear(256, 128))
-        self.exp1_fc_b = SequenceWise(nn.Linear(128, 256))
-
-        # Expert 02
-        self.exp2_fc_a = SequenceWise(nn.Linear(256, 128))
-        self.exp2_fc_b = SequenceWise(nn.Linear(128, 256))
-
-        self.mel2output = nn.Linear(256, 2)
-
-
-    def forward(self, latents, lengths=None):
-
-        # Embedding
-        latents = self.embedding(latents) 
-
-        # Pass through shared layers
-        mel = self.encoder(latents, lengths)
-
-        # Pass through expert 01
-        exp1_logits = torch.tanh(self.exp1_fc_a(mel))
-        exp1_logits = self.exp1_fc_b(exp1_logits)
-
-        # Pass through expert 02
-        exp2_logits = torch.tanh(self.exp2_fc_a(mel))
-        exp2_logits = self.exp2_fc_b(exp2_logits)
-
-        # Combine the experts
-        combination = torch.tanh(exp1_logits) * torch.sigmoid(exp2_logits)
-
-        val_prediction = self.mel2output(combination)
-        return val_prediction[:,-1,:]
-
-
-class LIDMixtureofExpertslatentsattention(LIDMixtureofExpertslatents):
-
-    def __init__(self, n_vocab=256):
-        super(LIDMixtureofExpertslatentsattention, self).__init__(n_vocab)
-        self.attention = MaskedAttention(256)
-
-    def forward(self, latents, lengths=None):
-
-        # Embedding
-        latents = self.embedding(latents) 
-
-        # Pass through shared layers
-        mel = self.encoder(latents, lengths)
-
-        # Pass through expert 01
-        exp1_logits = torch.tanh(self.exp1_fc_a(mel))
-        exp1_logits = self.exp1_fc_b(exp1_logits)
-        
-        # Pass through expert 02
-        exp2_logits = torch.tanh(self.exp2_fc_a(mel))
-        exp2_logits = self.exp2_fc_b(exp2_logits)
-       
-        # Combine the experts
-        combination = torch.tanh(exp1_logits) * torch.sigmoid(exp2_logits)
-
-        # Pooling
-        attention = self.attention(combination, lengths)
-
-        val_prediction = self.mel2output(attention)
-
-        return val_prediction
-
-
-class LIDMixtureofExpertsmfccattention(LIDMixtureofExpertslatents):
-
-    def __init__(self, n_vocab=256):
-        super(LIDMixtureofExpertsmfccattention, self).__init__(n_vocab)
-        self.attention = MaskedAttention(256)
-
-    def forward(self, mfcc, lengths=None):
-
-        # Pass through shared layers
-        mel = self.encoder(mfcc, lengths)
-
-        # Pass through expert 01
-        exp1_logits = torch.tanh(self.exp1_fc_a(mel))
-        exp1_logits = self.exp1_fc_b(exp1_logits)
-
-        # Pass through expert 02
-        exp2_logits = torch.tanh(self.exp2_fc_a(mel))
-        exp2_logits = self.exp2_fc_b(exp2_logits)
-
-        # Combine the experts
-        combination = torch.tanh(exp1_logits) * torch.sigmoid(exp2_logits)
-        
-        # Pooling
-        attention = self.attention(combination, lengths)
-    
-        val_prediction = self.mel2output(attention)
-
-        return val_prediction
-
-class LIDMixtureofExpertslatentsattentionconv(LIDMixtureofExpertslatentsattention):
-
-    def __init__(self, n_vocab=256):
-        super(LIDMixtureofExpertslatentsattentionconv, self).__init__(n_vocab)
-
-        self.conv_1x1 = nn.Conv1d(256, 256, 1)
-        self.conv_1x1.bias.data.zero_()
-        nn.init.orthogonal_(self.conv_1x1.weight)
-   
-        self.bn = nn.BatchNorm1d(256, momentum=0.9) 
- 
-    def forward(self, latents, lengths=None):
-
-        # Embedding
-        latents = self.embedding(latents) 
-
-        # Pass through shared layers
-        mel = self.encoder(latents, lengths)
-
-        # Pass through expert 01
-        exp1_logits = torch.tanh(self.exp1_fc_a(mel))
-        exp1_logits = self.exp1_fc_b(exp1_logits)
-
-        # Pass through expert 02
-        exp2_logits = torch.tanh(self.exp2_fc_a(mel))
-        exp2_logits = self.exp2_fc_b(exp2_logits)
-        
-        # Combine the experts
-        combination = torch.tanh(exp1_logits) * torch.sigmoid(exp2_logits)
-        combination = F.tanh(self.conv_1x1(combination.transpose(1,2)))
-        combination = self.bn(combination).transpose(1,2)
-
-        # Pooling
-        attention = self.attention(combination, lengths)
-    
-        val_prediction = self.mel2output(attention)
-
-        return val_prediction
 
