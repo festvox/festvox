@@ -2,9 +2,8 @@ import os, sys
 
 
 '''
-Takes as input: ph end_dur, start_dur
-Generates output: ph dur_in_frames
-
+Takes as input: punc, word, dur #0 zai 0.30500001 
+Generates output: phone+tone dur_in_frames # zai_4 24
 '''
 
 original_dir = sys.argv[1]
