@@ -14,7 +14,7 @@ Wavenet is a model built on top of ResidualDilatedCausalConv1d
 Sample [run.sh](https://github.com/festvox/festvox/blob/master/voices/arctic/rms/run.sh) can be found in any of the voices directories.
 
 
-# 20.01 
+# 20.01 January
 #### Acquisitions : 63% (14 blocks out of 22)
 #### Experiments
 
@@ -28,7 +28,7 @@ Sample [run.sh](https://github.com/festvox/festvox/blob/master/voices/arctic/rms
 
 [no ssil Expt]() Removing short silences obtained from EHMM alignment. Checkout the [samples](http://tts.speech.cs.cmu.edu/rsk/projects/falcon/exp/no_ssil.html)
 
-# 20.02
+# 20.02 February
 #### Acquisitions : 58% (14 blocks out of 24)
 #### Experiments
 
@@ -36,8 +36,15 @@ Sample [run.sh](https://github.com/festvox/festvox/blob/master/voices/arctic/rms
 
 Vocoder: [Checkout the samples](http://tts.speech.cs.cmu.edu/rsk/challenges/blizzard2020/exp/vocoder/baseline.html)
 
-# 20.03
+# 20.03 March
 #### Acquisitions : 58% (14 blocks out of 24)
 #### Experiments
 
 [Vocoder](https://github.com/festvox/festvox/blob/master/challenges/blizzard2020/v1/local/train_quants.py): WaveLSTM with additional FC for fine [Checkout the samples](http://tts.speech.cs.cmu.edu/rsk/challenges/blizzard2020/exp/vocoder_wavernn/wavernn.html)
+
+
+# 20.04 April
+#### Acquisitions : 50% (15 blocks out of 30)
+#### Experiments
+
+[Vocoder](): WaveGlow 
