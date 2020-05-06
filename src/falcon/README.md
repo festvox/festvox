@@ -42,7 +42,7 @@ Vocoder: [Checkout the samples](http://tts.speech.cs.cmu.edu/rsk/challenges/bliz
 
 [Vocoder](https://github.com/festvox/festvox/blob/master/challenges/blizzard2020/v1/local/train_quants.py): WaveLSTM with additional FC for fine [Checkout the samples](http://tts.speech.cs.cmu.edu/rsk/challenges/blizzard2020/exp/vocoder_wavernn/wavernn.html)
 
-[Judith](https://youtu.be/irkrx-gvqig)
+[Judith](https://www.youtube.com/watch?v=irkrx-gvqig)
 
 # 20.04 April
 #### Acquisitions : 50% (15 blocks out of 30)
