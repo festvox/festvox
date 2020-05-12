@@ -7,7 +7,7 @@ feats_dir=/home2/srallaba/challenges/compare2018/feats/CRIED_soundnet/
 mkdir -p ${VOXDIR}
 cd ${VOXDIR}
 $FESTVOXDIR/src/clustergen/setup_cg cmu us ${spk} || exit 1
-./bin/get_wavs ${data_dir}/arctic/cmu_us_${spk}_arctic/wav/* || exit 1
+./bin/get_wavs ${data_dir}/wav/* || exit 1
 
 # Prepare features and labels
 python3.5 local/dataprep_addlabels.py ${data_dir}/lab/ComParE2018_Crying.tsv  vox/
