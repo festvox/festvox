@@ -1,0 +1,2062 @@
+Command line args:
+ {'--checkpoint-dir': 'checkpoints',
+ '--checkpoint-path': None,
+ '--conf': 'conf/crying.conf',
+ '--exp-dir': 'exp/exp_baseline',
+ '--gpu-id': '0',
+ '--help': False,
+ '--hparams': '',
+ '--log-event-path': 'exp/log_tacotronOne'}
+Using GPU  0
+Fnames file is  vox/fnames.train.train
+Feat name is  crying
+Fnames file is  vox/fnames.train.test
+Feat name is  crying
+Hyperparameters:
+  adam_beta1: 0.9
+  adam_beta2: 0.999
+  batch_size: 32
+  checkpoint_interval: 25000
+  cleaners: english_cleaners
+  clip_thresh: 1.0
+  decay_learning_rate: True
+  ema_decay: 0.9999
+  exponential_moving_average: None
+  frame_length_ms: 50
+  frame_shift_ms: 12.5
+  global_gain_scale: 1.0
+  griffin_lim_iters: 60
+  highpass_cutoff: 70.0
+  initial_learning_rate: 0.002
+  max_iters: 200
+  min_level_db: -100
+  nepochs: 100
+  num_freq: 1025
+  num_mels: 80
+  num_workers: 4
+  outputs_per_step: 5
+  padding_idx: None
+  pin_memory: False
+  power: 1.5
+  preemphasis: 0.97
+  ref_level_db: 20
+  sample_rate: 16000
+  save_states_interval: 1000
+  use_cmudict: False
+  use_memory_mask: True
+  weight_decay: 0.0
+/usr/local/lib/python3.5/dist-packages/tensorflow/python/framework/dtypes.py:523: FutureWarning: Passing (type, 1) or '1type' as a synonym of type is deprecated; in a future version of numpy, it will be understood as (type, (1,)) / '(1,)type'.
+  _np_qint8 = np.dtype([("qint8", np.int8, 1)])
+/usr/local/lib/python3.5/dist-packages/tensorflow/python/framework/dtypes.py:524: FutureWarning: Passing (type, 1) or '1type' as a synonym of type is deprecated; in a future version of numpy, it will be understood as (type, (1,)) / '(1,)type'.
+  _np_quint8 = np.dtype([("quint8", np.uint8, 1)])
+/usr/local/lib/python3.5/dist-packages/tensorflow/python/framework/dtypes.py:525: FutureWarning: Passing (type, 1) or '1type' as a synonym of type is deprecated; in a future version of numpy, it will be understood as (type, (1,)) / '(1,)type'.
+  _np_qint16 = np.dtype([("qint16", np.int16, 1)])
+/usr/local/lib/python3.5/dist-packages/tensorflow/python/framework/dtypes.py:526: FutureWarning: Passing (type, 1) or '1type' as a synonym of type is deprecated; in a future version of numpy, it will be understood as (type, (1,)) / '(1,)type'.
+  _np_quint16 = np.dtype([("quint16", np.uint16, 1)])
+/usr/local/lib/python3.5/dist-packages/tensorflow/python/framework/dtypes.py:527: FutureWarning: Passing (type, 1) or '1type' as a synonym of type is deprecated; in a future version of numpy, it will be understood as (type, (1,)) / '(1,)type'.
+  _np_qint32 = np.dtype([("qint32", np.int32, 1)])
+/usr/local/lib/python3.5/dist-packages/tensorflow/python/framework/dtypes.py:532: FutureWarning: Passing (type, 1) or '1type' as a synonym of type is deprecated; in a future version of numpy, it will be understood as (type, (1,)) / '(1,)type'.
+  np_resource = np.dtype([("resource", np.ubyte, 1)])
+0it [00:00, ?it/s]17it [00:00, 162.91it/s]44it [00:00, 184.14it/s]78it [00:00, 213.06it/s]80it [00:00, 231.53it/s]Validating the model
+
+[[231   0   0]
+ [ 40   0   0]
+ [ 12   0   0]]
+              precision    recall  f1-score   support
+
+           0       0.82      1.00      0.90       231
+           1       0.00      0.00      0.00        40
+           2       0.00      0.00      0.00        12
+
+    accuracy                           0.82       283
+   macro avg       0.27      0.33      0.30       283
+weighted avg       0.67      0.82      0.73       283
+
+Accuracy is  0.8162544169611308
+EER is  1
+Unweighted Recall for the validation set:   0.3333333333333333
+
+
+/home/srallaba/.local/lib/python3.5/site-packages/sklearn/metrics/_classification.py:1272: UndefinedMetricWarning: Precision and F-score are ill-defined and being set to 0.0 in labels with no predicted samples. Use `zero_division` parameter to control this behavior.
+  _warn_prf(average, modifier, msg_start, len(result))
+0it [00:00, ?it/s]16it [00:00, 156.79it/s]50it [00:00, 186.09it/s]80it [00:00, 248.83it/s]Validating the model
+
+[[231   0   0]
+ [ 40   0   0]
+ [ 12   0   0]]
+              precision    recall  f1-score   support
+
+           0       0.82      1.00      0.90       231
+           1       0.00      0.00      0.00        40
+           2       0.00      0.00      0.00        12
+
+    accuracy                           0.82       283
+   macro avg       0.27      0.33      0.30       283
+weighted avg       0.67      0.82      0.73       283
+
+Accuracy is  0.8162544169611308
+EER is  1
+Unweighted Recall for the validation set:   0.3333333333333333
+
+
+0it [00:00, ?it/s]20it [00:00, 191.96it/s]50it [00:00, 214.83it/s]80it [00:00, 238.82it/s]Validating the model
+
+[[226   5   0]
+ [ 34   6   0]
+ [  8   4   0]]
+              precision    recall  f1-score   support
+
+           0       0.84      0.98      0.91       231
+           1       0.40      0.15      0.22        40
+           2       0.00      0.00      0.00        12
+
+    accuracy                           0.82       283
+   macro avg       0.41      0.38      0.37       283
+weighted avg       0.74      0.82      0.77       283
+
+Accuracy is  0.8197879858657244
+EER is  2
+Unweighted Recall for the validation set:   0.3761183261183261
+
+
+0it [00:00, ?it/s]20it [00:00, 195.49it/s]49it [00:00, 215.35it/s]80it [00:00, 236.84it/s]80it [00:00, 231.75it/s]Validating the model
+
+[[228   2   1]
+ [ 34   2   4]
+ [  6   2   4]]
+              precision    recall  f1-score   support
+
+           0       0.85      0.99      0.91       231
+           1       0.33      0.05      0.09        40
+           2       0.44      0.33      0.38        12
+
+    accuracy                           0.83       283
+   macro avg       0.54      0.46      0.46       283
+weighted avg       0.76      0.83      0.77       283
+
+Accuracy is  0.8268551236749117
+EER is  3
+Unweighted Recall for the validation set:   0.45678210678210673
+
+
+0it [00:00, ?it/s]19it [00:00, 174.63it/s]50it [00:00, 199.63it/s]80it [00:00, 234.06it/s]Validating the model
+
+[[226   4   1]
+ [ 30   5   5]
+ [  3   4   5]]
+              precision    recall  f1-score   support
+
+           0       0.87      0.98      0.92       231
+           1       0.38      0.12      0.19        40
+           2       0.45      0.42      0.43        12
+
+    accuracy                           0.83       283
+   macro avg       0.57      0.51      0.52       283
+weighted avg       0.79      0.83      0.80       283
+
+Accuracy is  0.833922261484099
+EER is  3
+Unweighted Recall for the validation set:   0.5066738816738817
+
+
+0it [00:00, ?it/s]18it [00:00, 177.50it/s]52it [00:00, 206.56it/s]80it [00:00, 228.98it/s]Validating the model
+
+[[224   6   1]
+ [ 24  10   6]
+ [  3   4   5]]
+              precision    recall  f1-score   support
+
+           0       0.89      0.97      0.93       231
+           1       0.50      0.25      0.33        40
+           2       0.42      0.42      0.42        12
+
+    accuracy                           0.84       283
+   macro avg       0.60      0.55      0.56       283
+weighted avg       0.82      0.84      0.82       283
+
+Accuracy is  0.8445229681978799
+EER is  3
+Unweighted Recall for the validation set:   0.5454545454545455
+
+
+0it [00:00, ?it/s]18it [00:00, 179.28it/s]50it [00:00, 205.86it/s]80it [00:00, 237.72it/s]Validating the model
+
+[[224   7   0]
+ [ 18  20   2]
+ [  2   6   4]]
+              precision    recall  f1-score   support
+
+           0       0.92      0.97      0.94       231
+           1       0.61      0.50      0.55        40
+           2       0.67      0.33      0.44        12
+
+    accuracy                           0.88       283
+   macro avg       0.73      0.60      0.65       283
+weighted avg       0.86      0.88      0.87       283
+
+Accuracy is  0.8763250883392226
+EER is  3
+Unweighted Recall for the validation set:   0.601010101010101
+
+
+0it [00:00, ?it/s]19it [00:00, 189.84it/s]52it [00:00, 215.57it/s]80it [00:00, 238.28it/s]Validating the model
+
+[[214  16   1]
+ [  8  26   6]
+ [  0   3   9]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.93      0.94       231
+           1       0.58      0.65      0.61        40
+           2       0.56      0.75      0.64        12
+
+    accuracy                           0.88       283
+   macro avg       0.70      0.78      0.73       283
+weighted avg       0.89      0.88      0.88       283
+
+Accuracy is  0.8798586572438163
+EER is  3
+Unweighted Recall for the validation set:   0.7754689754689755
+
+
+0it [00:00, ?it/s]23it [00:00, 228.84it/s]58it [00:00, 252.06it/s]80it [00:00, 246.67it/s]Validating the model
+
+[[220   9   2]
+ [ 13  19   8]
+ [  0   2  10]]
+              precision    recall  f1-score   support
+
+           0       0.94      0.95      0.95       231
+           1       0.63      0.47      0.54        40
+           2       0.50      0.83      0.62        12
+
+    accuracy                           0.88       283
+   macro avg       0.69      0.75      0.71       283
+weighted avg       0.88      0.88      0.88       283
+
+Accuracy is  0.8798586572438163
+EER is  3
+Unweighted Recall for the validation set:   0.7535714285714286
+
+
+0it [00:00, ?it/s]20it [00:00, 197.37it/s]51it [00:00, 219.09it/s]80it [00:00, 231.65it/s]Validating the model
+
+[[222   8   1]
+ [ 14  21   5]
+ [  0   5   7]]
+              precision    recall  f1-score   support
+
+           0       0.94      0.96      0.95       231
+           1       0.62      0.53      0.57        40
+           2       0.54      0.58      0.56        12
+
+    accuracy                           0.88       283
+   macro avg       0.70      0.69      0.69       283
+weighted avg       0.88      0.88      0.88       283
+
+Accuracy is  0.8833922261484098
+EER is  3
+Unweighted Recall for the validation set:   0.6897907647907648
+
+
+0it [00:00, ?it/s]16it [00:00, 158.86it/s]46it [00:00, 184.07it/s]79it [00:00, 209.25it/s]80it [00:00, 223.82it/s]Validating the model
+
+[[221  10   0]
+ [ 13  23   4]
+ [  0   7   5]]
+              precision    recall  f1-score   support
+
+           0       0.94      0.96      0.95       231
+           1       0.57      0.57      0.57        40
+           2       0.56      0.42      0.48        12
+
+    accuracy                           0.88       283
+   macro avg       0.69      0.65      0.67       283
+weighted avg       0.88      0.88      0.88       283
+
+Accuracy is  0.8798586572438163
+EER is  3
+Unweighted Recall for the validation set:   0.6494588744588745
+
+
+0it [00:00, ?it/s]18it [00:00, 164.38it/s]50it [00:00, 191.74it/s]80it [00:00, 229.68it/s]Validating the model
+
+[[225   5   1]
+ [ 18  15   7]
+ [  1   1  10]]
+              precision    recall  f1-score   support
+
+           0       0.92      0.97      0.95       231
+           1       0.71      0.38      0.49        40
+           2       0.56      0.83      0.67        12
+
+    accuracy                           0.88       283
+   macro avg       0.73      0.73      0.70       283
+weighted avg       0.88      0.88      0.87       283
+
+Accuracy is  0.8833922261484098
+EER is  3
+Unweighted Recall for the validation set:   0.7274531024531025
+
+
+0it [00:00, ?it/s]17it [00:00, 163.45it/s]48it [00:00, 190.16it/s]80it [00:00, 229.50it/s]Validating the model
+
+[[218  12   1]
+ [ 10  26   4]
+ [  0   7   5]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.94      0.95       231
+           1       0.58      0.65      0.61        40
+           2       0.50      0.42      0.45        12
+
+    accuracy                           0.88       283
+   macro avg       0.68      0.67      0.67       283
+weighted avg       0.88      0.88      0.88       283
+
+Accuracy is  0.8798586572438163
+EER is  3
+Unweighted Recall for the validation set:   0.6701298701298701
+
+
+0it [00:00, ?it/s]21it [00:00, 201.82it/s]52it [00:00, 223.97it/s]80it [00:00, 247.40it/s]Validating the model
+
+[[218  12   1]
+ [ 10  25   5]
+ [  0   3   9]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.94      0.95       231
+           1       0.62      0.62      0.62        40
+           2       0.60      0.75      0.67        12
+
+    accuracy                           0.89       283
+   macro avg       0.73      0.77      0.75       283
+weighted avg       0.89      0.89      0.89       283
+
+Accuracy is  0.8904593639575972
+EER is  3
+Unweighted Recall for the validation set:   0.7729076479076479
+
+
+0it [00:00, ?it/s]20it [00:00, 198.30it/s]46it [00:00, 212.85it/s]74it [00:00, 228.04it/s]80it [00:00, 217.79it/s]Validating the model
+
+[[224   6   1]
+ [ 17  17   6]
+ [  0   2  10]]
+              precision    recall  f1-score   support
+
+           0       0.93      0.97      0.95       231
+           1       0.68      0.42      0.52        40
+           2       0.59      0.83      0.69        12
+
+    accuracy                           0.89       283
+   macro avg       0.73      0.74      0.72       283
+weighted avg       0.88      0.89      0.88       283
+
+Accuracy is  0.8869257950530035
+EER is  3
+Unweighted Recall for the validation set:   0.7426767676767677
+
+
+0it [00:00, ?it/s]27it [00:00, 266.26it/s]58it [00:00, 276.14it/s]80it [00:00, 256.07it/s]Validating the model
+
+[[212  18   1]
+ [  9  24   7]
+ [  0   1  11]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.92      0.94       231
+           1       0.56      0.60      0.58        40
+           2       0.58      0.92      0.71        12
+
+    accuracy                           0.87       283
+   macro avg       0.70      0.81      0.74       283
+weighted avg       0.89      0.87      0.88       283
+
+Accuracy is  0.872791519434629
+EER is  3
+Unweighted Recall for the validation set:   0.8114718614718615
+
+
+0it [00:00, ?it/s]18it [00:00, 173.16it/s]46it [00:00, 195.22it/s]76it [00:00, 217.16it/s]80it [00:00, 219.43it/s]Validating the model
+
+[[223   7   1]
+ [ 16  22   2]
+ [  0   7   5]]
+              precision    recall  f1-score   support
+
+           0       0.93      0.97      0.95       231
+           1       0.61      0.55      0.58        40
+           2       0.62      0.42      0.50        12
+
+    accuracy                           0.88       283
+   macro avg       0.72      0.64      0.68       283
+weighted avg       0.87      0.88      0.88       283
+
+Accuracy is  0.8833922261484098
+EER is  3
+Unweighted Recall for the validation set:   0.644011544011544
+
+
+0it [00:00, ?it/s]21it [00:00, 209.57it/s]50it [00:00, 228.41it/s]80it [00:00, 244.58it/s]80it [00:00, 232.70it/s]Validating the model
+
+[[220  10   1]
+ [ 11  23   6]
+ [  0   4   8]]
+              precision    recall  f1-score   support
+
+           0       0.95      0.95      0.95       231
+           1       0.62      0.57      0.60        40
+           2       0.53      0.67      0.59        12
+
+    accuracy                           0.89       283
+   macro avg       0.70      0.73      0.71       283
+weighted avg       0.89      0.89      0.89       283
+
+Accuracy is  0.8869257950530035
+EER is  3
+Unweighted Recall for the validation set:   0.7313492063492063
+
+
+0it [00:00, ?it/s]17it [00:00, 166.58it/s]47it [00:00, 191.45it/s]80it [00:00, 240.72it/s]Validating the model
+
+[[214  16   1]
+ [  9  27   4]
+ [  0   4   8]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.93      0.94       231
+           1       0.57      0.68      0.62        40
+           2       0.62      0.67      0.64        12
+
+    accuracy                           0.88       283
+   macro avg       0.72      0.76      0.73       283
+weighted avg       0.89      0.88      0.88       283
+
+Accuracy is  0.8798586572438163
+EER is  3
+Unweighted Recall for the validation set:   0.756024531024531
+
+
+0it [00:00, ?it/s]21it [00:00, 207.61it/s]45it [00:00, 215.63it/s]77it [00:00, 237.92it/s]80it [00:00, 225.24it/s]Validating the model
+
+[[220  10   1]
+ [ 13  19   8]
+ [  0   2  10]]
+              precision    recall  f1-score   support
+
+           0       0.94      0.95      0.95       231
+           1       0.61      0.47      0.54        40
+           2       0.53      0.83      0.65        12
+
+    accuracy                           0.88       283
+   macro avg       0.69      0.75      0.71       283
+weighted avg       0.88      0.88      0.88       283
+
+Accuracy is  0.8798586572438163
+EER is  3
+Unweighted Recall for the validation set:   0.7535714285714286
+
+
+0it [00:00, ?it/s]18it [00:00, 179.42it/s]48it [00:00, 203.79it/s]76it [00:00, 221.12it/s]80it [00:00, 225.38it/s]Validating the model
+
+[[224   6   1]
+ [ 14  16  10]
+ [  0   1  11]]
+              precision    recall  f1-score   support
+
+           0       0.94      0.97      0.96       231
+           1       0.70      0.40      0.51        40
+           2       0.50      0.92      0.65        12
+
+    accuracy                           0.89       283
+   macro avg       0.71      0.76      0.70       283
+weighted avg       0.89      0.89      0.88       283
+
+Accuracy is  0.8869257950530035
+EER is  3
+Unweighted Recall for the validation set:   0.7621212121212121
+
+
+0it [00:00, ?it/s]19it [00:00, 177.26it/s]53it [00:00, 206.73it/s]80it [00:00, 226.80it/s]Validating the model
+
+[[213  17   1]
+ [ 10  25   5]
+ [  0   5   7]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.92      0.94       231
+           1       0.53      0.62      0.57        40
+           2       0.54      0.58      0.56        12
+
+    accuracy                           0.87       283
+   macro avg       0.68      0.71      0.69       283
+weighted avg       0.88      0.87      0.87       283
+
+Accuracy is  0.8657243816254417
+EER is  3
+Unweighted Recall for the validation set:   0.7101370851370851
+
+
+0it [00:00, ?it/s]15it [00:00, 149.84it/s]44it [00:00, 173.20it/s]80it [00:00, 225.88it/s]Validating the model
+
+[[207  24   0]
+ [  8  30   2]
+ [  0   9   3]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.90      0.93       231
+           1       0.48      0.75      0.58        40
+           2       0.60      0.25      0.35        12
+
+    accuracy                           0.85       283
+   macro avg       0.68      0.63      0.62       283
+weighted avg       0.88      0.85      0.85       283
+
+Accuracy is  0.8480565371024735
+EER is  3
+Unweighted Recall for the validation set:   0.6320346320346321
+
+
+0it [00:00, ?it/s]22it [00:00, 216.24it/s]53it [00:00, 235.29it/s]80it [00:00, 227.66it/s]Validating the model
+
+[[205  24   2]
+ [  6  22  12]
+ [  0   1  11]]
+              precision    recall  f1-score   support
+
+           0       0.97      0.89      0.93       231
+           1       0.47      0.55      0.51        40
+           2       0.44      0.92      0.59        12
+
+    accuracy                           0.84       283
+   macro avg       0.63      0.78      0.68       283
+weighted avg       0.88      0.84      0.85       283
+
+Accuracy is  0.8409893992932862
+EER is  3
+Unweighted Recall for the validation set:   0.7847041847041848
+
+
+0it [00:00, ?it/s]20it [00:00, 199.97it/s]53it [00:00, 225.48it/s]80it [00:00, 255.46it/s]Validating the model
+
+[[224   6   1]
+ [ 14  15  11]
+ [  0   1  11]]
+              precision    recall  f1-score   support
+
+           0       0.94      0.97      0.96       231
+           1       0.68      0.38      0.48        40
+           2       0.48      0.92      0.63        12
+
+    accuracy                           0.88       283
+   macro avg       0.70      0.75      0.69       283
+weighted avg       0.88      0.88      0.87       283
+
+Accuracy is  0.8833922261484098
+EER is  3
+Unweighted Recall for the validation set:   0.7537878787878788
+
+
+0it [00:00, ?it/s]23it [00:00, 223.86it/s]50it [00:00, 233.79it/s]80it [00:00, 248.33it/s]Validating the model
+
+[[228   2   1]
+ [ 20  16   4]
+ [  0   3   9]]
+              precision    recall  f1-score   support
+
+           0       0.92      0.99      0.95       231
+           1       0.76      0.40      0.52        40
+           2       0.64      0.75      0.69        12
+
+    accuracy                           0.89       283
+   macro avg       0.77      0.71      0.72       283
+weighted avg       0.89      0.89      0.88       283
+
+Accuracy is  0.8939929328621908
+EER is  3
+Unweighted Recall for the validation set:   0.7123376623376624
+
+
+0it [00:00, ?it/s]23it [00:00, 221.53it/s]62it [00:00, 254.22it/s]80it [00:00, 256.25it/s]Validating the model
+
+[[215  15   1]
+ [  8  23   9]
+ [  0   1  11]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.93      0.95       231
+           1       0.59      0.57      0.58        40
+           2       0.52      0.92      0.67        12
+
+    accuracy                           0.88       283
+   macro avg       0.69      0.81      0.73       283
+weighted avg       0.89      0.88      0.88       283
+
+Accuracy is  0.8798586572438163
+EER is  3
+Unweighted Recall for the validation set:   0.8074675324675323
+
+
+0it [00:00, ?it/s]19it [00:00, 182.49it/s]49it [00:00, 206.29it/s]80it [00:00, 232.72it/s]Validating the model
+
+[[211  19   1]
+ [  9  22   9]
+ [  0   1  11]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.91      0.94       231
+           1       0.52      0.55      0.54        40
+           2       0.52      0.92      0.67        12
+
+    accuracy                           0.86       283
+   macro avg       0.67      0.79      0.71       283
+weighted avg       0.88      0.86      0.87       283
+
+Accuracy is  0.8621908127208481
+EER is  3
+Unweighted Recall for the validation set:   0.7933621933621934
+
+
+0it [00:00, ?it/s]18it [00:00, 176.62it/s]45it [00:00, 196.35it/s]72it [00:00, 213.67it/s]80it [00:00, 216.40it/s]Validating the model
+
+[[220  10   1]
+ [ 11  24   5]
+ [  0   7   5]]
+              precision    recall  f1-score   support
+
+           0       0.95      0.95      0.95       231
+           1       0.59      0.60      0.59        40
+           2       0.45      0.42      0.43        12
+
+    accuracy                           0.88       283
+   macro avg       0.66      0.66      0.66       283
+weighted avg       0.88      0.88      0.88       283
+
+Accuracy is  0.8798586572438163
+EER is  3
+Unweighted Recall for the validation set:   0.6563492063492063
+
+
+0it [00:00, ?it/s]20it [00:00, 198.66it/s]51it [00:00, 221.54it/s]80it [00:00, 240.77it/s]Validating the model
+
+[[215  15   1]
+ [ 10  24   6]
+ [  0   4   8]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.93      0.94       231
+           1       0.56      0.60      0.58        40
+           2       0.53      0.67      0.59        12
+
+    accuracy                           0.87       283
+   macro avg       0.68      0.73      0.70       283
+weighted avg       0.88      0.87      0.88       283
+
+Accuracy is  0.872791519434629
+EER is  3
+Unweighted Recall for the validation set:   0.7324675324675325
+
+
+0it [00:00, ?it/s]18it [00:00, 173.85it/s]48it [00:00, 198.32it/s]77it [00:00, 218.32it/s]80it [00:00, 218.56it/s]Validating the model
+
+[[228   2   1]
+ [ 22  13   5]
+ [  2   5   5]]
+              precision    recall  f1-score   support
+
+           0       0.90      0.99      0.94       231
+           1       0.65      0.33      0.43        40
+           2       0.45      0.42      0.43        12
+
+    accuracy                           0.87       283
+   macro avg       0.67      0.58      0.60       283
+weighted avg       0.85      0.87      0.85       283
+
+Accuracy is  0.8692579505300353
+EER is  3
+Unweighted Recall for the validation set:   0.5762265512265513
+
+
+0it [00:00, ?it/s]17it [00:00, 164.13it/s]51it [00:00, 194.26it/s]80it [00:00, 228.49it/s]Validating the model
+
+[[215  15   1]
+ [  9  26   5]
+ [  0   3   9]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.93      0.95       231
+           1       0.59      0.65      0.62        40
+           2       0.60      0.75      0.67        12
+
+    accuracy                           0.88       283
+   macro avg       0.72      0.78      0.74       283
+weighted avg       0.89      0.88      0.89       283
+
+Accuracy is  0.8833922261484098
+EER is  3
+Unweighted Recall for the validation set:   0.7769119769119769
+
+
+0it [00:00, ?it/s]17it [00:00, 166.58it/s]50it [00:00, 195.49it/s]80it [00:00, 237.29it/s]Validating the model
+
+[[217  13   1]
+ [  9  23   8]
+ [  0   1  11]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.94      0.95       231
+           1       0.62      0.57      0.60        40
+           2       0.55      0.92      0.69        12
+
+    accuracy                           0.89       283
+   macro avg       0.71      0.81      0.74       283
+weighted avg       0.89      0.89      0.89       283
+
+Accuracy is  0.8869257950530035
+EER is  3
+Unweighted Recall for the validation set:   0.8103535353535354
+
+
+0it [00:00, ?it/s]16it [00:00, 157.55it/s]45it [00:00, 182.17it/s]77it [00:00, 209.05it/s]80it [00:00, 225.76it/s]Validating the model
+
+[[200  28   3]
+ [  5  24  11]
+ [  0   1  11]]
+              precision    recall  f1-score   support
+
+           0       0.98      0.87      0.92       231
+           1       0.45      0.60      0.52        40
+           2       0.44      0.92      0.59        12
+
+    accuracy                           0.83       283
+   macro avg       0.62      0.79      0.68       283
+weighted avg       0.88      0.83      0.85       283
+
+Accuracy is  0.8303886925795053
+EER is  3
+Unweighted Recall for the validation set:   0.7941558441558442
+
+
+0it [00:00, ?it/s]18it [00:00, 173.32it/s]51it [00:00, 201.92it/s]80it [00:00, 244.60it/s]Validating the model
+
+[[213  17   1]
+ [  8  28   4]
+ [  0   7   5]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.92      0.94       231
+           1       0.54      0.70      0.61        40
+           2       0.50      0.42      0.45        12
+
+    accuracy                           0.87       283
+   macro avg       0.67      0.68      0.67       283
+weighted avg       0.88      0.87      0.87       283
+
+Accuracy is  0.8692579505300353
+EER is  3
+Unweighted Recall for the validation set:   0.6795815295815295
+
+
+0it [00:00, ?it/s]18it [00:00, 179.15it/s]48it [00:00, 202.99it/s]80it [00:00, 234.34it/s]Validating the model
+
+[[224   4   3]
+ [ 15  13  12]
+ [  0   1  11]]
+              precision    recall  f1-score   support
+
+           0       0.94      0.97      0.95       231
+           1       0.72      0.33      0.45        40
+           2       0.42      0.92      0.58        12
+
+    accuracy                           0.88       283
+   macro avg       0.69      0.74      0.66       283
+weighted avg       0.89      0.88      0.87       283
+
+Accuracy is  0.8763250883392226
+EER is  3
+Unweighted Recall for the validation set:   0.7371212121212122
+
+
+0it [00:00, ?it/s]18it [00:00, 179.91it/s]47it [00:00, 201.90it/s]80it [00:00, 228.30it/s]80it [00:00, 234.41it/s]Validating the model
+
+[[214  16   1]
+ [  9  27   4]
+ [  0   7   5]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.93      0.94       231
+           1       0.54      0.68      0.60        40
+           2       0.50      0.42      0.45        12
+
+    accuracy                           0.87       283
+   macro avg       0.67      0.67      0.67       283
+weighted avg       0.88      0.87      0.87       283
+
+Accuracy is  0.8692579505300353
+EER is  3
+Unweighted Recall for the validation set:   0.6726911976911977
+
+
+0it [00:00, ?it/s]16it [00:00, 159.29it/s]46it [00:00, 185.01it/s]77it [00:00, 210.40it/s]80it [00:00, 230.87it/s]Validating the model
+
+[[202  28   1]
+ [  5  30   5]
+ [  0   4   8]]
+              precision    recall  f1-score   support
+
+           0       0.98      0.87      0.92       231
+           1       0.48      0.75      0.59        40
+           2       0.57      0.67      0.62        12
+
+    accuracy                           0.85       283
+   macro avg       0.68      0.76      0.71       283
+weighted avg       0.89      0.85      0.86       283
+
+Accuracy is  0.8480565371024735
+EER is  3
+Unweighted Recall for the validation set:   0.7637085137085137
+
+
+0it [00:00, ?it/s]22it [00:00, 219.24it/s]51it [00:00, 235.63it/s]80it [00:00, 273.69it/s]Validating the model
+
+[[226   4   1]
+ [ 19  10  11]
+ [  0   1  11]]
+              precision    recall  f1-score   support
+
+           0       0.92      0.98      0.95       231
+           1       0.67      0.25      0.36        40
+           2       0.48      0.92      0.63        12
+
+    accuracy                           0.87       283
+   macro avg       0.69      0.72      0.65       283
+weighted avg       0.87      0.87      0.85       283
+
+Accuracy is  0.872791519434629
+EER is  3
+Unweighted Recall for the validation set:   0.715007215007215
+
+
+0it [00:00, ?it/s]20it [00:00, 199.42it/s]49it [00:00, 215.67it/s]80it [00:00, 222.65it/s]Validating the model
+
+[[228   2   1]
+ [ 22  10   8]
+ [  2   1   9]]
+              precision    recall  f1-score   support
+
+           0       0.90      0.99      0.94       231
+           1       0.77      0.25      0.38        40
+           2       0.50      0.75      0.60        12
+
+    accuracy                           0.87       283
+   macro avg       0.72      0.66      0.64       283
+weighted avg       0.87      0.87      0.85       283
+
+Accuracy is  0.872791519434629
+EER is  3
+Unweighted Recall for the validation set:   0.6623376623376623
+
+
+0it [00:00, ?it/s]26it [00:00, 254.93it/s]59it [00:00, 272.69it/s]80it [00:00, 245.15it/s]Validating the model
+
+[[221   6   4]
+ [ 12  15  13]
+ [  0   1  11]]
+              precision    recall  f1-score   support
+
+           0       0.95      0.96      0.95       231
+           1       0.68      0.38      0.48        40
+           2       0.39      0.92      0.55        12
+
+    accuracy                           0.87       283
+   macro avg       0.67      0.75      0.66       283
+weighted avg       0.89      0.87      0.87       283
+
+Accuracy is  0.872791519434629
+EER is  3
+Unweighted Recall for the validation set:   0.7494588744588744
+
+
+0it [00:00, ?it/s]22it [00:00, 219.36it/s]54it [00:00, 241.08it/s]80it [00:00, 270.18it/s]Validating the model
+
+[[201  27   3]
+ [  5  24  11]
+ [  0   1  11]]
+              precision    recall  f1-score   support
+
+           0       0.98      0.87      0.92       231
+           1       0.46      0.60      0.52        40
+           2       0.44      0.92      0.59        12
+
+    accuracy                           0.83       283
+   macro avg       0.63      0.80      0.68       283
+weighted avg       0.88      0.83      0.85       283
+
+Accuracy is  0.833922261484099
+EER is  3
+Unweighted Recall for the validation set:   0.7955988455988455
+
+
+0it [00:00, ?it/s]18it [00:00, 178.36it/s]54it [00:00, 209.87it/s]80it [00:00, 278.16it/s]Validating the model
+
+[[226   5   0]
+ [ 18  18   4]
+ [  1   7   4]]
+              precision    recall  f1-score   support
+
+           0       0.92      0.98      0.95       231
+           1       0.60      0.45      0.51        40
+           2       0.50      0.33      0.40        12
+
+    accuracy                           0.88       283
+   macro avg       0.67      0.59      0.62       283
+weighted avg       0.86      0.88      0.86       283
+
+Accuracy is  0.8763250883392226
+EER is  3
+Unweighted Recall for the validation set:   0.5872294372294372
+
+
+0it [00:00, ?it/s]19it [00:00, 187.50it/s]49it [00:00, 209.00it/s]72it [00:00, 214.04it/s]80it [00:00, 213.50it/s]Validating the model
+
+[[226   5   0]
+ [ 19  19   2]
+ [  2   7   3]]
+              precision    recall  f1-score   support
+
+           0       0.91      0.98      0.95       231
+           1       0.61      0.47      0.54        40
+           2       0.60      0.25      0.35        12
+
+    accuracy                           0.88       283
+   macro avg       0.71      0.57      0.61       283
+weighted avg       0.86      0.88      0.86       283
+
+Accuracy is  0.8763250883392226
+EER is  3
+Unweighted Recall for the validation set:   0.5677849927849928
+
+
+0it [00:00, ?it/s]21it [00:00, 207.86it/s]50it [00:00, 225.94it/s]80it [00:00, 243.21it/s]Validating the model
+
+[[215  15   1]
+ [ 10  25   5]
+ [  0   5   7]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.93      0.94       231
+           1       0.56      0.62      0.59        40
+           2       0.54      0.58      0.56        12
+
+    accuracy                           0.87       283
+   macro avg       0.68      0.71      0.70       283
+weighted avg       0.88      0.87      0.88       283
+
+Accuracy is  0.872791519434629
+EER is  3
+Unweighted Recall for the validation set:   0.7130230880230881
+
+
+0it [00:00, ?it/s]24it [00:00, 235.74it/s]57it [00:00, 257.59it/s]80it [00:00, 256.94it/s]Validating the model
+
+[[223   5   3]
+ [ 13  16  11]
+ [  0   1  11]]
+              precision    recall  f1-score   support
+
+           0       0.94      0.97      0.96       231
+           1       0.73      0.40      0.52        40
+           2       0.44      0.92      0.59        12
+
+    accuracy                           0.88       283
+   macro avg       0.70      0.76      0.69       283
+weighted avg       0.89      0.88      0.88       283
+
+Accuracy is  0.8833922261484098
+EER is  3
+Unweighted Recall for the validation set:   0.7606782106782107
+
+
+0it [00:00, ?it/s]26it [00:00, 254.91it/s]52it [00:00, 254.53it/s]80it [00:00, 232.80it/s]Validating the model
+
+[[229   1   1]
+ [ 22   7  11]
+ [  3   0   9]]
+              precision    recall  f1-score   support
+
+           0       0.90      0.99      0.94       231
+           1       0.88      0.17      0.29        40
+           2       0.43      0.75      0.55        12
+
+    accuracy                           0.87       283
+   macro avg       0.74      0.64      0.59       283
+weighted avg       0.88      0.87      0.84       283
+
+Accuracy is  0.8657243816254417
+EER is  3
+Unweighted Recall for the validation set:   0.6387806637806638
+
+
+0it [00:00, ?it/s]22it [00:00, 215.81it/s]54it [00:00, 237.35it/s]80it [00:00, 243.85it/s]Validating the model
+
+[[227   2   2]
+ [ 15  15  10]
+ [  0   1  11]]
+              precision    recall  f1-score   support
+
+           0       0.94      0.98      0.96       231
+           1       0.83      0.38      0.52        40
+           2       0.48      0.92      0.63        12
+
+    accuracy                           0.89       283
+   macro avg       0.75      0.76      0.70       283
+weighted avg       0.90      0.89      0.88       283
+
+Accuracy is  0.8939929328621908
+EER is  3
+Unweighted Recall for the validation set:   0.7581168831168831
+
+
+0it [00:00, ?it/s]19it [00:00, 187.55it/s]56it [00:00, 219.90it/s]80it [00:00, 256.92it/s]Validating the model
+
+[[223   6   2]
+ [ 12  19   9]
+ [  0   2  10]]
+              precision    recall  f1-score   support
+
+           0       0.95      0.97      0.96       231
+           1       0.70      0.47      0.57        40
+           2       0.48      0.83      0.61        12
+
+    accuracy                           0.89       283
+   macro avg       0.71      0.76      0.71       283
+weighted avg       0.89      0.89      0.89       283
+
+Accuracy is  0.8904593639575972
+EER is  3
+Unweighted Recall for the validation set:   0.757900432900433
+
+
+0it [00:00, ?it/s]21it [00:00, 206.93it/s]50it [00:00, 225.72it/s]76it [00:00, 234.86it/s]80it [00:00, 218.43it/s]Validating the model
+
+[[210  14   7]
+ [  7  21  12]
+ [  0   0  12]]
+              precision    recall  f1-score   support
+
+           0       0.97      0.91      0.94       231
+           1       0.60      0.53      0.56        40
+           2       0.39      1.00      0.56        12
+
+    accuracy                           0.86       283
+   macro avg       0.65      0.81      0.69       283
+weighted avg       0.89      0.86      0.87       283
+
+Accuracy is  0.8586572438162544
+EER is  3
+Unweighted Recall for the validation set:   0.8113636363636364
+
+
+0it [00:00, ?it/s]20it [00:00, 196.08it/s]51it [00:00, 217.69it/s]80it [00:00, 254.42it/s]Validating the model
+
+[[213  17   1]
+ [ 10  25   5]
+ [  0   4   8]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.92      0.94       231
+           1       0.54      0.62      0.58        40
+           2       0.57      0.67      0.62        12
+
+    accuracy                           0.87       283
+   macro avg       0.69      0.74      0.71       283
+weighted avg       0.88      0.87      0.87       283
+
+Accuracy is  0.8692579505300353
+EER is  3
+Unweighted Recall for the validation set:   0.737914862914863
+
+
+0it [00:00, ?it/s]22it [00:00, 215.94it/s]58it [00:00, 245.06it/s]80it [00:00, 250.01it/s]Validating the model
+
+[[204  19   8]
+ [  6  22  12]
+ [  0   1  11]]
+              precision    recall  f1-score   support
+
+           0       0.97      0.88      0.93       231
+           1       0.52      0.55      0.54        40
+           2       0.35      0.92      0.51        12
+
+    accuracy                           0.84       283
+   macro avg       0.62      0.78      0.66       283
+weighted avg       0.88      0.84      0.85       283
+
+Accuracy is  0.8374558303886925
+EER is  3
+Unweighted Recall for the validation set:   0.7832611832611832
+
+
+0it [00:00, ?it/s]18it [00:00, 177.85it/s]48it [00:00, 202.14it/s]75it [00:00, 218.18it/s]80it [00:00, 220.26it/s]Validating the model
+
+[[207  23   1]
+ [  7  25   8]
+ [  0   5   7]]
+              precision    recall  f1-score   support
+
+           0       0.97      0.90      0.93       231
+           1       0.47      0.62      0.54        40
+           2       0.44      0.58      0.50        12
+
+    accuracy                           0.84       283
+   macro avg       0.63      0.70      0.66       283
+weighted avg       0.87      0.84      0.86       283
+
+Accuracy is  0.8445229681978799
+EER is  3
+Unweighted Recall for the validation set:   0.7014790764790765
+
+
+0it [00:00, ?it/s]21it [00:00, 208.97it/s]49it [00:00, 223.84it/s]75it [00:00, 233.04it/s]80it [00:00, 206.26it/s]Validating the model
+
+[[203  21   7]
+ [  7  20  13]
+ [  0   0  12]]
+              precision    recall  f1-score   support
+
+           0       0.97      0.88      0.92       231
+           1       0.49      0.50      0.49        40
+           2       0.38      1.00      0.55        12
+
+    accuracy                           0.83       283
+   macro avg       0.61      0.79      0.65       283
+weighted avg       0.87      0.83      0.84       283
+
+Accuracy is  0.8303886925795053
+EER is  3
+Unweighted Recall for the validation set:   0.7929292929292929
+
+
+0it [00:00, ?it/s]22it [00:00, 219.76it/s]54it [00:00, 241.44it/s]80it [00:00, 255.57it/s]Validating the model
+
+[[223   7   1]
+ [ 12  23   5]
+ [  0   6   6]]
+              precision    recall  f1-score   support
+
+           0       0.95      0.97      0.96       231
+           1       0.64      0.57      0.61        40
+           2       0.50      0.50      0.50        12
+
+    accuracy                           0.89       283
+   macro avg       0.70      0.68      0.69       283
+weighted avg       0.89      0.89      0.89       283
+
+Accuracy is  0.8904593639575972
+EER is  3
+Unweighted Recall for the validation set:   0.6801226551226551
+
+
+0it [00:00, ?it/s]19it [00:00, 189.12it/s]48it [00:00, 210.20it/s]80it [00:00, 227.15it/s]Validating the model
+
+[[208  23   0]
+ [  6  31   3]
+ [  0   9   3]]
+              precision    recall  f1-score   support
+
+           0       0.97      0.90      0.93       231
+           1       0.49      0.78      0.60        40
+           2       0.50      0.25      0.33        12
+
+    accuracy                           0.86       283
+   macro avg       0.65      0.64      0.62       283
+weighted avg       0.88      0.86      0.86       283
+
+Accuracy is  0.8551236749116607
+EER is  3
+Unweighted Recall for the validation set:   0.6418109668109668
+
+
+0it [00:00, ?it/s]19it [00:00, 172.78it/s]51it [00:00, 199.31it/s]80it [00:00, 235.11it/s]Validating the model
+
+[[214  10   7]
+ [  8  18  14]
+ [  0   0  12]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.93      0.94       231
+           1       0.64      0.45      0.53        40
+           2       0.36      1.00      0.53        12
+
+    accuracy                           0.86       283
+   macro avg       0.66      0.79      0.67       283
+weighted avg       0.89      0.86      0.87       283
+
+Accuracy is  0.8621908127208481
+EER is  3
+Unweighted Recall for the validation set:   0.7921356421356421
+
+
+0it [00:00, ?it/s]22it [00:00, 218.10it/s]55it [00:00, 241.79it/s]80it [00:00, 237.68it/s]Validating the model
+
+[[226   2   3]
+ [ 20   9  11]
+ [  1   1  10]]
+              precision    recall  f1-score   support
+
+           0       0.91      0.98      0.95       231
+           1       0.75      0.23      0.35        40
+           2       0.42      0.83      0.56        12
+
+    accuracy                           0.87       283
+   macro avg       0.69      0.68      0.62       283
+weighted avg       0.87      0.87      0.84       283
+
+Accuracy is  0.8657243816254417
+EER is  3
+Unweighted Recall for the validation set:   0.678896103896104
+
+
+0it [00:00, ?it/s]18it [00:00, 180.00it/s]48it [00:00, 204.49it/s]78it [00:00, 225.57it/s]80it [00:00, 232.70it/s]Validating the model
+
+[[221   5   5]
+ [ 11  14  15]
+ [  0   0  12]]
+              precision    recall  f1-score   support
+
+           0       0.95      0.96      0.95       231
+           1       0.74      0.35      0.47        40
+           2       0.38      1.00      0.55        12
+
+    accuracy                           0.87       283
+   macro avg       0.69      0.77      0.66       283
+weighted avg       0.90      0.87      0.87       283
+
+Accuracy is  0.872791519434629
+EER is  3
+Unweighted Recall for the validation set:   0.7689033189033189
+
+
+0it [00:00, ?it/s]21it [00:00, 207.30it/s]52it [00:00, 228.02it/s]80it [00:00, 246.29it/s]Validating the model
+
+[[219   8   4]
+ [ 11  15  14]
+ [  0   0  12]]
+              precision    recall  f1-score   support
+
+           0       0.95      0.95      0.95       231
+           1       0.65      0.38      0.48        40
+           2       0.40      1.00      0.57        12
+
+    accuracy                           0.87       283
+   macro avg       0.67      0.77      0.67       283
+weighted avg       0.89      0.87      0.87       283
+
+Accuracy is  0.8692579505300353
+EER is  3
+Unweighted Recall for the validation set:   0.7743506493506493
+
+
+0it [00:00, ?it/s]33it [00:00, 329.89it/s]66it [00:00, 328.54it/s]80it [00:00, 282.20it/s]Validating the model
+
+[[218  10   3]
+ [ 12  21   7]
+ [  0   2  10]]
+              precision    recall  f1-score   support
+
+           0       0.95      0.94      0.95       231
+           1       0.64      0.53      0.58        40
+           2       0.50      0.83      0.62        12
+
+    accuracy                           0.88       283
+   macro avg       0.69      0.77      0.72       283
+weighted avg       0.88      0.88      0.88       283
+
+Accuracy is  0.8798586572438163
+EER is  3
+Unweighted Recall for the validation set:   0.7673520923520925
+
+
+0it [00:00, ?it/s]18it [00:00, 176.36it/s]50it [00:00, 201.36it/s]80it [00:00, 231.30it/s]Validating the model
+
+[[224   4   3]
+ [ 16  14  10]
+ [  1   1  10]]
+              precision    recall  f1-score   support
+
+           0       0.93      0.97      0.95       231
+           1       0.74      0.35      0.47        40
+           2       0.43      0.83      0.57        12
+
+    accuracy                           0.88       283
+   macro avg       0.70      0.72      0.67       283
+weighted avg       0.88      0.88      0.87       283
+
+Accuracy is  0.8763250883392226
+EER is  3
+Unweighted Recall for the validation set:   0.7176767676767678
+
+
+0it [00:00, ?it/s]18it [00:00, 171.87it/s]47it [00:00, 193.03it/s]76it [00:00, 213.80it/s]80it [00:00, 222.52it/s]Validating the model
+
+[[229   1   1]
+ [ 21  11   8]
+ [  3   0   9]]
+              precision    recall  f1-score   support
+
+           0       0.91      0.99      0.95       231
+           1       0.92      0.28      0.42        40
+           2       0.50      0.75      0.60        12
+
+    accuracy                           0.88       283
+   macro avg       0.77      0.67      0.66       283
+weighted avg       0.89      0.88      0.86       283
+
+Accuracy is  0.8798586572438163
+EER is  3
+Unweighted Recall for the validation set:   0.6721139971139971
+
+
+0it [00:00, ?it/s]23it [00:00, 223.89it/s]52it [00:00, 239.92it/s]80it [00:00, 243.93it/s]Validating the model
+
+[[226   5   0]
+ [ 16  21   3]
+ [  3   6   3]]
+              precision    recall  f1-score   support
+
+           0       0.92      0.98      0.95       231
+           1       0.66      0.53      0.58        40
+           2       0.50      0.25      0.33        12
+
+    accuracy                           0.88       283
+   macro avg       0.69      0.58      0.62       283
+weighted avg       0.87      0.88      0.87       283
+
+Accuracy is  0.8833922261484098
+EER is  3
+Unweighted Recall for the validation set:   0.5844516594516594
+
+
+0it [00:00, ?it/s]17it [00:00, 168.34it/s]47it [00:00, 193.82it/s]76it [00:00, 214.72it/s]80it [00:00, 221.97it/s]Validating the model
+
+[[219  10   2]
+ [ 11  20   9]
+ [  0   4   8]]
+              precision    recall  f1-score   support
+
+           0       0.95      0.95      0.95       231
+           1       0.59      0.50      0.54        40
+           2       0.42      0.67      0.52        12
+
+    accuracy                           0.87       283
+   macro avg       0.65      0.70      0.67       283
+weighted avg       0.88      0.87      0.87       283
+
+Accuracy is  0.872791519434629
+EER is  3
+Unweighted Recall for the validation set:   0.7049062049062048
+
+
+0it [00:00, ?it/s]18it [00:00, 179.83it/s]51it [00:00, 207.48it/s]80it [00:00, 243.81it/s]Validating the model
+
+[[208  20   3]
+ [  7  22  11]
+ [  0   1  11]]
+              precision    recall  f1-score   support
+
+           0       0.97      0.90      0.93       231
+           1       0.51      0.55      0.53        40
+           2       0.44      0.92      0.59        12
+
+    accuracy                           0.85       283
+   macro avg       0.64      0.79      0.69       283
+weighted avg       0.88      0.85      0.86       283
+
+Accuracy is  0.8515901060070671
+EER is  3
+Unweighted Recall for the validation set:   0.789033189033189
+
+
+0it [00:00, ?it/s]22it [00:00, 217.78it/s]54it [00:00, 240.37it/s]80it [00:00, 254.12it/s]Validating the model
+
+[[219  11   1]
+ [ 10  23   7]
+ [  0   6   6]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.95      0.95       231
+           1       0.57      0.57      0.57        40
+           2       0.43      0.50      0.46        12
+
+    accuracy                           0.88       283
+   macro avg       0.65      0.67      0.66       283
+weighted avg       0.88      0.88      0.88       283
+
+Accuracy is  0.8763250883392226
+EER is  3
+Unweighted Recall for the validation set:   0.6743506493506493
+
+
+0it [00:00, ?it/s]23it [00:00, 228.24it/s]54it [00:00, 244.83it/s]80it [00:00, 242.65it/s]Validating the model
+
+[[222   7   2]
+ [ 16  15   9]
+ [  1   4   7]]
+              precision    recall  f1-score   support
+
+           0       0.93      0.96      0.94       231
+           1       0.58      0.38      0.45        40
+           2       0.39      0.58      0.47        12
+
+    accuracy                           0.86       283
+   macro avg       0.63      0.64      0.62       283
+weighted avg       0.86      0.86      0.86       283
+
+Accuracy is  0.8621908127208481
+EER is  3
+Unweighted Recall for the validation set:   0.6397907647907649
+
+
+0it [00:00, ?it/s]21it [00:00, 208.10it/s]55it [00:00, 231.96it/s]80it [00:00, 251.98it/s]Validating the model
+
+[[218  13   0]
+ [ 10  24   6]
+ [  0   6   6]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.94      0.95       231
+           1       0.56      0.60      0.58        40
+           2       0.50      0.50      0.50        12
+
+    accuracy                           0.88       283
+   macro avg       0.67      0.68      0.68       283
+weighted avg       0.88      0.88      0.88       283
+
+Accuracy is  0.8763250883392226
+EER is  3
+Unweighted Recall for the validation set:   0.6812409812409812
+
+
+0it [00:00, ?it/s]25it [00:00, 243.71it/s]55it [00:00, 254.02it/s]80it [00:00, 247.47it/s]Validating the model
+
+[[201  30   0]
+ [  5  32   3]
+ [  0   7   5]]
+              precision    recall  f1-score   support
+
+           0       0.98      0.87      0.92       231
+           1       0.46      0.80      0.59        40
+           2       0.62      0.42      0.50        12
+
+    accuracy                           0.84       283
+   macro avg       0.69      0.70      0.67       283
+weighted avg       0.89      0.84      0.86       283
+
+Accuracy is  0.8409893992932862
+EER is  3
+Unweighted Recall for the validation set:   0.6955988455988455
+
+
+0it [00:00, ?it/s]27it [00:00, 265.06it/s]58it [00:00, 275.80it/s]80it [00:00, 265.54it/s]Validating the model
+
+[[222   8   1]
+ [ 13  21   6]
+ [  1   5   6]]
+              precision    recall  f1-score   support
+
+           0       0.94      0.96      0.95       231
+           1       0.62      0.53      0.57        40
+           2       0.46      0.50      0.48        12
+
+    accuracy                           0.88       283
+   macro avg       0.67      0.66      0.67       283
+weighted avg       0.87      0.88      0.88       283
+
+Accuracy is  0.8798586572438163
+EER is  3
+Unweighted Recall for the validation set:   0.662012987012987
+
+
+0it [00:00, ?it/s]23it [00:00, 227.80it/s]51it [00:00, 241.05it/s]80it [00:00, 228.64it/s]Validating the model
+
+[[214  17   0]
+ [  8  29   3]
+ [  0   7   5]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.93      0.94       231
+           1       0.55      0.72      0.62        40
+           2       0.62      0.42      0.50        12
+
+    accuracy                           0.88       283
+   macro avg       0.71      0.69      0.69       283
+weighted avg       0.89      0.88      0.88       283
+
+Accuracy is  0.8763250883392226
+EER is  3
+Unweighted Recall for the validation set:   0.6893578643578643
+
+
+0it [00:00, ?it/s]19it [00:00, 188.45it/s]53it [00:00, 217.00it/s]80it [00:00, 251.93it/s]Validating the model
+
+[[199  30   2]
+ [  5  27   8]
+ [  0   5   7]]
+              precision    recall  f1-score   support
+
+           0       0.98      0.86      0.91       231
+           1       0.44      0.68      0.53        40
+           2       0.41      0.58      0.48        12
+
+    accuracy                           0.82       283
+   macro avg       0.61      0.71      0.64       283
+weighted avg       0.88      0.82      0.84       283
+
+Accuracy is  0.823321554770318
+EER is  3
+Unweighted Recall for the validation set:   0.7066017316017317
+
+
+0it [00:00, ?it/s]21it [00:00, 208.12it/s]50it [00:00, 227.28it/s]80it [00:00, 250.08it/s]Validating the model
+
+[[217  12   2]
+ [ 11  22   7]
+ [  0   5   7]]
+              precision    recall  f1-score   support
+
+           0       0.95      0.94      0.95       231
+           1       0.56      0.55      0.56        40
+           2       0.44      0.58      0.50        12
+
+    accuracy                           0.87       283
+   macro avg       0.65      0.69      0.67       283
+weighted avg       0.88      0.87      0.87       283
+
+Accuracy is  0.8692579505300353
+EER is  3
+Unweighted Recall for the validation set:   0.6909090909090909
+
+
+0it [00:00, ?it/s]18it [00:00, 179.68it/s]49it [00:00, 205.40it/s]80it [00:00, 248.73it/s]Validating the model
+
+[[210  21   0]
+ [  8  27   5]
+ [  0   7   5]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.91      0.94       231
+           1       0.49      0.68      0.57        40
+           2       0.50      0.42      0.45        12
+
+    accuracy                           0.86       283
+   macro avg       0.65      0.67      0.65       283
+weighted avg       0.88      0.86      0.86       283
+
+Accuracy is  0.8551236749116607
+EER is  3
+Unweighted Recall for the validation set:   0.6669191919191918
+
+
+0it [00:00, ?it/s]19it [00:00, 176.74it/s]46it [00:00, 196.49it/s]80it [00:00, 239.78it/s]Validating the model
+
+[[220   7   4]
+ [ 12  18  10]
+ [  1   3   8]]
+              precision    recall  f1-score   support
+
+           0       0.94      0.95      0.95       231
+           1       0.64      0.45      0.53        40
+           2       0.36      0.67      0.47        12
+
+    accuracy                           0.87       283
+   macro avg       0.65      0.69      0.65       283
+weighted avg       0.88      0.87      0.87       283
+
+Accuracy is  0.8692579505300353
+EER is  3
+Unweighted Recall for the validation set:   0.6896825396825396
+
+
+0it [00:00, ?it/s]21it [00:00, 209.05it/s]53it [00:00, 232.75it/s]80it [00:00, 249.07it/s]Validating the model
+
+[[214  17   0]
+ [  9  26   5]
+ [  0   6   6]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.93      0.94       231
+           1       0.53      0.65      0.58        40
+           2       0.55      0.50      0.52        12
+
+    accuracy                           0.87       283
+   macro avg       0.68      0.69      0.68       283
+weighted avg       0.88      0.87      0.87       283
+
+Accuracy is  0.8692579505300353
+EER is  3
+Unweighted Recall for the validation set:   0.6921356421356423
+
+
+0it [00:00, ?it/s]19it [00:00, 184.62it/s]44it [00:00, 198.90it/s]78it [00:00, 226.74it/s]80it [00:00, 232.58it/s]Validating the model
+
+[[225   4   2]
+ [ 13  19   8]
+ [  0   5   7]]
+              precision    recall  f1-score   support
+
+           0       0.95      0.97      0.96       231
+           1       0.68      0.47      0.56        40
+           2       0.41      0.58      0.48        12
+
+    accuracy                           0.89       283
+   macro avg       0.68      0.68      0.67       283
+weighted avg       0.89      0.89      0.88       283
+
+Accuracy is  0.8869257950530035
+EER is  3
+Unweighted Recall for the validation set:   0.6774531024531024
+
+
+0it [00:00, ?it/s]16it [00:00, 154.30it/s]47it [00:00, 181.35it/s]80it [00:00, 235.87it/s]Validating the model
+
+[[219   8   4]
+ [ 14  16  10]
+ [  2   3   7]]
+              precision    recall  f1-score   support
+
+           0       0.93      0.95      0.94       231
+           1       0.59      0.40      0.48        40
+           2       0.33      0.58      0.42        12
+
+    accuracy                           0.86       283
+   macro avg       0.62      0.64      0.61       283
+weighted avg       0.86      0.86      0.85       283
+
+Accuracy is  0.8551236749116607
+EER is  3
+Unweighted Recall for the validation set:   0.6437950937950938
+
+
+0it [00:00, ?it/s]19it [00:00, 184.99it/s]49it [00:00, 208.83it/s]80it [00:00, 240.60it/s]Validating the model
+
+[[228   3   0]
+ [ 21  16   3]
+ [  4   4   4]]
+              precision    recall  f1-score   support
+
+           0       0.90      0.99      0.94       231
+           1       0.70      0.40      0.51        40
+           2       0.57      0.33      0.42        12
+
+    accuracy                           0.88       283
+   macro avg       0.72      0.57      0.62       283
+weighted avg       0.86      0.88      0.86       283
+
+Accuracy is  0.8763250883392226
+EER is  3
+Unweighted Recall for the validation set:   0.5734487734487734
+
+
+0it [00:00, ?it/s]21it [00:00, 205.09it/s]56it [00:00, 232.91it/s]80it [00:00, 249.29it/s]Validating the model
+
+[[219  12   0]
+ [ 11  22   7]
+ [  0   6   6]]
+              precision    recall  f1-score   support
+
+           0       0.95      0.95      0.95       231
+           1       0.55      0.55      0.55        40
+           2       0.46      0.50      0.48        12
+
+    accuracy                           0.87       283
+   macro avg       0.65      0.67      0.66       283
+weighted avg       0.87      0.87      0.87       283
+
+Accuracy is  0.872791519434629
+EER is  3
+Unweighted Recall for the validation set:   0.6660173160173161
+
+
+0it [00:00, ?it/s]22it [00:00, 217.16it/s]51it [00:00, 234.60it/s]80it [00:00, 239.12it/s]Validating the model
+
+[[212  17   2]
+ [  8  24   8]
+ [  0   6   6]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.92      0.94       231
+           1       0.51      0.60      0.55        40
+           2       0.38      0.50      0.43        12
+
+    accuracy                           0.86       283
+   macro avg       0.62      0.67      0.64       283
+weighted avg       0.87      0.86      0.86       283
+
+Accuracy is  0.8551236749116607
+EER is  3
+Unweighted Recall for the validation set:   0.6725829725829726
+
+
+0it [00:00, ?it/s]24it [00:00, 234.27it/s]55it [00:00, 251.91it/s]80it [00:00, 237.58it/s]Validating the model
+
+[[227   2   2]
+ [ 18  13   9]
+ [  2   3   7]]
+              precision    recall  f1-score   support
+
+           0       0.92      0.98      0.95       231
+           1       0.72      0.33      0.45        40
+           2       0.39      0.58      0.47        12
+
+    accuracy                           0.87       283
+   macro avg       0.68      0.63      0.62       283
+weighted avg       0.87      0.87      0.86       283
+
+Accuracy is  0.872791519434629
+EER is  3
+Unweighted Recall for the validation set:   0.6303391053391053
+
+
+0it [00:00, ?it/s]18it [00:00, 177.41it/s]50it [00:00, 204.25it/s]80it [00:00, 258.99it/s]Validating the model
+
+[[207  24   0]
+ [  7  29   4]
+ [  0   7   5]]
+              precision    recall  f1-score   support
+
+           0       0.97      0.90      0.93       231
+           1       0.48      0.72      0.58        40
+           2       0.56      0.42      0.48        12
+
+    accuracy                           0.85       283
+   macro avg       0.67      0.68      0.66       283
+weighted avg       0.88      0.85      0.86       283
+
+Accuracy is  0.8515901060070671
+EER is  3
+Unweighted Recall for the validation set:   0.6792568542568542
+
+
+0it [00:00, ?it/s]21it [00:00, 209.50it/s]55it [00:00, 236.12it/s]80it [00:00, 244.05it/s]Validating the model
+
+[[194  36   1]
+ [  6  26   8]
+ [  0   6   6]]
+              precision    recall  f1-score   support
+
+           0       0.97      0.84      0.90       231
+           1       0.38      0.65      0.48        40
+           2       0.40      0.50      0.44        12
+
+    accuracy                           0.80       283
+   macro avg       0.58      0.66      0.61       283
+weighted avg       0.86      0.80      0.82       283
+
+Accuracy is  0.7985865724381626
+EER is  3
+Unweighted Recall for the validation set:   0.6632756132756134
+
+
+0it [00:00, ?it/s]19it [00:00, 186.27it/s]47it [00:00, 204.19it/s]80it [00:00, 216.37it/s]Validating the model
+
+[[220   7   4]
+ [ 12  14  14]
+ [  0   1  11]]
+              precision    recall  f1-score   support
+
+           0       0.95      0.95      0.95       231
+           1       0.64      0.35      0.45        40
+           2       0.38      0.92      0.54        12
+
+    accuracy                           0.87       283
+   macro avg       0.65      0.74      0.65       283
+weighted avg       0.88      0.87      0.86       283
+
+Accuracy is  0.8657243816254417
+EER is  3
+Unweighted Recall for the validation set:   0.7396825396825396
+
+
+0it [00:00, ?it/s]21it [00:00, 208.11it/s]56it [00:00, 234.81it/s]80it [00:00, 256.09it/s]Validating the model
+
+[[200  31   0]
+ [  7  30   3]
+ [  0   9   3]]
+              precision    recall  f1-score   support
+
+           0       0.97      0.87      0.91       231
+           1       0.43      0.75      0.55        40
+           2       0.50      0.25      0.33        12
+
+    accuracy                           0.82       283
+   macro avg       0.63      0.62      0.60       283
+weighted avg       0.87      0.82      0.84       283
+
+Accuracy is  0.823321554770318
+EER is  3
+Unweighted Recall for the validation set:   0.6219336219336219
+
+
+0it [00:00, ?it/s]20it [00:00, 195.21it/s]52it [00:00, 220.52it/s]80it [00:00, 245.13it/s]Validating the model
+
+[[213  18   0]
+ [  9  25   6]
+ [  0   7   5]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.92      0.94       231
+           1       0.50      0.62      0.56        40
+           2       0.45      0.42      0.43        12
+
+    accuracy                           0.86       283
+   macro avg       0.64      0.65      0.64       283
+weighted avg       0.87      0.86      0.86       283
+
+Accuracy is  0.8586572438162544
+EER is  3
+Unweighted Recall for the validation set:   0.6545815295815296
+
+
+0it [00:00, ?it/s]21it [00:00, 205.93it/s]50it [00:00, 225.07it/s]79it [00:00, 240.03it/s]80it [00:00, 222.72it/s]Validating the model
+
+[[215  14   2]
+ [ 10  23   7]
+ [  0   5   7]]
+              precision    recall  f1-score   support
+
+           0       0.96      0.93      0.94       231
+           1       0.55      0.57      0.56        40
+           2       0.44      0.58      0.50        12
+
+    accuracy                           0.87       283
+   macro avg       0.65      0.70      0.67       283
+weighted avg       0.88      0.87      0.87       283
+
+Accuracy is  0.8657243816254417
+EER is  3
+Unweighted Recall for the validation set:   0.6963564213564214
+
+
+0it [00:00, ?it/s]21it [00:00, 207.55it/s]49it [00:00, 224.37it/s]80it [00:00, 233.87it/s]Validating the model
+
+[[221   7   3]
+ [ 13  19   8]
+ [  1   4   7]]
+              precision    recall  f1-score   support
+
+           0       0.94      0.96      0.95       231
+           1       0.63      0.47      0.54        40
+           2       0.39      0.58      0.47        12
+
+    accuracy                           0.87       283
+   macro avg       0.65      0.67      0.65       283
+weighted avg       0.87      0.87      0.87       283
+
+Accuracy is  0.872791519434629
+EER is  3
+Unweighted Recall for the validation set:   0.6716810966810968
+
+
+0it [00:00, ?it/s]21it [00:00, 206.69it/s]51it [00:00, 226.43it/s]80it [00:00, 232.06it/s]Validating the model
+
+[[218  13   0]
+ [ 12  23   5]
+ [  0   6   6]]
+              precision    recall  f1-score   support
+
+           0       0.95      0.94      0.95       231
+           1       0.55      0.57      0.56        40
+           2       0.55      0.50      0.52        12
+
+    accuracy                           0.87       283
+   macro avg       0.68      0.67      0.68       283
+weighted avg       0.87      0.87      0.87       283
+
+Accuracy is  0.872791519434629
+EER is  3
+Unweighted Recall for the validation set:   0.6729076479076479
+
+
+0it [00:00, ?it/s]21it [00:00, 201.18it/s]55it [00:00, 228.97it/s]80it [00:00, 242.33it/s]Validating the model
+
+[[220   8   3]
+ [ 13  17  10]
+ [  1   2   9]]
+              precision    recall  f1-score   support
+
+           0       0.94      0.95      0.95       231
+           1       0.63      0.42      0.51        40
+           2       0.41      0.75      0.53        12
+
+    accuracy                           0.87       283
+   macro avg       0.66      0.71      0.66       283
+weighted avg       0.87      0.87      0.87       283
+
+Accuracy is  0.8692579505300353
+EER is  3
+Unweighted Recall for the validation set:   0.7091269841269842
+
+
+0it [00:00, ?it/s]21it [00:00, 207.32it/s]49it [00:00, 224.70it/s]80it [00:00, 254.91it/s]Validating the model
+
+[[225   4   2]
+ [ 17  15   8]
+ [  1   4   7]]
+              precision    recall  f1-score   support
+
+           0       0.93      0.97      0.95       231
+           1       0.65      0.38      0.48        40
+           2       0.41      0.58      0.48        12
+
+    accuracy                           0.87       283
+   macro avg       0.66      0.64      0.64       283
+weighted avg       0.87      0.87      0.86       283
+
+Accuracy is  0.872791519434629
+EER is  3
+Unweighted Recall for the validation set:   0.6441197691197691
+
+
+0it [00:00, ?it/s]18it [00:00, 179.50it/s]51it [00:00, 207.07it/s]80it [00:00, 232.70it/s]Validating the model
+
+[[223   5   3]
+ [ 15  17   8]
+ [  2   3   7]]
+              precision    recall  f1-score   support
+
+           0       0.93      0.97      0.95       231
+           1       0.68      0.42      0.52        40
+           2       0.39      0.58      0.47        12
+
+    accuracy                           0.87       283
+   macro avg       0.67      0.66      0.65       283
+weighted avg       0.87      0.87      0.87       283
+
+Accuracy is  0.872791519434629
+EER is  3
+Unweighted Recall for the validation set:   0.6579004329004329
+
+
+0it [00:00, ?it/s]21it [00:00, 209.67it/s]55it [00:00, 235.70it/s]80it [00:00, 243.61it/s]Validating the model
+
+[[207  24   0]
+ [  7  27   6]
+ [  0   6   6]]
+              precision    recall  f1-score   support
+
+           0       0.97      0.90      0.93       231
+           1       0.47      0.68      0.56        40
+           2       0.50      0.50      0.50        12
+
+    accuracy                           0.85       283
+   macro avg       0.65      0.69      0.66       283
+weighted avg       0.88      0.85      0.86       283
+
+Accuracy is  0.8480565371024735
+EER is  3
+Unweighted Recall for the validation set:   0.6903679653679653
+
+
+0it [00:00, ?it/s]20it [00:00, 196.38it/s]50it [00:00, 217.58it/s]80it [00:00, 236.56it/s]80it [00:00, 229.01it/s]Validating the model
+
+[[217  13   1]
+ [ 10  22   8]
+ [  1   4   7]]
+              precision    recall  f1-score   support
+
+           0       0.95      0.94      0.95       231
+           1       0.56      0.55      0.56        40
+           2       0.44      0.58      0.50        12
+
+    accuracy                           0.87       283
+   macro avg       0.65      0.69      0.67       283
+weighted avg       0.88      0.87      0.87       283
+
+Accuracy is  0.8692579505300353
+EER is  3
+Unweighted Recall for the validation set:   0.6909090909090909
+
+
+0it [00:00, ?it/s]19it [00:00, 184.27it/s]51it [00:00, 211.11it/s]80it [00:00, 232.85it/s]Validating the model
+
+[[214  17   0]
+ [ 13  21   6]
+ [  2   3   7]]
+              precision    recall  f1-score   support
+
+           0       0.93      0.93      0.93       231
+           1       0.51      0.53      0.52        40
+           2       0.54      0.58      0.56        12
+
+    accuracy                           0.86       283
+   macro avg       0.66      0.68      0.67       283
+weighted avg       0.86      0.86      0.86       283
+
+Accuracy is  0.8551236749116607
+EER is  3
+Unweighted Recall for the validation set:   0.6782467532467532
+
+
+0it [00:00, ?it/s]29it [00:00, 285.19it/s]68it [00:00, 307.76it/s]80it [00:00, 273.49it/s]Validating the model
+
+[[220  11   0]
+ [ 12  24   4]
+ [  2   6   4]]
+              precision    recall  f1-score   support
+
+           0       0.94      0.95      0.95       231
+           1       0.59      0.60      0.59        40
+           2       0.50      0.33      0.40        12
+
+    accuracy                           0.88       283
+   macro avg       0.68      0.63      0.65       283
+weighted avg       0.87      0.88      0.87       283
+
+Accuracy is  0.8763250883392226
+EER is  3
+Unweighted Recall for the validation set:   0.6285714285714284
+
+
+0it [00:00, ?it/s]27it [00:00, 268.85it/s]58it [00:00, 276.53it/s]80it [00:00, 256.89it/s]Validating the model
+
+[[219  11   1]
+ [ 11  22   7]
+ [  1   4   7]]
+              precision    recall  f1-score   support
+
+           0       0.95      0.95      0.95       231
+           1       0.59      0.55      0.57        40
+           2       0.47      0.58      0.52        12
+
+    accuracy                           0.88       283
+   macro avg       0.67      0.69      0.68       283
+weighted avg       0.88      0.88      0.88       283
+
+Accuracy is  0.8763250883392226
+EER is  3
+Unweighted Recall for the validation set:   0.6937950937950937
+
+
+0it [00:00, ?it/s]20it [00:00, 198.69it/s]52it [00:00, 223.56it/s]80it [00:00, 234.03it/s]Validating the model
+
+[[208  22   1]
+ [  7  27   6]
+ [  0   6   6]]
+              precision    recall  f1-score   support
+
+           0       0.97      0.90      0.93       231
+           1       0.49      0.68      0.57        40
+           2       0.46      0.50      0.48        12
+
+    accuracy                           0.85       283
+   macro avg       0.64      0.69      0.66       283
+weighted avg       0.88      0.85      0.86       283
+
+Accuracy is  0.8515901060070671
+EER is  3
+Unweighted Recall for the validation set:   0.6918109668109668
+
+
+Finished
