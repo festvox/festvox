@@ -11,6 +11,11 @@ import random
 from sklearn.metrics import classification_report, confusion_matrix
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.distributions import Normal
+
+
+
+
 
 ### Text Processing Stuff
 def populate_phonesarray(fname, feats_dir, feats_dict):
@@ -84,6 +89,9 @@ class categorical_datasource(CategoricalDataSource):
         elif self.feat_name == 'r9y9inputmol':
             fname += '.npy'
             return np.load(fname)
+        elif self.feat_name == 'r9y9outputmel':
+            fname += '.npy'
+            return np.load(fname)
 
         else:
             print("Unknown feature type: ", self.feat_name)
@@ -113,8 +121,13 @@ class float_datasource(FloatDataSource):
             fname = self.feats_dir + '/' + fname.strip() + '.feats.npy'
             return np.load(fname)
 
+        elif self.feat_name == 'r9y9inputmol':
+            fname =  str(self.filenames_array[idx])
+            fname = self.feats_dir + '/' + fname.strip() + '.feats.npy'
+            return np.load(fname)
+
         elif self.feat_name == 'r9y9outputmel':
-            fname =  str(self.filenames_array[idx]).zfill(8)
+            fname =  str(self.filenames_array[idx]) 
             fname = self.feats_dir + '/' + fname.strip() + '.feats.npy'
             return np.load(fname)
 
@@ -652,4 +665,78 @@ def sequence_mask(sequence_length, max_len=None):
     seq_length_expand = sequence_length.unsqueeze(1) \
         .expand_as(seq_range_expand)
     return (seq_range_expand < seq_length_expand).float()
+
+
+############################ EMA Stuff
+
+
+def clone_as_averaged_model(model, ema):
+    assert ema is not None
+    for name, param in model.named_parameters():
+        if name in ema.shadow:
+            param.data = ema.shadow[name].clone()
+    return model
+    
+
+# https://discuss.pytorch.org/t/how-to-apply-exponential-moving-average-decay-for-variables/10856/4
+# https://www.tensorflow.org/api_docs/python/tf/train/ExponentialMovingAverage
+# https://github.com/r9y9/wavenet_vocoder/blob/c4c148792c6263afbedb9f6bf11cd552668e26cb/train.py
+class ExponentialMovingAverage(object):
+    def __init__(self, decay):
+        self.decay = decay
+        self.shadow = {}
+
+    def register(self, name, val):
+        self.shadow[name] = val.clone()
+
+    def update(self, name, x):
+        assert name in self.shadow
+        update_delta = self.shadow[name] - x
+        self.shadow[name] -= (1.0 - self.decay) * update_delta
+        
+            
+            
+
+
+############################ WaveGlow stuff
+
+
+class WaveGlowDataset(object):
+    def __init__(self, X, Mel):
+        self.X = X
+        self.Mel = Mel
+    
+    def __getitem__(self, idx):
+        #print("Shape of mel: ", self.Mel[idx].shape)
+        return self.X[idx], self.Mel[idx]
+    
+    def __len__(self):
+        return len(self.X)
+    
+
+sample_rate=16000
+frame_length_ms=50
+frame_shift_ms=12.5
+seq_len = 4
+    
+ 
+def collate_fn_r9y9melNmol(batch):
+    """Create batch"""
+
+    #print(batch)
+    max_offsets = [x[1].shape[0] - seq_len for x in batch]
+    mel_lengths = [x[1].shape[0] for x in batch]
+
+    mel_offsets = [np.random.randint(0, offset) for offset in max_offsets]
+    sig_offsets = [int(offset * frame_shift_ms * sample_rate / 1000) for offset in mel_offsets]
+    sig_lengths = [x[0].shape[0] for x in batch]
+    sig_length = int(seq_len * frame_shift_ms * sample_rate / 1000)
+    #print("Sequence length and sign length: ", seq_len, sig_length)
+
+    mels = torch.FloatTensor([x[1][mel_offsets[i]:mel_offsets[i] + seq_len] for i, x in enumerate(batch)])
+    x = torch.FloatTensor([x[0][sig_offsets[i]:int(sig_offsets[i] + sig_length)] for i, x in enumerate(batch)])
+    #print("Shape of mels: ", mels.shape)
+    return mels, x
+
+
 
