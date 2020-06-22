@@ -81,6 +81,9 @@ class Judith(object):
        project = self.default_project
        assert project is not None 
 
+    def post_to_facebook(self):
+      
+       
 
     def act_upon_action(self, action, parameters=None):
 
@@ -89,6 +92,9 @@ class Judith(object):
 
        elif action == 'get_default_project':
           return self.get_default_project()
+
+       elif action == 'post_to_facebook':
+          return self.post_to_facebook()
 
        elif action == 'project_info':
 
