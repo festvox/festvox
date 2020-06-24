@@ -40,4 +40,6 @@ python3.5 $FALCONDIR/dataprep_addphones.py ehmm/etc/txt.phseq.data .
 
 python3.5 local/train_phones.py --exp-dir exp/exp_baseline_${lang} --gpu-id 2 --conf conf/tacotron.conf > log_phones
 
+python3.5 local/synthesize_phones.py exp/exp_baseline_ACCIBS/checkpoints/checkpoint_step0150000.pth vox/ehmm/etc/txt.phseq.data.test.head.1 exp/exp_baseline_ACCIBS/samples_tacotron
+
 echo "Done"
