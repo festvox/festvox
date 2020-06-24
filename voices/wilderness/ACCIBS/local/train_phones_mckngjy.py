@@ -11,6 +11,9 @@ options:
     --hparams=<parmas>        Hyper parameters [default: ].
     --log-event-path=<dir>    Log Path [default: exp/log_tacotronOne]
     -h, --help                Show this help message and exit
+This implementation is inspired by Mockingjay paper: https://arxiv.org/abs/1910.12638. But to understand well, we are first implementing the non masked version.
+Since mask was kind of the important component in that paper, wen naming this file, we thought a nice justice wud be to remove vowels from the name, since we are removing the masking component from the original.
+Anyways, that shows we name nerdy too. 
 """
 import os, sys
 from docopt import docopt
@@ -32,7 +35,7 @@ from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 from util import *
-from model import TacotronOneSeqwise as Tacotron
+from model import TacotronOneSelfAttention as Tacotron
 
 
 import json
@@ -50,7 +53,7 @@ from os.path import join, expanduser
 
 import tensorboard_logger
 from tensorboard_logger import *
-from hyperparameters import hyperparameters
+from hyperparameters import hparams, hparams_debug_string
 
 vox_dir ='vox'
 
@@ -61,8 +64,6 @@ if use_cuda:
     cudnn.benchmark = False
 use_multigpu = None
 
-hparams = hyperparameters()
-print(hparams)
 fs = hparams.sample_rate
 
 
@@ -142,7 +143,7 @@ def train(model, train_loader, val_loader, optimizer,
             log_value("linear loss", float(linear_loss.item()), global_step)
             log_value("gradient norm", grad_norm, global_step)
             log_value("learning rate", current_lr, global_step)
-            log_histogram("Last Linear Weights", model.last_linear.weight.detach().cpu(), global_step)
+            #log_histogram("Last Linear Weights", model.last_linear.weight.detach().cpu(), global_step)
             global_step += 1
             running_loss += loss.item()
 
@@ -162,15 +163,12 @@ if __name__ == "__main__":
     checkpoint_path = args["--checkpoint-path"]
     log_path = args["--exp-dir"] + '/tracking'
     conf = args["--conf"]
-    #hparams.parse(args["--hparams"])
+    hparams.parse(args["--hparams"])
 
     # Override hyper parameters
     if conf is not None:
         with open(conf) as f:
-            hparams.update_params(f)
-    #print(hparams)
-    #print(hparams.batch_size)
-    #sys.exit()
+            hparams.parse_json(f.read())
 
     os.makedirs(exp_dir, exist_ok=True)
     os.makedirs(checkpoint_dir, exist_ok=True)
@@ -251,7 +249,7 @@ if __name__ == "__main__":
     # Setup tensorboard logger
     tensorboard_logger.configure(log_path)
 
-    #print(hparams_debug_string())
+    print(hparams_debug_string())
 
     # Train!
     try:

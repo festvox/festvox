@@ -1,4 +1,4 @@
-"""Trainining script for Tacotron speech synthesis model.
+"""Trainining script for Tacotron speech synthesis model using GAN. Discriminator only after 7K steps.
 
 usage: train.py [options]
 
@@ -32,6 +32,7 @@ from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 from util import *
+from blocks import *
 from model import TacotronOneSeqwise as Tacotron
 
 
@@ -50,7 +51,7 @@ from os.path import join, expanduser
 
 import tensorboard_logger
 from tensorboard_logger import *
-from hyperparameters import hyperparameters
+from hyperparameters import hparams, hparams_debug_string
 
 vox_dir ='vox'
 
@@ -61,36 +62,80 @@ if use_cuda:
     cudnn.benchmark = False
 use_multigpu = None
 
-hparams = hyperparameters()
-print(hparams)
 fs = hparams.sample_rate
 
 
 
+def validate_discriminator(val_loader, model_discriminator, model):
+     model_discriminator.eval()
+     model.eval()
+     y_true = []
+     y_pred= []
+     criterion = nn.L1Loss()
+     val_loss = 0.
+     with torch.no_grad():
 
-def train(model, train_loader, val_loader, optimizer,
-          init_lr=0.002,
+        for step, (x, input_lengths, mel, y) in enumerate(val_loader):
+
+            x, mel, y = Variable(x), Variable(mel), Variable(y)
+            if use_cuda:
+                x, mel, y = x.cuda(), mel.cuda(), y.cuda()
+
+            mel_outputs, linear_outputs, attn = model(x)
+
+            labels_real = torch.ones(x.shape[0]).cuda().long()
+            labels_fake = torch.zeros(x.shape[0]).cuda().long()
+            outputs_real = model_discriminator(mel)
+            outputs_fake = model_discriminator(mel_outputs)
+
+            labels_real = labels_real.cpu().view(-1).numpy()
+            y_true += labels_real.tolist()
+
+            outputs_real = return_classes(outputs_real)
+            y_pred += outputs_real.tolist()
+
+            labels_fake = labels_fake.cpu().view(-1).numpy()
+            y_true += labels_fake.tolist()
+
+            outputs_fake = return_classes(outputs_fake)
+            y_pred += outputs_fake.tolist()
+
+     recall = get_metrics(y_pred, y_true)
+     print("Unweighted Recall for the validation set:  ", recall)
+     model_discriminator.train()
+     model.train()
+     return recall, model_discriminator, model
+
+def train(model, model_discriminator, train_loader, val_loader, optimizer,
+          optimizer_discriminator, init_lr=0.002,
           checkpoint_dir=None, checkpoint_interval=None, nepochs=None,
           clip_thresh=1.0):
-    model.train()
+
     if use_cuda:
         model = model.cuda()
+        model_discriminator = model_discriminator.cuda()
+
     linear_dim = model.linear_dim
 
     criterion = nn.L1Loss()
+    criterion_discriminator = nn.CrossEntropyLoss()
 
     global global_step, global_epoch
     while global_epoch < nepochs:
+        #model.eval()
+        model_discriminator.train()
+
         h = open(logfile_name, 'a')
         running_loss = 0.
+        running_loss_discriminator = 0.
+
         for step, (x, input_lengths, mel, y) in tqdm(enumerate(train_loader)):
 
             # Decay learning rate
             current_lr = learning_rate_decay(init_lr, global_step)
-            for param_group in optimizer.param_groups:
+            for param_group in optimizer_discriminator.param_groups:
                 param_group['lr'] = current_lr
 
-            optimizer.zero_grad()
 
             # Sort by length
             sorted_lengths, indices = torch.sort(
@@ -104,55 +149,85 @@ def train(model, train_loader, val_loader, optimizer,
             if use_cuda:
                 x, mel, y = x.cuda(), mel.cuda(), y.cuda()
 
-            # Multi GPU Configuration
-            if use_multigpu:
-               outputs,  r_, o_ = data_parallel_workaround(model, (x, mel))
-               mel_outputs, linear_outputs, attn = outputs[0], outputs[1], outputs[2]
- 
-            else:
-                mel_outputs, linear_outputs, attn = model(x, mel, input_lengths=sorted_lengths)
 
-            # Loss
-            mel_loss = criterion(mel_outputs, mel)
-            n_priority_freq = int(3000 / (fs * 0.5) * linear_dim)
-            linear_loss = 0.5 * criterion(linear_outputs, y) \
-                + 0.5 * criterion(linear_outputs[:, :, :n_priority_freq],
-                                  y[:, :, :n_priority_freq])
-            loss = mel_loss + linear_loss
+            # Update discriminator
+            if global_step > 7000: 
+               optimizer_discriminator.zero_grad()
+               mel_outputs, linear_outputs, attn = model(x, mel, input_lengths=sorted_lengths)
+               #mel_loss = criterion(mel_outputs, mel)
+               #n_priority_freq = int(3000 / (fs * 0.5) * linear_dim)
+               #linear_loss = 0.5 * criterion(linear_outputs, y) \
+               #    + 0.5 * criterion(linear_outputs[:, :, :n_priority_freq],
+                                  #y[:, :, :n_priority_freq])
+               #loss_L1 = mel_loss + linear_loss
+
+               labels_real = torch.ones(x.shape[0]).cuda().long()
+               labels_fake = torch.zeros(x.shape[0]).cuda().long()
+               outputs_real = model_discriminator(mel)
+               outputs_fake = model_discriminator(mel_outputs)
+
+               loss_discriminator_real = criterion_discriminator(outputs_real, labels_real)
+               loss_discriminator_fake = criterion_discriminator(outputs_fake, labels_fake)
+               loss_discriminator = loss_discriminator_fake + loss_discriminator_real
+
+               loss_discriminator.backward()
+               grad_norm = torch.nn.utils.clip_grad_norm_(
+               model_discriminator.parameters(), clip_thresh)
+               optimizer_discriminator.step()
+
 
             if global_step > 0 and global_step % hparams.save_states_interval == 0:
                 save_states(
                     global_step, mel_outputs, linear_outputs, attn, y,
                     None, checkpoint_dir)
-                visualize_phone_embeddings(model, checkpoint_dir, global_step)
 
-            if global_step > 0 and global_step % checkpoint_interval == 0:
-                save_checkpoint(
-                    model, optimizer, global_step, checkpoint_dir, global_epoch)
 
-            # Update
-            loss.backward(retain_graph=False)
+            # Update generator
+            optimizer.zero_grad()
+            mel_outputs, linear_outputs, attn = model(x, mel, input_lengths=sorted_lengths)
+            mel_loss = criterion(mel_outputs, mel)
+            n_priority_freq = int(3000 / (fs * 0.5) * linear_dim)
+            linear_loss = 0.5 * criterion(linear_outputs, y) \
+                + 0.5 * criterion(linear_outputs[:, :, :n_priority_freq],
+                                  y[:, :, :n_priority_freq])
+            loss_generator = mel_loss + linear_loss
+            if global_step > 7000:
+               loss = loss_discriminator + loss_generator
+               running_loss_discriminator += loss_discriminator.item()
+            else:
+               loss = loss_generator
+
+            loss_generator.backward()
             grad_norm = torch.nn.utils.clip_grad_norm_(
                  model.parameters(), clip_thresh)
             optimizer.step()
 
-            # Logs
+
+            # Tracking and logs
+
             log_value("loss", float(loss.item()), global_step)
-            log_value("mel loss", float(mel_loss.item()), global_step)
-            log_value("linear loss", float(linear_loss.item()), global_step)
+            #log_value("loss_discriminator", float(loss_discriminator.item()), global_step)
+            #log_value("loss_generator", float(loss_generator.item()), global_step)
+            #log_value("loss_discriminator_real", float(loss_discriminator.item()), global_step)
+            #log_value("loss_discriminator_fake", float(loss_discriminator.item()), global_step)
+            #log_value("mel loss", float(mel_loss.item()), global_step)
+            #log_value("linear loss", float(linear_loss.item()), global_step)
             log_value("gradient norm", grad_norm, global_step)
             log_value("learning rate", current_lr, global_step)
-            log_histogram("Last Linear Weights", model.last_linear.weight.detach().cpu(), global_step)
+            #log_histogram("Last Linear Weights", model.last_linear.weight.detach().cpu(), global_step)
             global_step += 1
             running_loss += loss.item()
 
         averaged_loss = running_loss / (len(train_loader))
         log_value("loss (per epoch)", averaged_loss, global_epoch)
-        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
-        h.close() 
-        #sys.exit()
+        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) 
+                + " Discriminator loss: " + format(running_loss_discriminator / (len(train_loader)))
+                + '\n')
+        h.close()
 
         global_epoch += 1
+        if global_step > 7000:
+            recall, model_discriminator, model = validate_discriminator(val_loader, model_discriminator, model)
 
 
 if __name__ == "__main__":
@@ -162,15 +237,12 @@ if __name__ == "__main__":
     checkpoint_path = args["--checkpoint-path"]
     log_path = args["--exp-dir"] + '/tracking'
     conf = args["--conf"]
-    #hparams.parse(args["--hparams"])
+    hparams.parse(args["--hparams"])
 
     # Override hyper parameters
     if conf is not None:
         with open(conf) as f:
-            hparams.update_params(f)
-    #print(hparams)
-    #print(hparams.batch_size)
-    #sys.exit()
+            hparams.parse_json(f.read())
 
     os.makedirs(exp_dir, exist_ok=True)
     os.makedirs(checkpoint_dir, exist_ok=True)
@@ -195,15 +267,15 @@ if __name__ == "__main__":
 
     feats_name = 'phones'
     X_train = categorical_datasource( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name, ph_ids)
-    X_val = CategoricalDataSource(vox_dir + '/' +  'fnames.val', vox_dir + '/' +  'etc/falcon_feats.desc', feats_name,  feats_name, ph_ids)
+    X_val = categorical_datasource( vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name, ph_ids)
 
     feats_name = 'lspec'
     Y_train = float_datasource(vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
-    Y_val = FloatDataSource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
+    Y_val = float_datasource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
 
     feats_name = 'mspec'
     Mel_train = float_datasource(vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
-    Mel_val = FloatDataSource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
+    Mel_val = float_datasource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
 
     # Dataset and Dataloader setup
     trainset = PyTorchDataset(X_train, Mel_train, Y_train)
@@ -227,10 +299,18 @@ if __name__ == "__main__":
                      padding_idx=hparams.padding_idx,
                      use_memory_mask=hparams.use_memory_mask,
                      )
+    model_discriminator = LSTMDiscriminator(hparams.num_mels, 32, 2) 
+
     model = model.cuda()
+    model_discriminator.cuda()
     #model = DataParallelFix(model)
 
     optimizer = optim.Adam(model.parameters(),
+                           lr=hparams.initial_learning_rate, betas=(
+                               hparams.adam_beta1, hparams.adam_beta2),
+                           weight_decay=hparams.weight_decay)
+
+    optimizer_discriminator = optim.Adam(model.parameters(),
                            lr=hparams.initial_learning_rate, betas=(
                                hparams.adam_beta1, hparams.adam_beta2),
                            weight_decay=hparams.weight_decay)
@@ -251,12 +331,12 @@ if __name__ == "__main__":
     # Setup tensorboard logger
     tensorboard_logger.configure(log_path)
 
-    #print(hparams_debug_string())
+    print(hparams_debug_string())
 
     # Train!
     try:
-        train(model, train_loader, val_loader, optimizer,
-              init_lr=hparams.initial_learning_rate,
+        train(model, model_discriminator, train_loader, val_loader, optimizer,
+              optimizer_discriminator, init_lr=hparams.initial_learning_rate,
               checkpoint_dir=checkpoint_dir,
               checkpoint_interval=hparams.checkpoint_interval,
               nepochs=hparams.nepochs,

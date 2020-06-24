@@ -1,4 +1,4 @@
-"""Trainining script for Tacotron speech synthesis model.
+"""Trainining script for WaveGlow vocoder
 
 usage: train.py [options]
 
@@ -32,7 +32,7 @@ from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 from util import *
-from model import TacotronOneSeqwise as Tacotron
+from model import WaveGlowNVIDIA, WaveGlowLoss
 
 
 import json
@@ -50,7 +50,7 @@ from os.path import join, expanduser
 
 import tensorboard_logger
 from tensorboard_logger import *
-from hyperparameters import hyperparameters
+from hyperparameters import hparams, hparams_debug_string
 
 vox_dir ='vox'
 
@@ -61,8 +61,6 @@ if use_cuda:
     cudnn.benchmark = False
 use_multigpu = None
 
-hparams = hyperparameters()
-print(hparams)
 fs = hparams.sample_rate
 
 
@@ -75,15 +73,13 @@ def train(model, train_loader, val_loader, optimizer,
     model.train()
     if use_cuda:
         model = model.cuda()
-    linear_dim = model.linear_dim
-
-    criterion = nn.L1Loss()
+    criterion = WaveGlowLoss()
 
     global global_step, global_epoch
     while global_epoch < nepochs:
         h = open(logfile_name, 'a')
         running_loss = 0.
-        for step, (x, input_lengths, mel, y) in tqdm(enumerate(train_loader)):
+        for step, (mel, x) in tqdm(enumerate(train_loader)):
 
             # Decay learning rate
             current_lr = learning_rate_decay(init_lr, global_step)
@@ -92,39 +88,14 @@ def train(model, train_loader, val_loader, optimizer,
 
             optimizer.zero_grad()
 
-            # Sort by length
-            sorted_lengths, indices = torch.sort(
-                input_lengths.view(-1), dim=0, descending=True)
-            sorted_lengths = sorted_lengths.long().numpy()
-
-            x, mel, y = x[indices], mel[indices], y[indices]
-
             # Feed data
-            x, mel, y = Variable(x), Variable(mel), Variable(y)
+            mel, x = Variable(mel), Variable(x)
             if use_cuda:
-                x, mel, y = x.cuda(), mel.cuda(), y.cuda()
+                mel, x = mel.cuda(), x.cuda()
 
-            # Multi GPU Configuration
-            if use_multigpu:
-               outputs,  r_, o_ = data_parallel_workaround(model, (x, mel))
-               mel_outputs, linear_outputs, attn = outputs[0], outputs[1], outputs[2]
- 
-            else:
-                mel_outputs, linear_outputs, attn = model(x, mel, input_lengths=sorted_lengths)
+            outputs = model(mel, x)
+            loss = criterion(outputs)
 
-            # Loss
-            mel_loss = criterion(mel_outputs, mel)
-            n_priority_freq = int(3000 / (fs * 0.5) * linear_dim)
-            linear_loss = 0.5 * criterion(linear_outputs, y) \
-                + 0.5 * criterion(linear_outputs[:, :, :n_priority_freq],
-                                  y[:, :, :n_priority_freq])
-            loss = mel_loss + linear_loss
-
-            if global_step > 0 and global_step % hparams.save_states_interval == 0:
-                save_states(
-                    global_step, mel_outputs, linear_outputs, attn, y,
-                    None, checkpoint_dir)
-                visualize_phone_embeddings(model, checkpoint_dir, global_step)
 
             if global_step > 0 and global_step % checkpoint_interval == 0:
                 save_checkpoint(
@@ -138,11 +109,8 @@ def train(model, train_loader, val_loader, optimizer,
 
             # Logs
             log_value("loss", float(loss.item()), global_step)
-            log_value("mel loss", float(mel_loss.item()), global_step)
-            log_value("linear loss", float(linear_loss.item()), global_step)
             log_value("gradient norm", grad_norm, global_step)
             log_value("learning rate", current_lr, global_step)
-            log_histogram("Last Linear Weights", model.last_linear.weight.detach().cpu(), global_step)
             global_step += 1
             running_loss += loss.item()
 
@@ -162,15 +130,12 @@ if __name__ == "__main__":
     checkpoint_path = args["--checkpoint-path"]
     log_path = args["--exp-dir"] + '/tracking'
     conf = args["--conf"]
-    #hparams.parse(args["--hparams"])
+    hparams.parse(args["--hparams"])
 
     # Override hyper parameters
     if conf is not None:
         with open(conf) as f:
-            hparams.update_params(f)
-    #print(hparams)
-    #print(hparams.batch_size)
-    #sys.exit()
+            hparams.parse_json(f.read())
 
     os.makedirs(exp_dir, exist_ok=True)
     os.makedirs(checkpoint_dir, exist_ok=True)
@@ -179,56 +144,30 @@ if __name__ == "__main__":
     h = open(logfile_name, 'w')
     h.close()
 
-    # Vocab size
-    with open(vox_dir + '/' + 'etc/ids_phones.json') as  f:
-       ph_ids = json.load(f)
-
-    ph_ids = dict(ph_ids)
-    print(ph_ids)
-
-    idsdict_file = checkpoint_dir + '/ids_phones.json'
-
-    with open(idsdict_file, 'w') as outfile:
-       json.dump(ph_ids, outfile)
-
-
-
-    feats_name = 'phones'
-    X_train = categorical_datasource( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name, ph_ids)
-    X_val = CategoricalDataSource(vox_dir + '/' +  'fnames.val', vox_dir + '/' +  'etc/falcon_feats.desc', feats_name,  feats_name, ph_ids)
-
-    feats_name = 'lspec'
-    Y_train = float_datasource(vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
-    Y_val = FloatDataSource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
-
-    feats_name = 'mspec'
+    feats_name = 'r9y9outputmel'
     Mel_train = float_datasource(vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
     Mel_val = FloatDataSource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
 
+    feats_name = 'r9y9inputmol'
+    X_train = float_datasource(vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
+    X_val = FloatDataSource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
+
     # Dataset and Dataloader setup
-    trainset = PyTorchDataset(X_train, Mel_train, Y_train)
+    trainset = WaveGlowDataset(X_train, Mel_train)
     train_loader = data_utils.DataLoader(
         trainset, batch_size=hparams.batch_size,
         num_workers=hparams.num_workers, shuffle=True,
-        collate_fn=collate_fn, pin_memory=hparams.pin_memory)
+        collate_fn=collate_fn_r9y9melNmol, pin_memory=hparams.pin_memory)
 
-    valset = PyTorchDataset(X_val, Mel_val, Y_val)
+    valset = WaveGlowDataset(X_val, Mel_val)
     val_loader = data_utils.DataLoader(
         valset, batch_size=hparams.batch_size,
         num_workers=hparams.num_workers, shuffle=True,
-        collate_fn=collate_fn, pin_memory=hparams.pin_memory)
+        collate_fn=collate_fn_r9y9melNmol, pin_memory=hparams.pin_memory)
 
     # Model
-    model = Tacotron(n_vocab=1+ len(ph_ids),
-                     embedding_dim=256,
-                     mel_dim=hparams.num_mels,
-                     linear_dim=hparams.num_freq,
-                     r=hparams.outputs_per_step,
-                     padding_idx=hparams.padding_idx,
-                     use_memory_mask=hparams.use_memory_mask,
-                     )
+    model = WaveGlowNVIDIA()
     model = model.cuda()
-    #model = DataParallelFix(model)
 
     optimizer = optim.Adam(model.parameters(),
                            lr=hparams.initial_learning_rate, betas=(
@@ -251,7 +190,7 @@ if __name__ == "__main__":
     # Setup tensorboard logger
     tensorboard_logger.configure(log_path)
 
-    #print(hparams_debug_string())
+    print(hparams_debug_string())
 
     # Train!
     try:

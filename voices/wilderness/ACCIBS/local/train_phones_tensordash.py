@@ -10,6 +10,7 @@ options:
     --checkpoint-path=<name>  Restore model from checkpoint path if given.
     --hparams=<parmas>        Hyper parameters [default: ].
     --log-event-path=<dir>    Log Path [default: exp/log_tacotronOne]
+    --password=<p>            Password to track on android
     -h, --help                Show this help message and exit
 """
 import os, sys
@@ -50,7 +51,10 @@ from os.path import join, expanduser
 
 import tensorboard_logger
 from tensorboard_logger import *
-from hyperparameters import hyperparameters
+from hyperparameters import hparams, hparams_debug_string
+
+
+from tensordash.torchdash import Torchdash
 
 vox_dir ='vox'
 
@@ -61,17 +65,13 @@ if use_cuda:
     cudnn.benchmark = False
 use_multigpu = None
 
-hparams = hyperparameters()
-print(hparams)
 fs = hparams.sample_rate
-
-
 
 
 def train(model, train_loader, val_loader, optimizer,
           init_lr=0.002,
           checkpoint_dir=None, checkpoint_interval=None, nepochs=None,
-          clip_thresh=1.0):
+          clip_thresh=1.0, histories=None):
     model.train()
     if use_cuda:
         model = model.cuda()
@@ -153,6 +153,12 @@ def train(model, train_loader, val_loader, optimizer,
         #sys.exit()
 
         global_epoch += 1
+        try:
+          histories.sendLoss(loss = running_loss / len(train_loader), epoch = global_epoch, total_epochs = hparams.nepochs)
+        except:
+          histories.sendCrash()
+
+
 
 
 if __name__ == "__main__":
@@ -162,15 +168,13 @@ if __name__ == "__main__":
     checkpoint_path = args["--checkpoint-path"]
     log_path = args["--exp-dir"] + '/tracking'
     conf = args["--conf"]
-    #hparams.parse(args["--hparams"])
+    password = args["--password"]
+    hparams.parse(args["--hparams"])
 
     # Override hyper parameters
     if conf is not None:
         with open(conf) as f:
-            hparams.update_params(f)
-    #print(hparams)
-    #print(hparams.batch_size)
-    #sys.exit()
+            hparams.parse_json(f.read())
 
     os.makedirs(exp_dir, exist_ok=True)
     os.makedirs(checkpoint_dir, exist_ok=True)
@@ -235,6 +239,11 @@ if __name__ == "__main__":
                                hparams.adam_beta1, hparams.adam_beta2),
                            weight_decay=hparams.weight_decay)
 
+    histories = Torchdash(
+       ModelName = 'model',
+       email = 'srallaba@andrew.cmu.edu',
+       password = password)
+
     # Load checkpoint
     if checkpoint_path:
         print("Load checkpoint from: {}".format(checkpoint_path))
@@ -251,7 +260,7 @@ if __name__ == "__main__":
     # Setup tensorboard logger
     tensorboard_logger.configure(log_path)
 
-    #print(hparams_debug_string())
+    print(hparams_debug_string())
 
     # Train!
     try:
@@ -260,7 +269,7 @@ if __name__ == "__main__":
               checkpoint_dir=checkpoint_dir,
               checkpoint_interval=hparams.checkpoint_interval,
               nepochs=hparams.nepochs,
-              clip_thresh=hparams.clip_thresh)
+              clip_thresh=hparams.clip_thresh, histories=histories)
     except KeyboardInterrupt:
         save_checkpoint(
             model, optimizer, global_step, checkpoint_dir, global_epoch)

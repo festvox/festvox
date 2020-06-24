@@ -50,7 +50,7 @@ from os.path import join, expanduser
 
 import tensorboard_logger
 from tensorboard_logger import *
-from hyperparameters import hyperparameters
+from hyperparameters import hparams, hparams_debug_string
 
 vox_dir ='vox'
 
@@ -61,15 +61,13 @@ if use_cuda:
     cudnn.benchmark = False
 use_multigpu = None
 
-hparams = hyperparameters()
-print(hparams)
 fs = hparams.sample_rate
 
 
 
 
-def train(model, train_loader, val_loader, optimizer,
-          init_lr=0.002,
+def train(model, train_loader, val_loader, optimizer_discriminator,
+          optimizer_generator, init_lr=0.002,
           checkpoint_dir=None, checkpoint_interval=None, nepochs=None,
           clip_thresh=1.0):
     model.train()
@@ -77,7 +75,8 @@ def train(model, train_loader, val_loader, optimizer,
         model = model.cuda()
     linear_dim = model.linear_dim
 
-    criterion = nn.L1Loss()
+    criterion_generator = nn.L1Loss()
+    criterion_discriminator = nn.CrossEntropyLoss()
 
     global global_step, global_epoch
     while global_epoch < nepochs:
@@ -112,7 +111,14 @@ def train(model, train_loader, val_loader, optimizer,
             else:
                 mel_outputs, linear_outputs, attn = model(x, mel, input_lengths=sorted_lengths)
 
-            # Loss
+            # Update discriminator
+            labels_real = Variable(torch.ones(hparams.batch_size))
+            labels_fake = Variable(torch.zeros(hparams.batch_size))
+
+            discriminator_loss_real = criterion_discriminator(mel, labels_real)
+            discriminator_loss_fake = criterion_discriminator(mel_outputs, labels_fake)
+
+            # Update generator
             mel_loss = criterion(mel_outputs, mel)
             n_priority_freq = int(3000 / (fs * 0.5) * linear_dim)
             linear_loss = 0.5 * criterion(linear_outputs, y) \
@@ -162,15 +168,12 @@ if __name__ == "__main__":
     checkpoint_path = args["--checkpoint-path"]
     log_path = args["--exp-dir"] + '/tracking'
     conf = args["--conf"]
-    #hparams.parse(args["--hparams"])
+    hparams.parse(args["--hparams"])
 
     # Override hyper parameters
     if conf is not None:
         with open(conf) as f:
-            hparams.update_params(f)
-    #print(hparams)
-    #print(hparams.batch_size)
-    #sys.exit()
+            hparams.parse_json(f.read())
 
     os.makedirs(exp_dir, exist_ok=True)
     os.makedirs(checkpoint_dir, exist_ok=True)
@@ -190,7 +193,6 @@ if __name__ == "__main__":
 
     with open(idsdict_file, 'w') as outfile:
        json.dump(ph_ids, outfile)
-
 
 
     feats_name = 'phones'
@@ -230,7 +232,12 @@ if __name__ == "__main__":
     model = model.cuda()
     #model = DataParallelFix(model)
 
-    optimizer = optim.Adam(model.parameters(),
+    optimizer_discriminator = optim.Adam(model.parameters(),
+                           lr=hparams.initial_learning_rate, betas=(
+                               hparams.adam_beta1, hparams.adam_beta2),
+                           weight_decay=hparams.weight_decay)
+
+    optimizer_generator = optim.Adam(model.parameters(),
                            lr=hparams.initial_learning_rate, betas=(
                                hparams.adam_beta1, hparams.adam_beta2),
                            weight_decay=hparams.weight_decay)
@@ -251,12 +258,12 @@ if __name__ == "__main__":
     # Setup tensorboard logger
     tensorboard_logger.configure(log_path)
 
-    #print(hparams_debug_string())
+    print(hparams_debug_string())
 
     # Train!
     try:
-        train(model, train_loader, val_loader, optimizer,
-              init_lr=hparams.initial_learning_rate,
+        train(model, train_loader, val_loader, optimizer_discriminator,
+              optimizer_generator, init_lr=hparams.initial_learning_rate,
               checkpoint_dir=checkpoint_dir,
               checkpoint_interval=hparams.checkpoint_interval,
               nepochs=hparams.nepochs,

@@ -1,4 +1,4 @@
-"""Trainining script for Tacotron speech synthesis model.
+"""Trainining script for Mandarin speech synthesis model. 1x1 conv and inflated loss. conv added before LSTM
 
 usage: train.py [options]
 
@@ -10,6 +10,8 @@ options:
     --checkpoint-path=<name>  Restore model from checkpoint path if given.
     --hparams=<parmas>        Hyper parameters [default: ].
     --log-event-path=<dir>    Log Path [default: exp/log_tacotronOne]
+    --pretrained_checkpoint_path=<name> Initialize with a pretrained model if given
+    --logits-dim=<N>         Dimensions for logits [default: 30] 
     -h, --help                Show this help message and exit
 """
 import os, sys
@@ -27,13 +29,12 @@ from collections import defaultdict
 FALCON_DIR = os.environ.get('FALCONDIR')
 sys.path.append(FALCON_DIR)
 ##############################################
-from utils.misc import *
+from utils.misc import * # ha sab kuch import karlo
 from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
-from util import *
-from model import TacotronOneSeqwise as Tacotron
-
+from util import * # modify
+from model import *
 
 import json
 
@@ -49,9 +50,12 @@ import numpy as np
 from os.path import join, expanduser
 
 import tensorboard_logger
-from tensorboard_logger import *
-from hyperparameters import hyperparameters
+from tensorboard_logger import *  # import X and then from X import *. naice!!
+from hyperparameters import hparams, hparams_debug_string
 
+from scipy.io.wavfile import write
+
+# Seriously??? vox_dir='vox'? kuch bhi
 vox_dir ='vox'
 
 global_step = 0
@@ -61,13 +65,11 @@ if use_cuda:
     cudnn.benchmark = False
 use_multigpu = None
 
-hparams = hyperparameters()
-print(hparams)
 fs = hparams.sample_rate
 
 
 
-
+ 
 def train(model, train_loader, val_loader, optimizer,
           init_lr=0.002,
           checkpoint_dir=None, checkpoint_interval=None, nepochs=None,
@@ -77,13 +79,25 @@ def train(model, train_loader, val_loader, optimizer,
         model = model.cuda()
     linear_dim = model.linear_dim
 
-    criterion = nn.L1Loss()
+    #criterion = nn.CrossEntropyLoss()
+    criterion = DiscretizedMixturelogisticLoss() 
+ 
+    # https://github.com/r9y9/wavenet_vocoder/blob/c4c148792c6263afbedb9f6bf11cd552668e26cb/train.py#L793
+    if hparams.exponential_moving_average is not None:
+        ema = ExponentialMovingAverage(hparams.ema_decay)
+        for name, param in model.named_parameters():
+            if param.requires_grad:
+                ema.register(name, param.data)
+    else:
+        ema = None
 
     global global_step, global_epoch
     while global_epoch < nepochs:
         h = open(logfile_name, 'a')
         running_loss = 0.
-        for step, (x, input_lengths, mel, y) in tqdm(enumerate(train_loader)):
+        running_loss_mol1 = 0.
+        running_loss_mol2 = 0.
+        for step, (mel, x) in tqdm(enumerate(train_loader)):
 
             # Decay learning rate
             current_lr = learning_rate_decay(init_lr, global_step)
@@ -92,43 +106,20 @@ def train(model, train_loader, val_loader, optimizer,
 
             optimizer.zero_grad()
 
-            # Sort by length
-            sorted_lengths, indices = torch.sort(
-                input_lengths.view(-1), dim=0, descending=True)
-            sorted_lengths = sorted_lengths.long().numpy()
-
-            x, mel, y = x[indices], mel[indices], y[indices]
-
-            # Feed data
-            x, mel, y = Variable(x), Variable(mel), Variable(y)
+            # Why are you doing this in multiple steps? Like writing more lines eh??
+            mel, x = Variable(mel), Variable(x)
             if use_cuda:
-                x, mel, y = x.cuda(), mel.cuda(), y.cuda()
+                mel, x = mel.cuda(), x.cuda()
 
-            # Multi GPU Configuration
-            if use_multigpu:
-               outputs,  r_, o_ = data_parallel_workaround(model, (x, mel))
-               mel_outputs, linear_outputs, attn = outputs[0], outputs[1], outputs[2]
- 
-            else:
-                mel_outputs, linear_outputs, attn = model(x, mel, input_lengths=sorted_lengths)
+            logits, targets = model(mel, x)
 
             # Loss
-            mel_loss = criterion(mel_outputs, mel)
-            n_priority_freq = int(3000 / (fs * 0.5) * linear_dim)
-            linear_loss = 0.5 * criterion(linear_outputs, y) \
-                + 0.5 * criterion(linear_outputs[:, :, :n_priority_freq],
-                                  y[:, :, :n_priority_freq])
-            loss = mel_loss + linear_loss
+            l = x.shape[1]
+            loss = criterion(logits.transpose(1,2), targets)
+            loss_weight = 1 #00
+            loss = loss_weight * loss
 
-            if global_step > 0 and global_step % hparams.save_states_interval == 0:
-                save_states(
-                    global_step, mel_outputs, linear_outputs, attn, y,
-                    None, checkpoint_dir)
-                visualize_phone_embeddings(model, checkpoint_dir, global_step)
-
-            if global_step > 0 and global_step % checkpoint_interval == 0:
-                save_checkpoint(
-                    model, optimizer, global_step, checkpoint_dir, global_epoch)
+            #print(loss)
 
             # Update
             loss.backward(retain_graph=False)
@@ -136,21 +127,35 @@ def train(model, train_loader, val_loader, optimizer,
                  model.parameters(), clip_thresh)
             optimizer.step()
 
+            if ema is not None:
+              for name, param in model.named_parameters():
+                 if name in ema.shadow:
+                    ema.update(name, param.data)
+
+
+            if global_step % checkpoint_interval == 0:
+
+               save_checkpoint(
+                    model, optimizer, global_step, checkpoint_dir, global_epoch, ema=ema)
+               print("Saved ema")
+
+            #print('EMA is ', ema)
+            #sys.exit()
+
             # Logs
             log_value("loss", float(loss.item()), global_step)
-            log_value("mel loss", float(mel_loss.item()), global_step)
-            log_value("linear loss", float(linear_loss.item()), global_step)
-            log_value("gradient norm", grad_norm, global_step)
-            log_value("learning rate", current_lr, global_step)
-            log_histogram("Last Linear Weights", model.last_linear.weight.detach().cpu(), global_step)
             global_step += 1
             running_loss += loss.item()
 
+
         averaged_loss = running_loss / (len(train_loader))
         log_value("loss (per epoch)", averaged_loss, global_epoch)
-        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
+        h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) 
+                +  '\n')
+
         h.close() 
         #sys.exit()
+
 
         global_epoch += 1
 
@@ -162,15 +167,18 @@ if __name__ == "__main__":
     checkpoint_path = args["--checkpoint-path"]
     log_path = args["--exp-dir"] + '/tracking'
     conf = args["--conf"]
-    #hparams.parse(args["--hparams"])
+    hparams.parse(args["--hparams"])
+    finetune = None
+    logits_dim = int(args["--logits-dim"])
+    print("Logits dim is ", logits_dim)
+    pretrained_checkpoint_path = args["--pretrained_checkpoint_path"]
+    if pretrained_checkpoint_path is not None and os.path.exists(pretrained_checkpoint_path):
+        finetune = 1    
 
     # Override hyper parameters
     if conf is not None:
         with open(conf) as f:
-            hparams.update_params(f)
-    #print(hparams)
-    #print(hparams.batch_size)
-    #sys.exit()
+            hparams.parse_json(f.read())
 
     os.makedirs(exp_dir, exist_ok=True)
     os.makedirs(checkpoint_dir, exist_ok=True)
@@ -179,51 +187,36 @@ if __name__ == "__main__":
     h = open(logfile_name, 'w')
     h.close()
 
-    # Vocab size
-    with open(vox_dir + '/' + 'etc/ids_phones.json') as  f:
-       ph_ids = json.load(f)
 
-    ph_ids = dict(ph_ids)
-    print(ph_ids)
+    feats_name = 'r9y9inputmol'
+    X_train = categorical_datasource( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name)
+    X_val = CategoricalDataSource(vox_dir + '/' +  'fnames.val', vox_dir + '/' +  'etc/falcon_feats.desc', feats_name,  feats_name)
 
-    idsdict_file = checkpoint_dir + '/ids_phones.json'
-
-    with open(idsdict_file, 'w') as outfile:
-       json.dump(ph_ids, outfile)
-
-
-
-    feats_name = 'phones'
-    X_train = categorical_datasource( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name, ph_ids)
-    X_val = CategoricalDataSource(vox_dir + '/' +  'fnames.val', vox_dir + '/' +  'etc/falcon_feats.desc', feats_name,  feats_name, ph_ids)
-
-    feats_name = 'lspec'
-    Y_train = float_datasource(vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
-    Y_val = FloatDataSource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
-
-    feats_name = 'mspec'
+    feats_name = 'r9y9outputmel'
     Mel_train = float_datasource(vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
     Mel_val = FloatDataSource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
 
     # Dataset and Dataloader setup
-    trainset = PyTorchDataset(X_train, Mel_train, Y_train)
+    trainset = WaveLSTMDataset(X_train, Mel_train)
     train_loader = data_utils.DataLoader(
         trainset, batch_size=hparams.batch_size,
-        num_workers=hparams.num_workers, shuffle=True,
-        collate_fn=collate_fn, pin_memory=hparams.pin_memory)
+        num_workers=0, shuffle=True,
+        collate_fn=collate_fn_r9y9melNmol, pin_memory=hparams.pin_memory)
 
-    valset = PyTorchDataset(X_val, Mel_val, Y_val)
+    ## Ok champion, tell me where you are using this  
+    valset = WaveLSTMDataset(X_val, Mel_val)
     val_loader = data_utils.DataLoader(
         valset, batch_size=hparams.batch_size,
         num_workers=hparams.num_workers, shuffle=True,
         collate_fn=collate_fn, pin_memory=hparams.pin_memory)
 
     # Model
-    model = Tacotron(n_vocab=1+ len(ph_ids),
+    model = WaveLSTM12b(n_vocab=257,
                      embedding_dim=256,
                      mel_dim=hparams.num_mels,
                      linear_dim=hparams.num_freq,
                      r=hparams.outputs_per_step,
+                     logits_dim=logits_dim,
                      padding_idx=hparams.padding_idx,
                      use_memory_mask=hparams.use_memory_mask,
                      )
@@ -242,16 +235,37 @@ if __name__ == "__main__":
         model.load_state_dict(checkpoint["state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer"])
         try:
-            global_step = checkpoint["global_step"]
-            global_epoch = checkpoint["global_epoch"]
+            global_step = int(checkpoint["global_step"])
+            global_epoch = int(checkpoint["global_epoch"])
         except:
-            # TODO
-            pass
+            print("Houston! We have got problems")
+            sys.exit()
+
+
+    if finetune:
+       assert os.path.exists(pretrained_checkpoint_path)
+       model8 = WaveLSTM8(n_vocab=257,
+                     embedding_dim=256,
+                     mel_dim=hparams.num_mels,
+                     logits_dim=logits_dim,
+                     linear_dim=hparams.num_freq,
+                     r=hparams.outputs_per_step,
+                     padding_idx=hparams.padding_idx,
+                     use_memory_mask=hparams.use_memory_mask,
+                     )
+       model8 = model8.cuda()
+
+       checkpoint = torch.load(pretrained_checkpoint_path)
+       model8.load_state_dict(checkpoint["state_dict"])
+       model.upsample_network = model8.upsample_network
+       #model.joint_encoder = model8.joint_encoder
+       #model.hidden2linear = model8.hidden2linear
+       #model.linear2logits = model8.linear2logits1
 
     # Setup tensorboard logger
     tensorboard_logger.configure(log_path)
 
-    #print(hparams_debug_string())
+    print(hparams_debug_string())
 
     # Train!
     try:
@@ -267,5 +281,6 @@ if __name__ == "__main__":
 
     print("Finished")
     sys.exit(0)
+
 
 

@@ -34,6 +34,7 @@ from tqdm import tqdm, trange
 from util import *
 from model import TacotronOneSeqwise as Tacotron
 
+from copy import deepcopy
 
 import json
 
@@ -50,7 +51,7 @@ from os.path import join, expanduser
 
 import tensorboard_logger
 from tensorboard_logger import *
-from hyperparameters import hyperparameters
+from hyperparameters import hparams, hparams_debug_string
 
 vox_dir ='vox'
 
@@ -61,12 +62,12 @@ if use_cuda:
     cudnn.benchmark = False
 use_multigpu = None
 
-hparams = hyperparameters()
-print(hparams)
 fs = hparams.sample_rate
 
 
+# Sample Implementations:
 
+# https://github.com/dragen1860/Reptile-Pytorch/blob/master/main.py
 
 def train(model, train_loader, val_loader, optimizer,
           init_lr=0.002,
@@ -78,6 +79,7 @@ def train(model, train_loader, val_loader, optimizer,
     linear_dim = model.linear_dim
 
     criterion = nn.L1Loss()
+    model_copy = deepcopy(model)
 
     global global_step, global_epoch
     while global_epoch < nepochs:
@@ -134,7 +136,13 @@ def train(model, train_loader, val_loader, optimizer,
             loss.backward(retain_graph=False)
             grad_norm = torch.nn.utils.clip_grad_norm_(
                  model.parameters(), clip_thresh)
-            optimizer.step()
+
+            if global_step % 2 ==  1:
+               model = deepcopy(model_copy)
+               optimizer.step()
+            else:
+               optimizer.step()
+               model_copy = deepcopy(model)
 
             # Logs
             log_value("loss", float(loss.item()), global_step)
@@ -162,15 +170,12 @@ if __name__ == "__main__":
     checkpoint_path = args["--checkpoint-path"]
     log_path = args["--exp-dir"] + '/tracking'
     conf = args["--conf"]
-    #hparams.parse(args["--hparams"])
+    hparams.parse(args["--hparams"])
 
     # Override hyper parameters
     if conf is not None:
         with open(conf) as f:
-            hparams.update_params(f)
-    #print(hparams)
-    #print(hparams.batch_size)
-    #sys.exit()
+            hparams.parse_json(f.read())
 
     os.makedirs(exp_dir, exist_ok=True)
     os.makedirs(checkpoint_dir, exist_ok=True)
@@ -251,7 +256,7 @@ if __name__ == "__main__":
     # Setup tensorboard logger
     tensorboard_logger.configure(log_path)
 
-    #print(hparams_debug_string())
+    print(hparams_debug_string())
 
     # Train!
     try:

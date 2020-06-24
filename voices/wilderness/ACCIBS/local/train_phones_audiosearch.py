@@ -32,8 +32,10 @@ from utils import audio
 from utils.plot import plot_alignment
 from tqdm import tqdm, trange
 from util import *
-from model import TacotronOneSeqwise as Tacotron
+from model import TacotronOneSeqwiseAudiosearch as Tacotron
 
+from torch import autograd
+import random
 
 import json
 
@@ -50,7 +52,7 @@ from os.path import join, expanduser
 
 import tensorboard_logger
 from tensorboard_logger import *
-from hyperparameters import hyperparameters
+from hyperparameters import hparams, hparams_debug_string
 
 vox_dir ='vox'
 
@@ -61,12 +63,41 @@ if use_cuda:
     cudnn.benchmark = False
 use_multigpu = None
 
-hparams = hyperparameters()
-print(hparams)
 fs = hparams.sample_rate
 
 
 
+
+def validate(val_loader):
+
+         with torch.no_grad():
+             predictions = []
+             targets = []
+             for step, (x, pos, neg) in tqdm(enumerate(val_loader)):     
+
+                # Feed data
+                x, pos, neg = Variable(x), Variable(pos), Variable(neg)
+                if use_cuda:
+                    x, pos, neg = x.cuda(), pos.cuda(), neg.cuda()
+
+                positive_labels = pos.new(pos.shape[0]).zero_() + 1
+                negative_labels = pos.new(neg.shape[0]).zero_()
+
+                logits_positive, x_reconstructed  = model(pos.long(), x)
+                logits_negative, x_reconstructed  = model(neg.long(), x)
+
+                classes = return_classes(logits_positive.view(-1, logits_positive.shape[-1]))
+                classes = classes.cpu().numpy().tolist()
+                predictions += classes
+                targets += positive_labels.detach().cpu().numpy().tolist()
+
+                classes = return_classes(logits_negative.view(-1, logits_negative.shape[-1]))
+                classes = classes.cpu().numpy().tolist()
+                predictions += classes
+                targets += negative_labels.detach().cpu().numpy().tolist()
+
+             get_metrics(predictions, targets)
+                      
 
 def train(model, train_loader, val_loader, optimizer,
           init_lr=0.002,
@@ -77,13 +108,16 @@ def train(model, train_loader, val_loader, optimizer,
         model = model.cuda()
     linear_dim = model.linear_dim
 
-    criterion = nn.L1Loss()
+    criterion = nn.CrossEntropyLoss()
+    validate(val_loader)
+    #sys.exit()
 
     global global_step, global_epoch
     while global_epoch < nepochs:
+     with autograd.detect_anomaly():
         h = open(logfile_name, 'a')
         running_loss = 0.
-        for step, (x, input_lengths, mel, y) in tqdm(enumerate(train_loader)):
+        for step, (x, pos, neg) in tqdm(enumerate(train_loader)):
 
             # Decay learning rate
             current_lr = learning_rate_decay(init_lr, global_step)
@@ -92,17 +126,13 @@ def train(model, train_loader, val_loader, optimizer,
 
             optimizer.zero_grad()
 
-            # Sort by length
-            sorted_lengths, indices = torch.sort(
-                input_lengths.view(-1), dim=0, descending=True)
-            sorted_lengths = sorted_lengths.long().numpy()
-
-            x, mel, y = x[indices], mel[indices], y[indices]
-
             # Feed data
-            x, mel, y = Variable(x), Variable(mel), Variable(y)
+            x, pos, neg = Variable(x), Variable(pos), Variable(neg)
             if use_cuda:
-                x, mel, y = x.cuda(), mel.cuda(), y.cuda()
+                x, pos, neg = x.cuda(), pos.cuda(), neg.cuda()
+
+            positive_labels = pos.new(pos.shape[0]).zero_() + 1
+            negative_labels = pos.new(neg.shape[0]).zero_()
 
             # Multi GPU Configuration
             if use_multigpu:
@@ -110,21 +140,20 @@ def train(model, train_loader, val_loader, optimizer,
                mel_outputs, linear_outputs, attn = outputs[0], outputs[1], outputs[2]
  
             else:
-                mel_outputs, linear_outputs, attn = model(x, mel, input_lengths=sorted_lengths)
+                inps = [pos, neg]
+                labels = [positive_labels, negative_labels] 
+                choice = random.choice([0, 1])
+                choice_inputs = inps[choice]
+                choice_labels = labels[choice]
+                #print("Shape of choice: ", choice.shape)
+                logits, x_reconstructed  = model(choice_inputs.long(), x)
 
             # Loss
-            mel_loss = criterion(mel_outputs, mel)
-            n_priority_freq = int(3000 / (fs * 0.5) * linear_dim)
-            linear_loss = 0.5 * criterion(linear_outputs, y) \
-                + 0.5 * criterion(linear_outputs[:, :, :n_priority_freq],
-                                  y[:, :, :n_priority_freq])
-            loss = mel_loss + linear_loss
+            loss_search = criterion(logits.contiguous().view(-1, 2), choice_labels.long())
+            #print("Shapes of x and x_recon: ", x.shape, x_reconstructed.shape) 
+            loss_reconstruction = criterion(x_reconstructed.contiguous().view(-1, 1 + len(ph_ids)), x.long().contiguous().view(-1) )
+            loss = loss_search + loss_reconstruction
 
-            if global_step > 0 and global_step % hparams.save_states_interval == 0:
-                save_states(
-                    global_step, mel_outputs, linear_outputs, attn, y,
-                    None, checkpoint_dir)
-                visualize_phone_embeddings(model, checkpoint_dir, global_step)
 
             if global_step > 0 and global_step % checkpoint_interval == 0:
                 save_checkpoint(
@@ -138,21 +167,22 @@ def train(model, train_loader, val_loader, optimizer,
 
             # Logs
             log_value("loss", float(loss.item()), global_step)
-            log_value("mel loss", float(mel_loss.item()), global_step)
-            log_value("linear loss", float(linear_loss.item()), global_step)
+            log_value("search loss", float(loss_search.item()), global_step)
+            log_value("reconstruction loss", float(loss_reconstruction.item()), global_step)
             log_value("gradient norm", grad_norm, global_step)
             log_value("learning rate", current_lr, global_step)
-            log_histogram("Last Linear Weights", model.last_linear.weight.detach().cpu(), global_step)
             global_step += 1
             running_loss += loss.item()
 
         averaged_loss = running_loss / (len(train_loader))
         log_value("loss (per epoch)", averaged_loss, global_epoch)
         h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
-        h.close() 
+        h.close()
         #sys.exit()
 
         global_epoch += 1
+
+        validate(val_loader)
 
 
 if __name__ == "__main__":
@@ -162,15 +192,12 @@ if __name__ == "__main__":
     checkpoint_path = args["--checkpoint-path"]
     log_path = args["--exp-dir"] + '/tracking'
     conf = args["--conf"]
-    #hparams.parse(args["--hparams"])
+    hparams.parse(args["--hparams"])
 
     # Override hyper parameters
     if conf is not None:
         with open(conf) as f:
-            hparams.update_params(f)
-    #print(hparams)
-    #print(hparams.batch_size)
-    #sys.exit()
+            hparams.parse_json(f.read())
 
     os.makedirs(exp_dir, exist_ok=True)
     os.makedirs(checkpoint_dir, exist_ok=True)
@@ -195,28 +222,20 @@ if __name__ == "__main__":
 
     feats_name = 'phones'
     X_train = categorical_datasource( vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name, ph_ids)
-    X_val = CategoricalDataSource(vox_dir + '/' +  'fnames.val', vox_dir + '/' +  'etc/falcon_feats.desc', feats_name,  feats_name, ph_ids)
-
-    feats_name = 'lspec'
-    Y_train = float_datasource(vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
-    Y_val = FloatDataSource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
-
-    feats_name = 'mspec'
-    Mel_train = float_datasource(vox_dir + '/' + 'fnames.train', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
-    Mel_val = FloatDataSource(vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' + 'festival/falcon_' + feats_name)
+    X_val = categorical_datasource( vox_dir + '/' + 'fnames.val', vox_dir + '/' + 'etc/falcon_feats.desc', feats_name, vox_dir + '/' +  'festival/falcon_' + feats_name, ph_ids)
 
     # Dataset and Dataloader setup
-    trainset = PyTorchDataset(X_train, Mel_train, Y_train)
+    trainset = AudiosearchDataset(X_train)
     train_loader = data_utils.DataLoader(
         trainset, batch_size=hparams.batch_size,
         num_workers=hparams.num_workers, shuffle=True,
-        collate_fn=collate_fn, pin_memory=hparams.pin_memory)
+        collate_fn=collate_fn_audiosearch, pin_memory=hparams.pin_memory)
 
-    valset = PyTorchDataset(X_val, Mel_val, Y_val)
+    valset = AudiosearchDataset(X_val)
     val_loader = data_utils.DataLoader(
         valset, batch_size=hparams.batch_size,
         num_workers=hparams.num_workers, shuffle=True,
-        collate_fn=collate_fn, pin_memory=hparams.pin_memory)
+        collate_fn=collate_fn_audiosearch, pin_memory=hparams.pin_memory)
 
     # Model
     model = Tacotron(n_vocab=1+ len(ph_ids),
@@ -251,7 +270,7 @@ if __name__ == "__main__":
     # Setup tensorboard logger
     tensorboard_logger.configure(log_path)
 
-    #print(hparams_debug_string())
+    print(hparams_debug_string())
 
     # Train!
     try:

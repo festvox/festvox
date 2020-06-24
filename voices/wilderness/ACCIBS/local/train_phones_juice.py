@@ -4,12 +4,13 @@ usage: train.py [options]
 
 options:
     --conf=<json>             Path of configuration file (json).
-    --gpu-id=<N>               ID of the GPU to use [default: 0]
+    --gpu-id=<N>              ID of the GPU to use [default: 0]
     --exp-dir=<dir>           Experiment directory
     --checkpoint-dir=<dir>    Directory where to save model checkpoints [default: checkpoints].
     --checkpoint-path=<name>  Restore model from checkpoint path if given.
     --hparams=<parmas>        Hyper parameters [default: ].
     --log-event-path=<dir>    Log Path [default: exp/log_tacotronOne]
+    --global-conf-path=<json> Path of conf file (json) [default: /home_original/srallaba/falcon.conf]
     -h, --help                Show this help message and exit
 """
 import os, sys
@@ -18,7 +19,7 @@ args = docopt(__doc__)
 print("Command line args:\n", args)
 gpu_id = args['--gpu-id']
 print("Using GPU ", gpu_id)
-os.environ["CUDA_VISIBLE_DEVICES"]=gpu_id
+#os.environ["CUDA_VISIBLE_DEVICES"]=gpu_id
 
 
 from collections import defaultdict
@@ -50,7 +51,7 @@ from os.path import join, expanduser
 
 import tensorboard_logger
 from tensorboard_logger import *
-from hyperparameters import hyperparameters
+from hyperparameters import hparams, hparams_debug_string
 
 vox_dir ='vox'
 
@@ -59,14 +60,32 @@ global_epoch = 0
 use_cuda = torch.cuda.is_available()
 if use_cuda:
     cudnn.benchmark = False
-use_multigpu = None
+use_multigpu = False
 
-hparams = hyperparameters()
-print(hparams)
 fs = hparams.sample_rate
 
+global_config_file = args['--global-conf-path']
+print("File with global configs is ", global_config_file)
+stamp = os.stat(global_config_file).st_mtime
 
 
+
+def check_globalconf_changed():
+
+      global stamp
+      global use_multigpu 
+      stamp_local = os.stat(global_config_file).st_mtime
+
+      if stamp_local == stamp:
+         return
+
+      else:
+         with open(global_config_file) as json_file:
+            info = json.load(json_file)
+            use_multigpu = info['use_multigpu']
+         print("File modified")
+         stamp = stamp_local
+         return
 
 def train(model, train_loader, val_loader, optimizer,
           init_lr=0.002,
@@ -85,6 +104,7 @@ def train(model, train_loader, val_loader, optimizer,
         running_loss = 0.
         for step, (x, input_lengths, mel, y) in tqdm(enumerate(train_loader)):
 
+ 
             # Decay learning rate
             current_lr = learning_rate_decay(init_lr, global_step)
             for param_group in optimizer.param_groups:
@@ -106,12 +126,16 @@ def train(model, train_loader, val_loader, optimizer,
 
             # Multi GPU Configuration
             if use_multigpu:
+               #print("Adopting distributed training")
                outputs,  r_, o_ = data_parallel_workaround(model, (x, mel))
                mel_outputs, linear_outputs, attn = outputs[0], outputs[1], outputs[2]
  
             else:
+                #print("Not using distributed training since use_multigpu flag is set to ", use_multigpu)
                 mel_outputs, linear_outputs, attn = model(x, mel, input_lengths=sorted_lengths)
 
+            print(use_multigpu)
+            
             # Loss
             mel_loss = criterion(mel_outputs, mel)
             n_priority_freq = int(3000 / (fs * 0.5) * linear_dim)
@@ -146,6 +170,8 @@ def train(model, train_loader, val_loader, optimizer,
             global_step += 1
             running_loss += loss.item()
 
+            check_globalconf_changed()
+
         averaged_loss = running_loss / (len(train_loader))
         log_value("loss (per epoch)", averaged_loss, global_epoch)
         h.write("Loss after epoch " + str(global_epoch) + ': '  + format(running_loss / (len(train_loader))) + '\n')
@@ -162,15 +188,15 @@ if __name__ == "__main__":
     checkpoint_path = args["--checkpoint-path"]
     log_path = args["--exp-dir"] + '/tracking'
     conf = args["--conf"]
-    #hparams.parse(args["--hparams"])
+    hparams.parse(args["--hparams"])
+    global_config_file = args['--global-conf-path']
+    print("File with global configs is ", global_config_file)
+    stamp = os.stat(global_config_file).st_mtime
 
     # Override hyper parameters
     if conf is not None:
         with open(conf) as f:
-            hparams.update_params(f)
-    #print(hparams)
-    #print(hparams.batch_size)
-    #sys.exit()
+            hparams.parse_json(f.read())
 
     os.makedirs(exp_dir, exist_ok=True)
     os.makedirs(checkpoint_dir, exist_ok=True)
@@ -251,7 +277,7 @@ if __name__ == "__main__":
     # Setup tensorboard logger
     tensorboard_logger.configure(log_path)
 
-    #print(hparams_debug_string())
+    print(hparams_debug_string())
 
     # Train!
     try:
