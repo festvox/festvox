@@ -4,8 +4,10 @@ import math
 import numpy as np
 import tensorflow as tf
 from scipy import signal
-from hyperparameters import hparams
+from hyperparameters import hyperparameters
 from scipy.io import wavfile
+
+hparams = hyperparameters()
 
 #This file is basically a clone from https://github.com/r9y9/tacotron/blob/0987cedd0d6a6909749c594ca978ac4e11ae79ae/util/audio.py
 
