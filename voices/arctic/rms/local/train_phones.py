@@ -50,7 +50,7 @@ from os.path import join, expanduser
 
 import tensorboard_logger
 from tensorboard_logger import *
-from hyperparameters import hparams, hparams_debug_string
+from hyperparameters import hyperparameters
 
 vox_dir ='vox'
 
@@ -61,6 +61,8 @@ if use_cuda:
     cudnn.benchmark = False
 use_multigpu = None
 
+hparams = hyperparameters()
+print(hparams)
 fs = hparams.sample_rate
 
 
@@ -160,12 +162,15 @@ if __name__ == "__main__":
     checkpoint_path = args["--checkpoint-path"]
     log_path = args["--exp-dir"] + '/tracking'
     conf = args["--conf"]
-    hparams.parse(args["--hparams"])
+    #hparams.parse(args["--hparams"])
 
     # Override hyper parameters
     if conf is not None:
         with open(conf) as f:
-            hparams.parse_json(f.read())
+            hparams.update_params(f)
+    #print(hparams)
+    #print(hparams.batch_size)
+    #sys.exit()
 
     os.makedirs(exp_dir, exist_ok=True)
     os.makedirs(checkpoint_dir, exist_ok=True)
@@ -246,7 +251,7 @@ if __name__ == "__main__":
     # Setup tensorboard logger
     tensorboard_logger.configure(log_path)
 
-    print(hparams_debug_string())
+    #print(hparams_debug_string())
 
     # Train!
     try:
