@@ -49,3 +49,10 @@ Vocoder: [Checkout the samples](http://tts.speech.cs.cmu.edu/rsk/challenges/bliz
 #### Experiments
 
 [Vocoder](): WaveGlow 
+
+
+# 20.05 May
+#### Acquisitions : 50% (15 blocks out of 30)
+#### Experiments
+
+[Judith based Lit Review](https://www.youtube.com/watch?v=A_idoFssTjE&list=PLOP55xdQB5RGDGnwUbK9dUn6t-7KuFn_F&index=8)
