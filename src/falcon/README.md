@@ -1,6 +1,6 @@
 Falcon is a neural extension to festvox voice building suite. 
 
-It is built inspired by [Ryuichi Yamamoto's tacotron repo](https://github.com/r9y9/tacotron_pytorch) and follows coding style of [Kaldi](https://github.com/kaldi-asr/kaldi) and [Google Research](https://arxiv.org/ftp/arxiv/papers/1702/1702.01715.pdf)
+It is built inspired by [Ryuichi Yamamoto's tacotron repo](https://github.com/r9y9/tacotron_pytorch) and follows the style of [Kaldi](https://github.com/kaldi-asr/kaldi) and [Google Research](https://arxiv.org/ftp/arxiv/papers/1702/1702.01715.pdf)
 
 
 Layers -> Blocks -> Models
