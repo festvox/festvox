@@ -61,5 +61,6 @@ Vocoder: [Checkout the samples](http://tts.speech.cs.cmu.edu/rsk/challenges/bliz
 #### Integrating Judith. 
 
 [Judith based Lit Review](https://www.youtube.com/watch?v=A_idoFssTjE&list=PLOP55xdQB5RGDGnwUbK9dUn6t-7KuFn_F&index=8)
+
 [Developer Cut](http://www.cs.cmu.edu/~srallaba/ProjectDeveloperCut/)
 
