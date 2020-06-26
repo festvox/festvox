@@ -12,7 +12,7 @@ Wavenet is a model built on top of ResidualDilatedCausalConv1d
 
 Sample [run.sh](https://github.com/festvox/festvox/blob/master/voices/arctic/rms/run.sh) can be found in any of the voices directories.
 
-For the first 18 months, I have decided to track the amount of blocks that are indigenous to us as opposed to those borrowed from the giants. I refer to these as acquisitions. This is inspired by Marissa Mayer's notion of acquisitions at Yahoo.
+For the first 18 months, I have decided to track the amount of blocks that are indigenous to us as opposed to those borrowed from the giants. I refer to these as acquisitions. This is inspired by Marissa Mayer's notion of [acquisitions](https://gizmodo.com/heres-what-happened-to-all-of-marissa-mayers-yahoo-acqu-1781980352) at Yahoo.
 
 # 20.01 January
 #### Acquisitions : 63% (14 blocks out of 22)
