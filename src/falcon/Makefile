@@ -1,7 +1,8 @@
 ###########################################################################
 ##                                                                       ##
+##                   Language Technologies Institute                     ##
 ##                     Carnegie Mellon University                        ##
-##                         Copyright (c) 2005                            ##
+##                       Copyright (c) 2005-2008                         ##
 ##                        All Rights Reserved.                           ##
 ##                                                                       ##
 ##  Permission is hereby granted, free of charge, to use and distribute  ##
@@ -29,19 +30,21 @@
 ##  THIS SOFTWARE.                                                       ##
 ##                                                                       ##
 ###########################################################################
-##                                                                       ##
-##  Scripts, examples and sources directory                              ##
-##                                                                       ##
+###                                                                      ##
+###  Makefile for falcon specific scripts                                ##
+###                                                                      ##
 ###########################################################################
-TOP=..
-DIRNAME=src
-BUILD_DIRS = general diphones eval promptselect vc ehmm interslice mllr \
-             spamf0 phrasyn grapheme lts
-ALL_DIRS= db_example intonation duration unitsel clustergen falcon \
-          ldom vox_diphone vox_files prosody st hts_build $(BUILD_DIRS)
-FILES = Makefile 
+TOP=../..
+DIRNAME=src/falcon
+PYFILES = blocks.py hyperparameters.py layers.py models.py
+SUBDIRS = judith utils
+OTHERS = README.md
 
-ALL = 
+FILES = Makefile $(PYFILES) $(SUBDIRS) $(OTHERS)
 
 include $(TOP)/config/common_make_rules
+
+
+
+
 
