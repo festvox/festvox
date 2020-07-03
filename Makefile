@@ -52,7 +52,7 @@ BUILD_DIRS = src
 ALL_DIRS=config docbook $(BUILD_DIRS)
 CONFIG=configure configure.in config.sub config.guess \
        missing install-sh mkinstalldirs
-OTHERS = README.md ACKNOWLEDGEMENTS
+OTHERS = README.md ACKNOWLEDGEMENTS COPYING
 OTHERDIRS = voices # challenges
 FILES = Makefile $(OTHERS) $(CONFIG) $(OTHERDIRS)
 
