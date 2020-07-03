@@ -61,7 +61,8 @@ SCRIPTS = setup_cg setup_cg_indic \
           cg_get_mcd get_cd_dtw get_cd_dtw_mgc get_str_sptk \
           build_cg_voice find_wstop find_nstates freq_response_vector_gen \
           do_xsent find_dg wagon_rf wagon_rf_f0 rf_post_build build_rfs \
-          make_dur_model_mcep_rf build_cg_rfs_voice reduce_senones
+          make_dur_model_mcep_rf build_cg_rfs_voice reduce_senones \
+          build_cg_world_rfs_voice build_cg_world_voice
 OTHERS = mcep.desc mceptraj.desc statedur.feats statedur.feats_flite HOWTO \
          mcep.desc.graph statedur.feats.graph statedur.feats_flite.graph \
 	 SPTK-3.6.patch xsent.desc
