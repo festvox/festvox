@@ -1,0 +1,354 @@
+#! /bin/csh -f
+#######################################################################
+##                                                                   ##
+##            Nagoya Institute of Technology, Aichi, Japan,          ##
+##       Nara Institute of Science and Technology, Nara, Japan       ##
+##                                and                                ##
+##             Carnegie Mellon University, Pittsburgh, PA            ##
+##                      Copyright (c) 2003-2004                      ##
+##                        All Rights Reserved.                       ##
+##                                                                   ##
+##  Permission is hereby granted, free of charge, to use and         ##
+##  distribute this software and its documentation without           ##
+##  restriction, including without limitation the rights to use,     ##
+##  copy, modify, merge, publish, distribute, sublicense, and/or     ##
+##  sell copies of this work, and to permit persons to whom this     ##
+##  work is furnished to do so, subject to the following conditions: ##
+##                                                                   ##
+##    1. The code must retain the above copyright notice, this list  ##
+##       of conditions and the following disclaimer.                 ##
+##    2. Any modifications must be clearly marked as such.           ##
+##    3. Original authors' names are not deleted.                    ##
+##                                                                   ##    
+##  NAGOYA INSTITUTE OF TECHNOLOGY, NARA INSTITUTE OF SCIENCE AND    ##
+##  TECHNOLOGY, CARNEGIE MELLON UNiVERSITY, AND THE CONTRIBUTORS TO  ##
+##  THIS WORK DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,  ##
+##  INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, ##
+##  IN NO EVENT SHALL NAGOYA INSTITUTE OF TECHNOLOGY, NARA           ##
+##  INSTITUTE OF SCIENCE AND TECHNOLOGY, CARNEGIE MELLON UNIVERSITY, ##
+##  NOR THE CONTRIBUTORS BE LIABLE FOR ANY SPECIAL, INDIRECT OR      ##
+##  CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM   ##
+##  LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,  ##
+##  NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN        ##
+##  CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.         ##
+##                                                                   ##
+#######################################################################
+##                                                                   ##
+##          Author :  Tomoki Toda (tomoki@ics.nitech.ac.jp)          ##
+##          Date   :  June 2004                                      ##
+##                                                                   ##
+#######################################################################
+##                                                                   ##
+##  Training of GMM for Voice Conversion                             ##
+##                                                                   ##
+#######################################################################
+
+#if ( $# == 0 ) then
+#   echo "vc_train FROMWAVDIR TOWAVDIR"
+#   echo "GMM voice conversion training script"
+#   echo "e.g. $FESTVOXDIR/src/vc/scripts/vc_train diphones/kal wav/awb"
+#endif
+
+###########################################################
+#  You may want to change some of the following
+###########################################################
+set SYNORG = 0	# 1: SYNTHETIC speech is used as source
+		# 0: NATURAL speech is used as source
+set org = $2	# source speaker
+set tar = $3	# target speaker
+set work_dir = .
+set list_dir = ./list
+set src_dir  = $FESTVOXDIR/src/vc/src
+set csh_dir  = $FESTVOXDIR/src/vc/scripts/GMMMAP
+###########################################################
+if ( $1 == "train_cg") then
+set SYNORG = 2  # source is from CG voice
+set EXPAR = 1	# Parameter Extraction
+set F0STS = 1	# Calculation of Statistics of F0
+set TRSPC = 1	# Training of Spectral Conversion Function
+set TRSPCMLLR = 0	# Training of Spectral Conversion Function MLLR
+set GVSTS = 1	# Calculation of Statistics of Global Variance
+set CPPAR = 1	# Copy Parameter Files
+set CVWAV = 0	# Test of Voice Conversion
+endif
+if ( $1 == "train") then
+set EXPAR = 1	# Parameter Extraction
+set F0STS = 1	# Calculation of Statistics of F0
+set TRSPC = 1	# Training of Spectral Conversion Function GMM
+set TRSPCMLLR = 0	# Training of Spectral Conversion Function MLLR
+set GVSTS = 1	# Calculation of Statistics of Global Variance
+set CPPAR = 1	# Copy Parameter Files
+set CVWAV = 0	# Test of Voice Conversion
+endif
+if ( $1 == "test") then
+set EXPAR = 0	# Parameter Extraction
+set F0STS = 0	# Calculation of Statistics of F0
+set TRSPC = 0	# Training of Spectral Conversion Function
+set GVSTS = 0	# Calculation of Statistics of Global Variance
+set CPPAR = 0	# Copy Parameter Files
+set CVWAV = 1	# Test of Voice Conversion
+set TRSPCMLLR = 0	# Training of Spectral Conversion Function MLLR
+set MLLR = 0
+endif
+
+####################
+set olist = $list_dir/$org"_tr.list"	# list of source files for training
+set tlist = $list_dir/$tar"_tr.list"	# list of target files for training
+set itnum = 2				# the number of iterations
+set clsnum = 32				# the number of mixtures
+###########################################################
+
+# Parameter Extraction
+if ($EXPAR == 1) then
+	if ($SYNORG == 1) then
+		# F0 extraction from utterance file
+		echo "# F0 extraction for source speech ..."
+		csh $csh_dir/get_utt2f0.csh \
+			$work_dir \
+			$src_dir \
+			$olist
+		# mel-cepstrum analysis (fast version)
+		echo "# mel-cepstrum analysis for source speech ..."
+		csh $csh_dir/get_mcep_fast.csh \
+			$work_dir \
+			$src_dir \
+			$olist
+	else
+            if ($SYNORG == 2) then
+                true; # do nothing
+            else
+		# F0 extraction
+		echo "# F0 extraction for source speech ..."
+		csh $csh_dir/get_f0.csh \
+			$work_dir \
+			$src_dir \
+			$olist
+		# mel-cepstrum extraction
+		echo "# mel-cepstrum analysis for source speech ..."
+		csh $csh_dir/get_mcep.csh \
+			$work_dir \
+			$src_dir \
+			$olist
+            endif
+	endif
+
+	# F0 extraction
+	echo "# F0 extraction for target speech ..."
+	csh $csh_dir/get_f0.csh \
+		$work_dir \
+		$src_dir \
+		$tlist
+	# mel-cepstrum extraction
+	echo "# mel-cepstrum analysis for target speech ..."
+	csh $csh_dir/get_mcep.csh \
+		$work_dir \
+		$src_dir \
+		$tlist
+
+	# error check
+	if (-r DUMMY-ERROR-LOG) then
+		echo "### ERROR ###"
+		rm DUMMY-ERROR-LOG
+		exit
+	endif
+
+	echo "### Parameter extraction has been finished. ###"
+endif
+
+# Calculation of Statistics of F0
+if ($F0STS == 1) then
+	csh $csh_dir/get_f0stats.csh \
+		$work_dir \
+		$src_dir \
+		$olist \
+		$work_dir/f0/$org.stats
+	csh $csh_dir/get_f0stats.csh \
+		$work_dir \
+		$src_dir \
+		$tlist \
+		$work_dir/f0/$tar.stats
+
+	# error check
+	if (-r DUMMY-ERROR-LOG) then
+		echo "### ERROR ###"
+		rm DUMMY-ERROR-LOG
+		exit
+	endif
+	echo "### Statistics of F0 has been extracted. ###"
+endif
+
+# Training of Spectral Conversion Function GMM
+if ($TRSPC == 1) then
+        # iterative training of spectral conversion function
+	csh $csh_dir/GMMMAP-EstGMM.csh \
+		$work_dir \
+		$src_dir \
+		$csh_dir \
+		$org \
+		$tar \
+		$olist \
+		$tlist \
+		$clsnum \
+		$itnum
+
+	# error check
+	if (-r DUMMY-ERROR-LOG) then
+		echo "### ERROR ###"
+		rm DUMMY-ERROR-LOG
+		exit
+	endif
+
+	echo "### Training of spectral conversion function has been finished. ###"
+endif
+
+# Training of Spectral Conversion Function MLLR
+if ($TRSPCMLLR == 1) then
+        # iterative training of spectral conversion function
+	csh $csh_dir/MLLR-Est.csh \
+		$work_dir \
+		$src_dir \
+		$csh_dir \
+		$org \
+		$tar \
+		$olist \
+		$tlist \
+		$clsnum \
+		$itnum
+
+        exit
+	# error check
+	if (-r DUMMY-ERROR-LOG) then
+		echo "### ERROR ###"
+		rm DUMMY-ERROR-LOG
+		exit
+	endif
+
+	echo "### Training of spectral conversion function has been finished. ###"
+endif
+
+# Calculation of Statistics of Global Variance
+if ($GVSTS == 1) then
+	# calculating global variance of mel-cepstrum sequence
+	echo "# global variance analysis ..."
+	csh $csh_dir/get_var.csh \
+		$work_dir \
+		$src_dir \
+		$tlist
+
+	csh $csh_dir/get_gvstats.csh \
+		$work_dir \
+		$src_dir \
+		$tlist \
+		$work_dir/mcep/$tar"_var"
+
+	# error check
+	if (-r DUMMY-ERROR-LOG) then
+		echo "### ERROR ###"
+		rm DUMMY-ERROR-LOG
+		exit
+	endif
+
+	echo "### Statistics of global variance has been extracted. ###"
+endif
+
+# Copy Parameter Files
+if ($CPPAR == 1) then
+	# Parameter File Directory
+	set otpdir = $work_dir/param/$org"-"$tar
+	mkdir -p $otpdir
+
+	# Copy Parameters for Conversion
+	if ($itnum == 0) then
+		cp $work_dir/gmm_jde/$org"-"$tar/$org"-"$tar"_sdmcep_cb"$clsnum.param $otpdir/$org"-"$tar"_sdmcep_cls"$clsnum.gmm
+	else
+		cp $work_dir/gmm_jde/$org"-"$tar/it$itnum"_"$org"-"$tar"_sdmcep_cb"$clsnum.param $otpdir/$org"-"$tar"_sdmcep_cls"$clsnum.gmm
+	endif
+	cp $work_dir/mcep/$tar"_var.mean" $otpdir/$tar"_mcep.vm"
+	cp $work_dir/mcep/$tar"_var.dcov" $otpdir/$tar"_mcep.vv"
+	cp $work_dir/f0/$org.stats $otpdir/$org"_lf0.stats"
+	cp $work_dir/f0/$tar.stats $otpdir/$tar"_lf0.stats"
+	cp $src_dir/win/dyn.win $otpdir/dyn.win
+
+	# error check
+	if (!(-r $otpdir/dyn.win)) then
+		echo Error: $otpdir/dyn.win
+		exit
+	endif
+	if (!(-r $otpdir/$org"-"$tar"_sdmcep_cls"$clsnum.gmm)) then
+		echo Error: $otpdir/$org"-"$tar"_sdmcep_cls"$clsnum.gmm
+		exit
+	endif
+	if (!(-r $otpdir/$tar"_mcep.vm")) then
+		echo Error: $otpdir/$tar"_mcep.vm"
+		exit
+	endif
+	if (!(-r $otpdir/$tar"_mcep.vv")) then
+		echo Error: $otpdir/$tar"_mcep.vv"
+		exit
+	endif
+	if (!(-r $otpdir/$org"_lf0.stats")) then
+		echo Error: $otpdir/$org"_lf0.stats"
+		exit
+	endif
+	if (!(-r $otpdir/$tar"_lf0.stats")) then
+		echo Error: $otpdir/$tar"_lf0.stats"
+		exit
+	endif
+
+	# Parameter File List
+	set otplist = $work_dir/param/$org"-"$tar"_param.list"
+
+	# Parameters for Conversion
+	echo $otpdir/dyn.win > $otplist.tmp.1
+	echo $clsnum > $otplist.tmp.2
+	echo $otpdir/$org"-"$tar"_sdmcep_cls"$clsnum.gmm > $otplist.tmp.3
+	echo $otpdir/$tar"_mcep.vm" > $otplist.tmp.4
+	echo $otpdir/$tar"_mcep.vv" > $otplist.tmp.5
+	echo $otpdir/$org"_lf0.stats" > $otplist.tmp.6
+	echo $otpdir/$tar"_lf0.stats" > $otplist.tmp.7
+	cat $otplist.tmp.* > $otplist
+	rm $otplist.tmp.*
+
+	echo "### Parameter file list has been generated. ###"
+	echo "### "$otplist" ###"
+endif
+
+# Test of Voice Conversion
+if ($CVWAV == 1) then
+        # Parameter File List
+        set otplist = $work_dir/param/$org"-"$tar"_param.list"
+
+        echo "# test of voice conversion ..."
+        foreach owav ($work_dir/test/wav/$org/*.wav)
+            set cvwav = $work_dir/test/wav/$org"-"$tar/$owav:t
+            if ($MLLR == 1) then
+                csh $csh_dir/../VConv_mllr.csh \
+                            $src_dir \
+                            $work_dir/mllr/$org"-"$tar \
+                            $owav \
+                            $work_dir/test/wav/$org"-"$tar/$owav:t
+            else
+                if ($SYNORG == 1) then
+                        set outt = $work_dir/test/utt/$org/$owav:t:r.utt
+                        csh $csh_dir/../VConvFestival.csh \
+                                $src_dir \
+                                $otplist \
+                                $owav \
+                                $outt \
+                                $work_dir/test/wav/$org"-"$tar/$owav:t
+                else
+                        csh $csh_dir/../VConv.csh \
+                                $src_dir \
+                                $otplist \
+                                $owav \
+                                $work_dir/test/wav/$org"-"$tar/$owav:t
+                endif
+            endif
+            if (!(-r $work_dir/test/wav/$org"-"$tar/$owav:t)) then
+                    echo "Error: "$work_dir/test/wav/$org"-"$tar/$owav:t
+                    exit
+            else
+                    echo "Output: "$work_dir/test/wav/$org"-"$tar/$owav:t
+            endif
+        end
+endif

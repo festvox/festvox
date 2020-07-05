@@ -1,0 +1,172 @@
+#!/bin/sh
+#####################################################-*-mode:shell-script-*-
+##                                                                       ##
+##                   Carnegie Mellon University and                      ##
+##                   Alan W Black and Kevin A. Lenzo                     ##
+##                        Copyright (c) 2005                             ##
+##                        All Rights Reserved.                           ##
+##                                                                       ##
+##  Permission is hereby granted, free of charge, to use and distribute  ##
+##  this software and its documentation without restriction, including   ##
+##  without limitation the rights to use, copy, modify, merge, publish,  ##
+##  distribute, sublicense, and/or sell copies of this work, and to      ##
+##  permit persons to whom this work is furnished to do so, subject to   ##
+##  the following conditions:                                            ##
+##   1. The code must retain the above copyright notice, this list of    ##
+##      conditions and the following disclaimer.                         ##
+##   2. Any modifications must be clearly marked as such.                ##
+##   3. Original authors' names are not deleted.                         ##
+##   4. The authors' names are not used to endorse or promote products   ##
+##      derived from this software without specific prior written        ##
+##      permission.                                                      ##
+##                                                                       ##
+##  CARNEGIE MELLON UNIVERSITY AND THE CONTRIBUTORS TO THIS WORK         ##
+##  DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING      ##
+##  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT   ##
+##  SHALL CARNEGIE MELLON UNIVERSITY NOR THE CONTRIBUTORS BE LIABLE      ##
+##  FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    ##
+##  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN   ##
+##  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,          ##
+##  ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF       ##
+##  THIS SOFTWARE.                                                       ##
+##                                                                       ##
+###########################################################################
+##                                                                       ##
+##  Setup the current voice for voice transformation                     ##
+##                                                                       ##
+###########################################################################
+
+if [ ! "$ESTDIR" ]
+then
+   echo "environment variable ESTDIR is unset"
+   echo "set it to your local speech tools directory e.g."
+   echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
+   echo or
+   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
+   exit 1
+fi
+
+if [ ! "$FESTVOXDIR" ]
+then
+   echo "environment variable FESTVOXDIR is unset"
+   echo "set it to your local festvox directory e.g."
+   echo '   bash$ export FESTVOXDIR=/home/awb/projects/festvox/'
+   echo or
+   echo '   csh% setenv FESTVOXDIR /home/awb/projects/festvox/'
+   exit 1
+fi
+
+LANG=C; export LANG
+
+. etc/voice.defs
+
+if [ $# = 0 ]
+then
+   $0 setup
+   $0 train
+   $0 festvox
+   $0 festvox_dist
+   exit 0
+fi
+
+if [ "$1" = "setup" ]
+then
+    echo "Voice Transformation setup"
+    cp -r $FESTVOXDIR/src/vc/build_transform bin
+    if [ ! -d vc ]
+    then
+       mkdir vc
+       mkdir vc/wav
+       mkdir vc/wav/source
+       mkdir vc/wav/target
+       mkdir vc/list
+    fi
+   exit 0
+fi
+
+if [ "$1" = "default_us" ]
+then
+    echo TRANSFORM set up prompt list
+    head -30 $FESTVOXDIR/src/vox_files/prompts/cmuarctic.data >etc/txt.transform.data
+fi
+
+if [ "$1" = "train_cg" ]
+then
+    # Uses a cg voice to generate more of the base files and trains from that
+    echo TRANSFORM make prompts cg
+    # Need to dump mcep and f0 into vc/mcep/source and vc/f0/source
+    VOICENAME=$FV_INST"_"$FV_LANG"_"$FV_NAME
+    $ESTDIR/../festival/bin/festival -b festvox/${VOICENAME}_cg.scm '(voice_'$VOICENAME'_cg)' '(build_cg_vc_source "etc/txt.transform.data")'
+    for i in `awk '{print $2}' etc/txt.transform.data`
+    do
+       $ESTDIR/bin/ch_wave -F 16000 -scaleN 0.65 wav-target/$i.wav -o vc/wav/target/$i.wav
+    done
+    (cd vc/wav && ls source/*.wav) | sed 's/.wav$//' > vc/list/source_tr.list
+    (cd vc/wav && ls target/*.wav) | sed 's/.wav$//' > vc/list/target_tr.list
+    (cd vc && $FESTVOXDIR/src/vc/scripts/VCTrain train_cg source target)
+   exit 0
+fi
+
+if [ "$1" = "train" ]
+then
+    echo TRANSFORM 
+#    festival -b festvox/build_clunits.scm '(build_prompts "etc/txt.transform.data")'
+    for i in `awk '{print $2}' etc/txt.transform.data`
+    do
+       $ESTDIR/bin/ch_wave -F 16000 -scaleN 0.65 prompt-wav/$i.wav -o vc/wav/source/$i.wav 
+       $ESTDIR/bin/ch_wave -F 16000 -scaleN 0.65 wav/$i.wav -o vc/wav/target/$i.wav
+    done
+    (cd vc/wav && ls source/*.wav) | sed 's/.wav$//' > vc/list/source_tr.list
+    (cd vc/wav && ls target/*.wav) | sed 's/.wav$//' > vc/list/target_tr.list
+    (cd vc && $FESTVOXDIR/src/vc/scripts/VCTrain train source target)
+   exit 0
+fi
+
+if [ "$1" = "festvox" ]
+then
+    VOICENAME=$FV_INST"_"$FV_LANG"_"$FV_NAME
+    cat $FESTVOXDIR/src/vc/scripts/VOICE_transform.scm |
+    sed 's%VOICENAME%'$VOICENAME'%g' | 
+    cat >festvox/$VOICENAME"_transform.scm"
+    if [ `uname` = "Linux" -o `uname` = "Darwin" ]
+    then
+       EXT=""
+    else
+       EXT=".exe"
+    fi
+    (cd $FESTVOXDIR/src/vc &&
+     tar zcvf - \
+         src/utt2f0/utt2f0$EXT \
+         src/f0map/f0map$EXT \
+         src/analysis/analysis$EXT \
+         src/extdim/extdim$EXT \
+         src/mlpg/delta$EXT \
+         src/gmmmap/gmmmap$EXT \
+         src/mlpg/mlpg_vit$EXT \
+         src/jdmat/jdmat$EXT \
+         src/synthesis/synthesis$EXT \
+         scripts/VConvFestival_cg.csh \
+         scripts/VConvFestival.csh ) | \
+    (cd vc && tar zxf -)
+   exit 0
+fi
+
+if [ "$1" = "festvox_dist" ]
+then
+    echo TRANSFORM "Make festvox voice distribution"
+    mkdir -p festival/lib/voices/
+    mkdir -p festival/lib/voices/${FV_LANG}
+    ln -s ../../../.. festival/lib/voices/${FV_LANG}/${FV_VOICENAME}_transform
+
+    tar zcvf festvox_${FV_VOICENAME}_transform.tar.gz \
+         festival/lib/voices/$FV_LANG/${FV_VOICENAME}_transform/vc/scripts \
+         festival/lib/voices/$FV_LANG/${FV_VOICENAME}_transform/vc/src \
+         festival/lib/voices/$FV_LANG/${FV_VOICENAME}_transform/vc/param \
+         festival/lib/voices/$FV_LANG/${FV_VOICENAME}_transform/festvox/${FV_VOICENAME}_transform.scm \
+         festival/lib/voices/$FV_LANG/${FV_VOICENAME}_transform/README \
+         festival/lib/voices/$FV_LANG/${FV_VOICENAME}_transform/COPYING
+    rm -rf festival/lib
+
+   exit 0
+fi
+
