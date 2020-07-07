@@ -612,7 +612,8 @@ void StoreWordTran(double **trw, int nw, char *mF) {
   fp_out.close();
 }
 
-void BuildEnv(char *fnm, wrdC*& hwrd, stC*& hst, int& now, int& tst, int& dim) {
+void BuildEnv(char *fnm, wrdC*& hwrd, stC*& hst, int& now, int& tst, int& dim)
+{
   char tstr[kNmLimit];
   int noc;
   int nog;
@@ -658,14 +659,12 @@ void BuildEnv(char *fnm, wrdC*& hwrd, stC*& hst, int& now, int& tst, int& dim) {
   int t_bs;
   int t_es;
   int t_noc;
-  int skipF = 0;
 
   int conBS;
   int t_nullF;
 
 
   for (int i = 0; i < now; i++) {
-    skipF = 0;
     fp_in >> wid >> nm >> nst >> noc >> nog;
     fp_pl << nm << " " << nst << " ";
 
@@ -838,13 +837,25 @@ void LoadBinaryFeatFile(char *filename, double*** feats_ptr,
     exit(-1);
   }
 
-  fread(num_rows, sizeof(*num_rows), 1, input_file);
-  fread(num_cols, sizeof(*num_cols), 1, input_file);
+  if (fread(num_rows, sizeof(*num_rows), 1, input_file) != 1)
+  {
+      fprintf(stderr, "Can't read num_rows\n");
+      exit(1);
+  }
+  if (fread(num_cols, sizeof(*num_cols), 1, input_file) != 1)
+  {
+      fprintf(stderr, "Can't read num_cols\n");
+      exit(1);
+  }
 
   feats = new double*[*num_rows];
   for (int row = 0; row < *num_rows; row++) {
     feats[row] = new double[*num_cols];
-    fread(feats[row], sizeof(feat), *num_cols, input_file);
+    if (fread(feats[row], sizeof(feat), *num_cols, input_file) != (unsigned int)*num_cols)
+    {
+        fprintf(stderr, "Can't read enough feats\n");
+        exit(1);
+    }
   }
   *feats_ptr = feats;
   fclose(input_file);

@@ -577,9 +577,6 @@ void PostProcess(int *path, int *stMap, int ns, int nt, ofstream& fp_log,
   int s;
   double tim = 0;
   // double pT = 0;
-
-  int uno = 0;
-
   // char labD[] = "lab/";
 
   char myfile[kNmLimit];
@@ -611,8 +608,6 @@ void PostProcess(int *path, int *stMap, int ns, int nt, ofstream& fp_log,
 #endif
     fp_log << fnm << endl;
   }
-
-  uno = 0;
 
   s = path[0];
   ps = s;
@@ -823,13 +818,26 @@ void LoadBinaryFeatFile(char *filename, double*** feats_ptr,
     exit(-1);
   }
 
-  fread(num_rows, sizeof(*num_rows), 1, input_file);
-  fread(num_cols, sizeof(*num_cols), 1, input_file);
+  if (fread(num_rows, sizeof(*num_rows), 1, input_file) != 1)
+  {
+      fprintf(stderr, "Can't read num_rows\n");
+      exit(1);
+  }
+  if (fread(num_cols, sizeof(*num_cols), 1, input_file) != 1)
+  {
+      fprintf(stderr, "Can't read num_cols\n");
+      exit(1);
+  }
 
   feats = new double*[*num_rows];
   for (int row = 0; row < *num_rows; row++) {
     feats[row] = new double[*num_cols];
-    fread(feats[row], sizeof(feat), *num_cols, input_file);
+    if (fread(feats[row], sizeof(feat), *num_cols, input_file) != (unsigned int)*num_cols)
+    {
+        fprintf(stderr, "Can't read enough feats\n");
+        exit(1);
+    }
+
   }
   *feats_ptr = feats;
   fclose(input_file);
@@ -980,8 +988,6 @@ void FillWordTrans(double **arcW, int *tar, int ltar, double **trw,
   int tw;
   int bs;
   int es;
-  int cw;
-  int nw;
 
   int *esa;
   int *bsa;
@@ -989,7 +995,6 @@ void FillWordTrans(double **arcW, int *tar, int ltar, double **trw,
 
   int nos;
 
-  double sum;
   double estrn;
   double bias;
 
@@ -1016,9 +1021,9 @@ void FillWordTrans(double **arcW, int *tar, int ltar, double **trw,
 
   for (int i = 0; i < ltar; i++) {
     es = esa[i];
-    cw = wa[i];
 
     /*This code stops transition leaks, if any.. */
+    // cw = wa[i];
     // sum = 0;     //Compute the summations of the remianing trans.
     // for (int j = 0; j < ltar; j++) {
     //    bs = bsa[j];
@@ -1026,7 +1031,6 @@ void FillWordTrans(double **arcW, int *tar, int ltar, double **trw,
     //  sum += trw[cw][nw];
     //  }
 
-    sum = 0;
     estrn = arcW[es][es];  // Take end state transition
     if (0 != estrn) {
       cout << "ESTRN SHOULD HAVE BEEN ZERO ALWAYS..." << endl;
@@ -1039,7 +1043,7 @@ void FillWordTrans(double **arcW, int *tar, int ltar, double **trw,
     // ltar + 1 is for self-transition.
     for (int j = 0; j < ltar; j++) {
       bs = bsa[j];
-      nw = wa[j];
+      //      nw = wa[j];
       // arcW[es][bs] = trw[cw][nw] + bias;
       arcW[es][bs] = bias;
     }

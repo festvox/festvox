@@ -56,7 +56,7 @@ nothing:
 	@ echo > /dev/null
 
 .build_lib: $(OBJS)
-	$(AR) cruv $(TOP)/lib/lib$(LIBNAME).a $(OBJS)
+	$(AR) crv $(TOP)/lib/lib$(LIBNAME).a $(OBJS)
 	$(RANLIB) $(TOP)/lib/lib$(LIBNAME).a
 	touch .build_lib
 

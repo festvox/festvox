@@ -1,11 +1,6 @@
-voices/*/*/vox
 log_run
-voices/*/*/exp
 *.swp
 *.pyc
 *.o
 log_*
-challenges/*/*/vox*
-challenges/*/*/exp
-config*
 log*

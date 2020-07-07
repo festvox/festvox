@@ -71,8 +71,16 @@ void ConvertFileToBinaryFormat(char* input_filename, char* output_filename) {
     exit(-1);
   }
 
-  fscanf(input_file, "%d", &num_rows);
-  fscanf(input_file, "%d", &num_cols);
+  if (fscanf(input_file, "%d", &num_rows) != 1)
+  {
+      fprintf(stderr, "Can't read num_rows\n");
+      exit(1);
+  }
+  if (fscanf(input_file, "%d", &num_cols) != 1)
+  {
+      fprintf(stderr, "Can't read num_cols\n");
+      exit(1);
+  }
 
   fwrite(&num_rows, sizeof(num_rows), 1, output_file);
   fwrite(&num_cols, sizeof(num_cols), 1, output_file);
@@ -81,7 +89,11 @@ void ConvertFileToBinaryFormat(char* input_filename, char* output_filename) {
   for (int row = 0; row < num_rows; row++) {
     feats[row] = new double[num_cols];
     for (int col = 0; col < num_cols; col++) {
-      fscanf(input_file, "%lf", &feats[row][col]);
+        if (fscanf(input_file, "%lf", &feats[row][col]) != 1)
+        {
+            fprintf(stderr, "Can't read num_cols\n");
+            exit(1);
+        }
     }
   }
 
