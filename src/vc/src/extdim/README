@@ -1,0 +1,109 @@
+Program for Component Extraction of Specific Dimension
+* FOR LITTLE ENDIAN
+
+usage: extdim [options...] [inputfile] [outputfile]
+options:
+        -dim dim[25]                    : dimension of vector
+        -sd sd[0]                       : start dim
+        -ed ed[-1]                      : end dim
+        -sf sf[0]                       : start frame
+        -ef ef[-1]                      : end frame
+        -jf jf[0]                       : jump frame
+        -chinf chinf                    : channel file
+        -txt                            : text output
+        -eprt                           : e print
+        -nmsg                           : no message
+        -help                           : display this message
+
+Input and output files are binary files of vectors. If -txt is used,
+the output file is a text file.  Moreover, If both -txt and -eprt are
+used, the output text file has exponential format such as 2.0e-8.
+
+The [sd]-th through the [ed]-th dimensional components at the [sf]-th
+through the [ef]-th frames are extracted, where [sd], [ed], [sf], and
+[ef] are changed by -sf, -ed, -sf, and -ef, respectively. The number
+of dimensions of input vectors is changed by -dim. The number of
+skipped frames is changed by -jf.
+
+Any dimensional component can be extracted by using -chinf. A text
+file describing extracted dimensions is necessary. For example, in
+order to extract the 1st, the 4th, and the 5th dimensional components
+from six dimensional vectors consisting of the 0th through the 5th
+dimensional components, the text file describing as follows:
+0.0
+1.0
+0.0
+0.0
+1.0
+1.0
+is used.
+
+Binary data has double-type format.
+
+Some messages are printed while executing this program. If you
+don't need those messages, use -nmsg.
+
+
+<EXAMPLE>
+% extdim \
+	-dim 24 \
+	-sd 2 \
+	-ed 8 \
+	-sf 5 \
+	-ef 100 \
+	-txt \
+	-eprt \
+	-nmsg \
+	input.vecs \
+	output.vecs.txt
+
+
+Tomoki Toda (tomoki@ics.nitech.ac.jp)
+
+
+==================================================
+The current copyright is
+
+/*********************************************************************/
+/*                                                                   */
+/*            Nagoya Institute of Technology, Aichi, Japan,          */
+/*       Nara Institute of Science and Technology, Nara, Japan       */
+/*                                and                                */
+/*             Carnegie Mellon University, Pittsburgh, PA            */
+/*                      Copyright (c) 2003-2004                      */
+/*                        All Rights Reserved.                       */
+/*                                                                   */
+/*  Permission is hereby granted, free of charge, to use and         */
+/*  distribute this software and its documentation without           */
+/*  restriction, including without limitation the rights to use,     */
+/*  copy, modify, merge, publish, distribute, sublicense, and/or     */
+/*  sell copies of this work, and to permit persons to whom this     */
+/*  work is furnished to do so, subject to the following conditions: */
+/*                                                                   */
+/*    1. The code must retain the above copyright notice, this list  */
+/*       of conditions and the following disclaimer.                 */
+/*    2. Any modifications must be clearly marked as such.           */
+/*    3. Original authors' names are not deleted.                    */
+/*                                                                   */    
+/*  NAGOYA INSTITUTE OF TECHNOLOGY, NARA INSTITUTE OF SCIENCE AND    */
+/*  TECHNOLOGY, CARNEGIE MELLON UNIVERSITY, AND THE CONTRIBUTORS TO  */
+/*  THIS WORK DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,  */
+/*  INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, */
+/*  IN NO EVENT SHALL NAGOYA INSTITUTE OF TECHNOLOGY, NARA           */
+/*  INSTITUTE OF SCIENCE AND TECHNOLOGY, CARNEGIE MELLON UNIVERSITY, */
+/*  NOR THE CONTRIBUTORS BE LIABLE FOR ANY SPECIAL, INDIRECT OR      */
+/*  CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM   */
+/*  LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,  */
+/*  NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN        */
+/*  CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.         */
+/*                                                                   */
+/*********************************************************************/
+/*                                                                   */
+/*          Author :  Tomoki Toda (tomoki@ics.nitech.ac.jp)          */
+/*          Date   :  June 2004                                      */
+/*                                                                   */
+/*-------------------------------------------------------------------*/
+/*                                                                   */
+/*  Component Extraction of Specific Dimension                       */
+/*                                                                   */
+/*-------------------------------------------------------------------*/
