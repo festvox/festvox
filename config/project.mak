@@ -39,4 +39,4 @@ PROJECT_NAME = Building Voices in Festival
 PROJECT_PREFIX = festvox
 PROJECT_VERSION = 2.8.2
 PROJECT_DATE = July 2020
-PROJECT_STATE = release
+PROJECT_STATE = current
