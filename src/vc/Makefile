@@ -41,7 +41,7 @@
 ##  Voice Conversion software                                        ##
 ##                                                                   ##
 #######################################################################
-TOP=../../
+TOP=../..
 DIRNAME=src/vc
 BUILD_DIRS = src 
 ALL_DIRS= scripts $(BUILD_DIRS)
