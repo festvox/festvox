@@ -537,7 +537,7 @@ void MatrixInversion(double **A, int order, double **Y)
 double compute_log_prob(double *obs, double *mean, double *var, int Ndim)
 {
 	int i, j;
-	double tmp,max,score;
+	double tmp,score;
 	double loginvsqrtdet=0,*halfinvvar;
 	halfinvvar=(double*)malloc(sizeof(double)*Ndim);
 	// Assuming variances are preinverted and scaled by 2.
@@ -548,8 +548,6 @@ double compute_log_prob(double *obs, double *mean, double *var, int Ndim)
 		loginvsqrtdet-=0.5*log(tmp);
 	}
 	loginvsqrtdet-=(0.5*double(Ndim)) * log(2*PI);
-	// Find max
-	max = -1e+30;
 	score = loginvsqrtdet;
 	for (j=0;j<Ndim;j++){
 		tmp = obs[j] - mean[j];
