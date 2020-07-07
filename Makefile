@@ -2,7 +2,7 @@
 ##                                                                       ##
 ##                   Carnegie Mellon University and                      ##
 ##                   Alan W Black and Kevin A. Lenzo                     ##
-##                      Copyright (c) 1998-2017                          ##
+##                      Copyright (c) 1998-2020                          ##
 ##                        All Rights Reserved.                           ##
 ##                                                                       ##
 ##  Permission is hereby granted, free of charge, to use and distribute  ##
@@ -33,7 +33,7 @@
 ##                                                                       ##
 ##  Authors: Alan W Black (awb@cs.cmu.edu)                               ##
 ##           Kevin A. Lenzo (lenzo@cs.cmu.edu)                           ##
-##  Version: festvox-2.8 December 2017                                   ##
+##  Version: festvox-2.8.2 July 2020                                     ##
 ##                                                                       ##
 ###########################################################################
 ##                                                                       ##
