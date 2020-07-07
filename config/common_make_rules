@@ -167,6 +167,6 @@ info:
 	@echo FESTDIR = $(FESTDIR)
 
 # If there are sources in this directory, load in the dependencies
-ifdef SRCS
-include $(DEPEND)
-endif
+#ifdef SRCS
+#include $(DEPEND)
+#endif
