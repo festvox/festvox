@@ -1,0 +1,91 @@
+Program for F0 Linear Mapping
+* FOR LITTLE ENDIAN
+
+usage: f0map [options...] [inputfile] [outputfile]
+options:
+        -ostfile ostfile                : original statistics file
+        -tstfile tstfile                : target statistics file
+        -log                            : statistics of log F0
+        -nmsg                           : no message
+        -help                           : display this message
+
+Input and output files are F0 text file where each F0 is
+represented by Hz.
+
+Statistics text files describing mean and standard deviation as follows:
+150.0
+50.0
+are necessary. The first value shows mean and the second value shows
+standard deviation. The statistics file before conversion is used by
+-ostfile, and that after conversion is used by -tstfile.  Input F0s
+are converted with a simple linear conversion as follows:
+ conv F0 =
+  (org F0 - [org mean]) / [org stdev] * [tar stdev] + [tar mean].
+
+If -log is used, log-scale F0 conversion is performed.
+* Note that statistics text files should describe mean and standard
+deviation of the log-scaled F0.
+
+Some messages are printed while executing this program. If you
+don't need those messages, use -nmsg.
+
+
+<EXAMPLE>
+% f0map \
+	-ostfile input.ost \
+	-tstfile input.tst \
+	-log \
+	-nmsg \
+	input.f0 \
+	output.f0
+
+
+Tomoki Toda (tomoki@ics.nitech.ac.jp)
+
+
+==================================================
+The current copyright is
+
+/*********************************************************************/
+/*                                                                   */
+/*            Nagoya Institute of Technology, Aichi, Japan,          */
+/*       Nara Institute of Science and Technology, Nara, Japan       */
+/*                                and                                */
+/*             Carnegie Mellon University, Pittsburgh, PA            */
+/*                      Copyright (c) 2003-2004                      */
+/*                        All Rights Reserved.                       */
+/*                                                                   */
+/*  Permission is hereby granted, free of charge, to use and         */
+/*  distribute this software and its documentation without           */
+/*  restriction, including without limitation the rights to use,     */
+/*  copy, modify, merge, publish, distribute, sublicense, and/or     */
+/*  sell copies of this work, and to permit persons to whom this     */
+/*  work is furnished to do so, subject to the following conditions: */
+/*                                                                   */
+/*    1. The code must retain the above copyright notice, this list  */
+/*       of conditions and the following disclaimer.                 */
+/*    2. Any modifications must be clearly marked as such.           */
+/*    3. Original authors' names are not deleted.                    */
+/*                                                                   */    
+/*  NAGOYA INSTITUTE OF TECHNOLOGY, NARA INSTITUTE OF SCIENCE AND    */
+/*  TECHNOLOGY, CARNEGIE MELLON UNIVERSITY, AND THE CONTRIBUTORS TO  */
+/*  THIS WORK DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,  */
+/*  INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, */
+/*  IN NO EVENT SHALL NAGOYA INSTITUTE OF TECHNOLOGY, NARA           */
+/*  INSTITUTE OF SCIENCE AND TECHNOLOGY, CARNEGIE MELLON UNIVERSITY, */
+/*  NOR THE CONTRIBUTORS BE LIABLE FOR ANY SPECIAL, INDIRECT OR      */
+/*  CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM   */
+/*  LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,  */
+/*  NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN        */
+/*  CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.         */
+/*                                                                   */
+/*********************************************************************/
+/*                                                                   */
+/*          Author :  Tomoki Toda (tomoki@ics.nitech.ac.jp)          */
+/*          Date   :  June 2004                                      */
+/*                                                                   */
+/*-------------------------------------------------------------------*/
+/*                                                                   */
+/*  F0 Linear Mapping                                                */
+/*                                                                   */
+/*-------------------------------------------------------------------*/
