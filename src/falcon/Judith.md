@@ -22,7 +22,7 @@ One day during the transport there was a solar flare that knocked her pod off co
 She then dropped the transport pod. 
 She was stuck in a space-time bubble with no signal and no hope of rescue. 
 The onboard AI saved her life and opened a wormhole connection. 
-She landed on 21st century Earth safely but her pod got damaged.  
+She landed on 21st century Earth safely but her pod got damaged.
 And of course she had to go to the police, which was a tedious experience due to cultural differences. 
 So she decided to hide her identity and work in a company as a research assistant. 
 She joined Falcon.
