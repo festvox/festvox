@@ -27,6 +27,8 @@ And of course she had to go to the police, which was a tedious experience due to
 So she decided to hide her identity and work in a company as a research assistant. 
 She joined Falcon.
 
+Seems good. So I will co-edit this story from now on.
+
 #### 10 July 2020
 
 When the story begins she has been with Falcon for 6 years and has been working with them for around 5 years.
