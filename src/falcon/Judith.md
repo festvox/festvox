@@ -37,3 +37,5 @@ It is also during these 6 years that she found out about alien life and interste
 This gave her hope that she can repair her pod and return to her timeline. 
 Therefore, she decides to actively upgrade the technology at Falcon. 
 "*This should work*", she told herself.
+Falcon is an interesting organization. It has a Professor and a group of students working on language technologies. 
+Falcon has a lot of money and a lot of resources.
