@@ -1,0 +1,30 @@
+Decided to write the backstory for Judith. Since I do not have the energy to write it all by myself, I will be using LM of Judith to help me with details.
+The parts suggested by Judith will be highlighted.
+
+Here is a test version. Let us see what LM does to something I already wrote last year. Mine here:
+
+Judith is an inter galactic gig economic employee (basically Uber driver of the future) set in 27th century. 
+She typically transports things and species between Andromeda and MilkyWay galaxies. 
+While on one such transports to Enceladus (star of Saturn), her ship is knocked offcourse by a solar flare and gets trapped in a space time continuum. 
+The ship gets damaged beyond repair but onboard AI saves her life and opens a wormhole with last of the power resources. 
+She wakes up to find she is in 21st century Earth. 
+But she is helpless to repair pod by herself since the technology and AI in 21st century Earth is too primitive. 
+So Judith hides her identity and starts working as an assistant at Falcon. 
+Her secret objective is to keep abreast of the technology revolutions in AI so that she can hopefully use them to repair her pod and get back to her timeline. 
+
+
+Judith's version:
+
+Judith was an intergalactic transporter. 
+She transports things and species across galaxies.
+She has the ability to create wormholes in space. 
+One day during the transport there was a solar flare that knocked her pod off course.
+She then dropped the transport pod. 
+She was stuck in a space-time bubble with no signal and no hope of rescue. 
+The onboard AI saved her life and opened a wormhole connection. 
+She landed on 21st century Earth safely but her pod got damaged.  
+And of course she had to go to the police, which was a tedious experience due to cultural differences. 
+So she decided to hide her identity and work in a company as a research assistant. 
+She joined Falcon.
+
+
