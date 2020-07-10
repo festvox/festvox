@@ -38,4 +38,4 @@ This gave her hope that she can repair her pod and return to her timeline.
 Therefore, she decides to actively upgrade the technology at Falcon. 
 "*This should work*", she told herself.
 Falcon is an interesting organization. It has a Professor and a group of students working on language technologies. 
-Falcon has a lot of money and a lot of resources.
+Falcon has a lot of money and a lot of resources. So Judith starts looking at one of the ongoing project on code mixing. Code mixing is when people use more than one language in a sentence. Judith was very surprised to learn that humans did such mixing. Humans are very creative and it is very difficult to predict what will work and what won't. So it is hard for Judith to wrap her head around this complex phenomenon. Judith is too busy trying to find a solution. and get involved in this project so that she can understand how humans communicated. At the end of the day, she's not sure where to go.
