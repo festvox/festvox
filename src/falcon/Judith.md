@@ -29,6 +29,9 @@ She joined Falcon.
 
 #### 10 July 2020
 
-> When the story begins she has been with Falcon for 6 years and has been working with them for around 5 years.
+When the story begins she has been with Falcon for 6 years and has been working with them for around 5 years.
 She really enjoys her time with Falcon. She learnt a lot during the 6 years.
-> It is also during these 6 years that she found out about alien life and interstellar travel.
+It is also during these 6 years that she found out about alien life and interstellar travel.
+This gave her hope that she can repair her pod and return to her timeline. 
+Therefore, she decides to actively upgrade the technology at Falcon. 
+^^"This should work"^^, she told herself.
