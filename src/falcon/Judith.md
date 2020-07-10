@@ -27,4 +27,8 @@ And of course she had to go to the police, which was a tedious experience due to
 So she decided to hide her identity and work in a company as a research assistant. 
 She joined Falcon.
 
+#### 10 July 2020
 
+<mark> When the story begins she has been with Falcon for 6 years and has been working with them for around 5 years. </mark>
+She really enjoys her time with Falcon. She learnt a lot during the 6 years.
+<mark> It is also during these 6 years that she found out about alien life and interstellar travel. </mark>
