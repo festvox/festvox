@@ -50,7 +50,7 @@ from os.path import join, expanduser
 
 import tensorboard_logger
 from tensorboard_logger import *
-from hyperparameters import hparams, hparams_debug_string
+from hyperparameters import hyperparameters
 
 vox_dir ='vox'
 
@@ -60,6 +60,7 @@ use_cuda = torch.cuda.is_available()
 if use_cuda:
     cudnn.benchmark = False
 use_multigpu = None
+hparams = hyperparameters()
 
 fs = hparams.sample_rate
 
@@ -164,7 +165,7 @@ if __name__ == "__main__":
     # Override hyper parameters
     if conf is not None:
         with open(conf) as f:
-            hparams.parse_json(f.read())
+            hparams.update_params(f)
 
     os.makedirs(exp_dir, exist_ok=True)
     os.makedirs(checkpoint_dir, exist_ok=True)
