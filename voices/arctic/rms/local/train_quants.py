@@ -1,5 +1,28 @@
+"""Trainining script for WaveLSTM
 
+usage: train.py [options]
 
+options:
+    --conf=<json>             Path of configuration file (json).
+    --gpu-id=<N>               ID of the GPU to use [default: 0]
+    --exp-dir=<dir>           Experiment directory
+    --checkpoint-dir=<dir>    Directory where to save model checkpoints [default: checkpoints].
+    --checkpoint-path=<name>  Restore model from checkpoint path if given.
+    --hparams=<parmas>        Hyper parameters [default: ].
+    --log-event-path=<dir>    Log Path [default: exp/log_tacotronOne]
+    -h, --help                Show this help message and exit
+"""
+import os, sys
+from docopt import docopt
+import os, sys
+from docopt import docopt
+args = docopt(__doc__)
+print("Command line args:\n", args)
+gpu_id = args['--gpu-id']
+print("Using GPU ", gpu_id)
+os.environ["CUDA_VISIBLE_DEVICES"]=gpu_id
+
+from collections import defaultdict
 ### This is not supposed to be hardcoded #####
 FALCON_DIR = os.environ.get('FALCONDIR')
 sys.path.append(FALCON_DIR)
