@@ -156,7 +156,8 @@ class TacotronOneActNorm(TacotronOne):
         self.postnet = CBHGActNorm(mel_dim, K=8, projections=[256, mel_dim])
 
 
-
+#Type : Indigenous 
+# vocoder part is inspired by https://github.com/mkotha/WaveRNN
 class WaveLSTM(TacotronOne):
        
     def __init__(self, n_vocab, embedding_dim=256, mel_dim=80, linear_dim=1025,
