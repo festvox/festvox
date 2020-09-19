@@ -46,7 +46,8 @@ DIRNAME=src/vc/src/analysis
 BUILD_DIRS = 
 ALL_DIRS= $(BUILD_DIRS)
 H = analysis_sub.h 
-SRCS=main.cc analysis_sub.cc
+CPPSRCS = main.cc analysis_sub.cc
+SRCS=$(CPPSRCS)
 OBJS = $(SRCS:.cc=.o)
 PROGRAM = analysis
 

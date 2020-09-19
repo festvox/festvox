@@ -46,6 +46,8 @@ OTHERS =
 
 FILES = Makefile $(SCRIPTS) $(SCHEMEFILES) $(OTHERS)
 
+LOCAL_CLEAN = wave2html
+
 ALL = wave2html
 
 include $(TOP)/config/common_make_rules

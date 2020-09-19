@@ -47,5 +47,9 @@ EHMMBINDIR=../bin
 
 ALL = 
 
+LOCAL_CLEAN = check_lab.pl comp_dcep.pl do_ehmm phfromutt.pl phseq.scm \
+              rem_ssil.pl rm_nan_utts scale_feat.pl seqproc.pl sl2nm.pl \
+              sym2nm.pl
+
 include $(TOP)/config/common_make_rules
 

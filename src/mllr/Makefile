@@ -50,7 +50,9 @@ ALL = mllr
 
 include $(TOP)/config/common_make_rules
 
+LOCAL_CLEAN = mllr
+
 mllr: mllr.cc
-	g++ -Wall -o mllr mllr.cc
+	$(CXX) -Wall -o mllr mllr.cc
 
 

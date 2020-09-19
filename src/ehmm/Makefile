@@ -40,7 +40,7 @@
 ###########################################################################
 TOP=../../
 DIRNAME=src/ehmm
-BUILD_DIRS = src scripts
+BUILD_DIRS = src scripts bin
 ALL_DIRS= $(BUILD_DIRS) etc bin
 SCHEMEFILES = 
 
