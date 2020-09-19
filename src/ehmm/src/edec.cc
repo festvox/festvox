@@ -534,6 +534,7 @@ void Get_FrameRate(char *file, double& shft, double& sf, double& size) {
 
 void NewProcess(int *path, int **pbuf, int *wrdB, int *nullI, int *stMap,
                 stC *hst, int ns, int nt, int lastS) {
+  (void) ns;
   int mas, sid, t;
   t = nt - 1;
   mas = -1;
@@ -571,6 +572,9 @@ void PostProcess(int *path, int *stMap, int ns, int nt, ofstream& fp_log,
   // wrdB: Word (actually phone) beginning
 
   // int prev = list[0]; //Assign the first word-id of list[0]...
+  (void) ns;
+  (void) list;
+  (void)ltar;
 
   int sid;
   int wid;
@@ -863,6 +867,7 @@ void Emissions(wrdC *hwrd, stC *hst, double**& emt, int& er, int& ec,
   // ltar : Number of phones in utterance
   // stMap : List of statenames corresponding to this utterance (I think)
 
+  (void)fc;
   int tw;
   int bs;
   int sid;
@@ -984,6 +989,7 @@ void FillStateTrans(double **arcW, int *tar, int ltar, int *nullI) {
 
 void FillWordTrans(double **arcW, int *tar, int ltar, double **trw,
                    int *bI, int *eI, int**& fwM, int**& bwM, int er) {
+  (void)trw;
   int rn;
   int tw;
   int bs;
@@ -1117,6 +1123,7 @@ int Viterbi(double **emt, int r, int c, double **trp,
             double **alp, double **bet, double *nrmF,
             int *bI, int *eI, int *path, int **fwM, int **bwM,
             int *nullI, int **pbuf, int& lastS) {
+  (void)bet;
   int ns;
   int nt;
   int t;
@@ -1299,6 +1306,9 @@ int Viterbi_Seq(double **emt, int r, int c, double **trp,
   // pbuf : Empty matrix
   // lastS : Last state
 
+  (void)bet;
+  (void) bI;
+  (void) eI;
   int ns;
   int nt;
   int t;
@@ -1455,6 +1465,9 @@ int Viterbi_Seq_nde(double **emt, int r, int c, double **trp,
                     double **alp, double **bet, double *nrmF,
                     int *bI, int *eI, int *path, int **fwM, int **bwM,
                     int *nullI, int **pbuf, int &lastS) {
+  (void) eI;
+  (void) bI;
+  (void) bet;
   int ns;
   int nt;
   int t;
@@ -1631,6 +1644,7 @@ void FillWordTrans_Seq(double **arcW, int *tar, int ltar,
   // er: Number of rows of emission matrix (number of states)
 
   // There is no need of trw matrix here....
+  (void) trw;
   int rn;
   int tw;
   int bs;

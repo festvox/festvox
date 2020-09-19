@@ -291,7 +291,7 @@ void Get_FrameRate(char *file, double& shft, double& sf, double& size) {
 }
 
 void NewProcess(int *path, int **pbuf, int *wrdB, int *nullI, int *stMap, stC *hst, int ns, int nt, int lastS) {
-
+  (void) ns;
   int mas, sid, t;	
   t = nt - 1;
   mas = -1;
@@ -315,7 +315,9 @@ void NewProcess(int *path, int **pbuf, int *wrdB, int *nullI, int *stMap, stC *h
 }
 
 void PostProcess(int *path, int *stMap, int ns, int nt, ofstream& fp_log, char *fnm, int *list, int ltar, int *wrdB) {
-
+  (void) ns;
+  (void) list;
+  (void) ltar;
   //int prev = list[0]; //Assign the first word-id of list[0]...
 
   int sid;
@@ -524,7 +526,7 @@ void LoadFeatFile(char *fnm, double**& feat, int&r, int&c) {
 }
 
 void Emissions(wrdC *hwrd, stC *hst, double**& emt, int& er, int& ec, double **ft, int fr, int fc, int *tar, int ltar, int*& stMap) {
-
+  (void) fc;
   int tw; 
   int bs; 
   int sid; 
@@ -629,7 +631,7 @@ void FillStateTrans(double **arcW, int *tar, int ltar, int *nullI) {
 }
 
 void FillWordTrans(double **arcW, int *tar, int ltar, double **trw, int *bI, int *eI, int**& fwM, int**& bwM, int er) {
-
+  (void) trw;
   int rn;	
   int tw;
   int bs;
@@ -758,7 +760,7 @@ void FillWordTrans(double **arcW, int *tar, int ltar, double **trw, int *bI, int
 }
 
 int Viterbi(double **emt, int r, int c, double **trp, double **alp, double **bet, double *nrmF, int *bI, int *eI, int *path, int **fwM, int **bwM, int *nullI, int **pbuf, int& lastS) {
-
+   (void) bet;
    int ns;	
    int nt;
    int t;
@@ -927,7 +929,9 @@ int Viterbi(double **emt, int r, int c, double **trp, double **alp, double **bet
 }
 
 int Viterbi_Seq(double **emt, int r, int c, double **trp, double **alp, double **bet, double *nrmF, int *bI, int *eI, int *path, int **fwM, int **bwM, int *nullI, int **pbuf, int &lastS) {
-
+   (void) bet;
+   (void) bI;
+   (void) eI;
    int ns;	
    int nt;
    int t;
@@ -1082,7 +1086,9 @@ int Viterbi_Seq(double **emt, int r, int c, double **trp, double **alp, double *
 }
 
 int Viterbi_Seq_nde_row(double **emt, int r, int c, double **trp, double **alp, double **bet, double *nrmF, int *bI, int *eI, int *path, int **fwM, int **bwM, int *nullI, int **pbuf, int &lastS) {
-
+   (void) bI;
+   (void) eI;
+   (void) bet;
    int ns;	
    int nt;
    int t;
@@ -1245,7 +1251,10 @@ int Viterbi_Seq_nde_row(double **emt, int r, int c, double **trp, double **alp, 
 
 
 int Viterbi_Seq_nde_col(double **emt, int r, int c, double **trp, double **alp, double **bet, double *nrmF, int *bI, int *eI, int *path, int **fwM, int **bwM, int *nullI, int **pbuf, int &lastS, int &endT) {
-
+   (void) eI;
+   (void) bI;
+   (void) trw;
+   (void) bet;
    int ns;	
    int nt;
    int t;
@@ -1477,7 +1486,7 @@ int Viterbi_Seq_nde_col(double **emt, int r, int c, double **trp, double **alp, 
 
 
 void FillWordTrans_Seq(double **arcW, int *tar, int ltar, double **trw, int *bI, int *eI, int**& fwM, int**& bwM, int er) {
- 
+  (void) trw;
   //There is no need of trw matrix here....	
 
   int rn;	
