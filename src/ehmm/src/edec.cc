@@ -814,6 +814,12 @@ void LoadBinaryFeatFile(char *filename, double*** feats_ptr,
   double** feats;
   double feat;
 
+  if (*num_cols < 0) {
+    cout << "Error: negative number of columns on: "
+         << filename << endl;
+    cout << "Aborting." << endl;
+    exit(-1);
+  }
   input_file = fopen(filename, "rb");
   if (input_file == NULL) {
     cout << "Error opening file: "
