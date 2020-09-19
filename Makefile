@@ -50,7 +50,7 @@ TOP=.
 DIRNAME=.
 BUILD_DIRS = src 
 ALL_DIRS=config docbook $(BUILD_DIRS)
-CONFIG=configure configure.in config.sub config.guess \
+CONFIG=configure configure.ac config.sub config.guess \
        missing install-sh mkinstalldirs
 OTHERS = README.md ACKNOWLEDGEMENTS COPYING
 OTHERDIRS = voices # challenges
@@ -66,7 +66,7 @@ include $(TOP)/config/common_make_rules
 config/config: config/config.in config.status
 	./config.status
 
-configure: configure.in
+configure: configure.ac
 	autoconf
 
 release: 

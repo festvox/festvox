@@ -39,10 +39,6 @@ AC_PROG_INSTALL
 AC_CHECK_TOOL(AR, ar)
 AC_C_BIGENDIAN
 
-if test "x$GCC" = "xyes"; then
-	CFLAGS="$CFLAGS -Wall"
-fi
-
 SHFLAGS=
 OTHERLIBS=
 if test "$shared" = true; then
