@@ -417,7 +417,7 @@ Reset global variables back to previous voice."
 
 (define (voice_INST_LANG_VOX_cg)
   "(voice_INST_LANG_VOX_cg)
-Define voice for us."
+Define voice for LANG."
   ;; *always* required
   (voice_reset)
 

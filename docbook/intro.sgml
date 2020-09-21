@@ -160,7 +160,7 @@ Tokuda's HTS System (from Nagoya Institute of Technology) showed that
 building generative models of speech, rather than selecting unit
 instances can generate reliable high quality speech.  Its prominance
 came to the fore front at the first Blizzard Challange in 2005 which
-showed that HTS output was reliably understoof by listeners.  HTS, and
+showed that HTS output was reliably understood by listeners.  HTS, and
 so-called HMM synthesis seems to do well on smaller amounts of data,
 and when then the data is less reliably recorded which offers a
 significant advantage over the requirement of very large carefully

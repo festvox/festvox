@@ -406,6 +406,7 @@ int main(int argc, char *argv[]) {
 
 void RemoveShortPauses(int*& tarM, int& lenM,
                        int *srcA, int srcL, int itr, int ssF) {
+  (void) itr;
   Alloc1d(tarM, srcL);
 
   // if (itr < _citr) {
@@ -864,6 +865,7 @@ void LoadBinaryFeatFile(char *filename, double*** feats_ptr,
 void Emissions(wrdC *hwrd, stC *hst, double**& emt,
                int& er, int& ec, double **ft,
                int fr, int fc, int *tar, int ltar, int*& stMap) {
+  (void) fc;
   int tw;
   int bs;
   int sid;
@@ -1184,6 +1186,7 @@ void AccumScores(double **emt, int er, int ec,
                  int *bI, int *eI, double **trx, double *denW ,
                  int *begR, int **fwM, int *nullI)  {
   // cout<<"In Accumscores... "<<endl;
+  (void) fc;
 
   // int fr = ec;
   int nt = ec;
@@ -1275,6 +1278,7 @@ void AccumScores(double **emt, int er, int ec,
 
 void AccumWordTran(double *gtrn, int s, int *bI, int ns,
                    double **trx, double *denW, int *stMap) {
+  (void) denW;
   int sid = stMap[s];
   int wid = hst[sid].getwid();
 
@@ -1326,6 +1330,7 @@ void FillWordTrans_Seq(double **arcW, int *tar, int ltar,
                        double **trw, int *bI, int *eI,
                        int**& fwM, int**& bwM, int er, int ssilF) {
   // There is no need of trw matrix here....
+  (void) trw;
 
   int rn;
   int tw;
@@ -1500,6 +1505,8 @@ double AlphaBetas_Seq(double **emt, int r, int c,
                       double ** trp, double **alp, double **bet,
                       double *nrmF, int *bI, int *eI,
                       int **fwM, int **bwM, int *nullI, int& nanF) {
+  (void)bI;
+  (void) eI;
   int ns;
   int nt;
   int t;

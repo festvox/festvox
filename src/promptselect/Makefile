@@ -43,6 +43,8 @@ FILES = Makefile $(SCRIPTS) $(SCHEMEFILES) $(OTHERS)
 
 ALL = text2utts
 
+LOCAL_CLEAN = text2utts
+
 include $(TOP)/config/common_make_rules
 
 text2utts: text2utts.scm

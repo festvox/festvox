@@ -39,7 +39,7 @@
 /*                                                                       */
 /*************************************************************************/
 
-#include <math.h>
+#include <cmath>
 #include "EST.h"
 #include "EST_cmd_line_options.h"
 

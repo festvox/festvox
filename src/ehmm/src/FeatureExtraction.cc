@@ -444,6 +444,10 @@ void Compute_Residual_v1(float *tempspeechSegment, float *residualSignal,
                          char *autoFileName, char *lpcFileName,
                          char *lpccFileName, char *energyFileName,
                          char *vpFileName, fe_t& FE, char *mfccFileName) {
+  (void)resFileName;
+  (void)autoFileName;
+  (void)lpcFileName;
+  (void)energyFileName;
   float *speechSegment;
 
   speechSegment = tempspeechSegment;

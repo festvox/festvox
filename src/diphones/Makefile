@@ -46,6 +46,8 @@ ALL = make_diph_index
 
 include $(TOP)/config/common_make_rules
 
+LOCAL_CLEAN = make_diph_index
+
 make_diph_index: make_diph_index.sh
 	@echo making make_diph_index script
 	@rm -f make_diph_index

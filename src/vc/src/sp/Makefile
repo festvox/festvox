@@ -46,8 +46,9 @@ DIRNAME=src/vc/src/sp
 BUILD_DIRS = 
 ALL_DIRS= $(BUILD_DIRS)
 H = 
-SRCS= basic.cc fft.cc filter.cc matrix.cc option.cc voperate.cc \
+CCSRCS= basic.cc fft.cc filter.cc matrix.cc option.cc voperate.cc \
       complex.cc fileio.cc kaiser.cc memory.cc vector.cc window.cc
+SRCS = $(CCSRCS)
 OBJS = $(SRCS:.cc=.o)
 
 FILES = Makefile $(H) $(SRCS)
@@ -57,8 +58,12 @@ LOCAL_CLEAN = ../lib/libsp.a
 
 include $(TOP)/config/common_make_rules
 
-%.o : %.cc
-	$(CXX) $(DEFS) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+# GCC and systems settings got from EST's config
+EST=$(ESTDIR)
+include $(ESTDIR)/config/config
+include $(ESTDIR)/config/rules/defaults.mak
+include $(ESTDIR)/config/rules/compile_options.mak
+
 
 ../lib/libsp.a: $(OBJS)
 	$(AR) crv ../lib/libsp.a $(OBJS)
