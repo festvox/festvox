@@ -1,6 +1,7 @@
 
                   "Building Voices in Festival"
-     Alan W Black (awb@cs.cmu.edu) and see ACKNOWLEDGEMENTS
+     Alan W Black (awb@cs.cmu.edu), Kevin Lenzo (lenzo@duolingo.com)
+                     and see ACKNOWLEDGEMENTS
                       http://www.festvox.org
 
 For full details about voice building see the document itself
