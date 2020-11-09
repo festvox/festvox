@@ -64,3 +64,13 @@ Vocoder: [Checkout the samples](http://tts.speech.cs.cmu.edu/rsk/challenges/bliz
 
 [Developer Cut](http://www.cs.cmu.edu/~srallaba/ProjectDeveloperCut/)
 
+# 20.08 August
+#### Acquisitions : 50% (15 blocks out of 30)
+#### Presented my PhD proposal
+[Proposal Document](https://www.dropbox.com/s/jx5x8qnzflz00gj/proposal_srallaba_De-Entanglement_15July2020.pdf?dl=0)
+
+# 20.09 October
+#### Acquisitions : 50% (15 blocks out of 30)
+#### Attended Interspeech 2020
+[Interspeech Insights](https://srallaba.medium.com/insights-from-interspeech-2k20-a-letter-to-prospective-busy-junior-pb-j-research-students-c430b9ac07c7)
+
