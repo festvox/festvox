@@ -4,3 +4,4 @@ log_run
 *.o
 log_*
 log*
+*exp/*
