@@ -91,7 +91,7 @@ extern double *dalloc(int cc);
 extern double *dgetmem(int leng);
 extern char *getmem(int leng, unsigned size);
 extern void fillz(char *ptr, int size, int nitem);
-extern void movem(register char *a, register char *b, int size, int nitem);
+extern void movem(char *a, char *b, int size, int nitem);
 extern void freqt(double *c1, long m1, double *c2, long m2, double a);
 extern int mcep(double *spc, int flng, double *mc, int m, double a, int itr1,
 		int itr2, double dd, double e);

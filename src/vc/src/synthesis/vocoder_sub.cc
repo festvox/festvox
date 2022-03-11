@@ -322,7 +322,7 @@ double mlsadf(double x, double *b, int m, double a, int pd, double *d, VocoderSe
 double mlsadf1(double x, double *b, int m, double a, int pd, double *d, VocoderSetup *vs)
 {
    double v, out = 0.0, *pt, aa;
-   register int i;
+   int i;
 
    aa = 1 - a*a;
    pt = &d[pd+1];
@@ -345,7 +345,7 @@ double mlsadf2 (double x, double *b, int m, double a, int pd, double *d, Vocoder
 {
    double v, out = 0.0, *pt;
    double mlsafir(double, double*, int, double, double*);
-   register int i;
+   int i;
     
    pt = &d[pd * (m+2)];
 
@@ -367,7 +367,7 @@ double mlsafir (double x, double *b, int m, double a, double *d)
 {
    double y = 0.0;
    double aa;
-   register int i;
+   int i;
 
    aa = 1 - a*a;
 
@@ -423,7 +423,7 @@ unsigned long srnd ( unsigned long seed )
 
 int mseq (VocoderSetup *vs)
 {
-   register int x0, x28;
+   int x0, x28;
 
    vs->x >>= 1;
 
@@ -501,7 +501,7 @@ void b2mc (double *b, double *mc, int m, double a)
 // freqt : frequency transformation
 void freqt (double *c1, int m1, double *c2, int m2, double a, VocoderSetup *vs)
 {
-   register int i, j;
+   int i, j;
    double b;
     
    if (vs->d==NULL) {
@@ -538,7 +538,7 @@ void freqt (double *c1, int m1, double *c2, int m2, double a, VocoderSetup *vs)
 // c2ir : The minimum phase impulse response is evaluated from the minimum phase cepstrum
 void c2ir (double *c, int nc, double *h, int leng)
 {
-   register int n, k, upl;
+   int n, k, upl;
    double  d;
 
    h[0] = exp(c[0]);
