@@ -64,10 +64,10 @@ stC  *hst;  //State Class defined in hmmstate.h
 double **trw; //transition weights: Matrix that's [number of words x number of words]
 
 int _tst;
-int _now; // number of words
-int _dim; // number of dimensions (of MFCCs)
-int _noc; // number of connections
-int _nog; // number of Gaussians
+int _now = 0; // number of words
+int _dim = 0; // number of dimensions (of MFCCs)
+int _noc = 0; // number of connections
+int _nog = 0 ; // number of Gaussians
 
 int **tarUL;
 int *lenU;
