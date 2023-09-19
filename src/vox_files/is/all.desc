@@ -1,0 +1,164 @@
+(
+( occurid cluster )
+( p.name 0 "p" "ph" "m" "mz" "f" "v" "t" "th" "D" "T" "n" "nz" "l" "lz" "r" "rz" "s" "c" "ch" "j" "C" "J" "Jz" "k" "kh" "x" "G" "N" "Nz" "h" "i" "ii" "I" "II" "Y" "YY" "Yi" "oe" "oee" "E" "EE" "u" "uu" "O" "OO" "a" "aa" "Oi" "ou" "ouu" "ai" "aii" "au" "auu" "oei" "oeii" "ei" "eii" "pau")
+( p.ph_vc consonant vowel diph silence 0 )
+( p.ph_cplace bilabial labiodental dental alveolar palatal velar glottal 0 )
+( p.ph_ctype plosive fricative nasal lateral trill 0 )
+( p.ph_cvox voiced voiceless 0 )
+( p.ph_casp aspirated unaspirated 0 )
+( p.ph_vfrontness front central back 0 )
+( p.ph_vcloseness close nearclose closemid mid openmid nearopen open 0 )
+( p.ph_vroundness unrounded rounded 0 )
+( p.ph_dfrontness2 front central back 0 )
+( p.ph_dcloseness2 close nearclose closemid mid openmid nearopen open 0 )
+( p.ph_droundness2 unrounded rounded 0 )
+( p.ph_vlength long short 0 )
+( n.name ignore 0 "p" "ph" "m" "mz" "f" "v" "t" "th" "D" "T" "n" "nz" "l" "lz" "r" "rz" "s" "c" "ch" "j" "C" "J" "Jz" "k" "kh" "x" "G" "N" "Nz" "h" "i" "ii" "I" "II" "Y" "YY" "Yi" "oe" "oee" "E" "EE" "u" "uu" "O" "OO" "a" "aa" "Oi" "ou" "ouu" "ai" "aii" "au" "auu" "oei" "oeii" "ei" "eii" "pau")
+( n.ph_vc consonant vowel diph silence 0 )
+( n.ph_cplace bilabial labiodental dental alveolar palatal velar glottal 0 )
+( n.ph_ctype plosive fricative nasal lateral trill 0 )
+( n.ph_cvox voiced voiceless 0 )
+( n.ph_casp aspirated unaspirated 0 )
+( n.ph_vfrontness front central back 0 )
+( n.ph_vcloseness close nearclose closemid mid openmid nearopen open 0 )
+( n.ph_vroundness unrounded rounded 0 )
+( n.ph_dfrontness2 front central back 0 )
+( n.ph_dcloseness2 close nearclose closemid mid openmid nearopen open 0 )
+( n.ph_droundness2 unrounded rounded 0 )
+( n.ph_vlength long short 0 )
+( segment_duration ignore float)
+( seg_pitch ignore float )
+( p.seg_pitch ignore float )
+( n.seg_pitch ignore float )
+( R:SylStructure.parent.stress
+0
+1
+)
+( seg_onsetcoda
+coda
+onset
+)
+( n.seg_onsetcoda
+0
+coda
+onset
+)
+( p.seg_onsetcoda
+0
+coda
+onset
+)
+( R:SylStructure.parent.accented
+0
+1
+)
+( pos_in_syl
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+)
+( syl_initial
+0
+1
+)
+( syl_final
+0
+1
+)
+( R:SylStructure.parent.lisp_cg_break
+0
+1
+2
+3
+4
+)
+( R:SylStructure.parent.R:Syllable.p.lisp_cg_break
+0
+1
+2
+3
+4
+)
+( R:SylStructure.parent.position_type
+0
+initial
+single
+final
+mid
+)
+( pp.name ignore 0 "p" "ph" "m" "mz" "f" "v" "t" "th" "D" "T" "n" "nz" "l" "lz" "r" "rz" "s" "c" "ch" "j" "C" "J" "Jz" "k" "kh" "x" "G" "N" "Nz" "h" "i" "i:" "I" "I:" "Y" "Y:" "Yi" "oe" "oe:" "E" "E:" "u" "u:" "O" "O:" "a" "a:" "Oi" "ou" "ou:" "ai" "ai:" "au" "au:" "oei" "oeii" "ei" "eii" "pau")
+( pp.ph_vc ignore consonant vowel diph silence 0 )
+( pp.ph_cplace ignore bilabial labiodental dental alveolar palatal velar glottal 0 )
+( pp.ph_ctype ignore plosive fricative nasal lateral trill 0 )
+( pp.ph_cvox ignore voiced voiceless 0 )
+( pp.ph_casp aspirated unaspirated 0 )
+( pp.ph_vfrontness ignore front central back 0 )
+( pp.ph_vcloseness ignore close nearclose closemid mid openmid nearopen open 0 )
+( pp.ph_vroundness ignore unrounded rounded 0 )
+( pp.ph_dfrontness2 ignore front central back 0 )
+( pp.ph_dcloseness2 ignore close nearclose closemid mid openmid nearopen open 0 )
+( pp.ph_droundness2 ignore unrounded rounded 0 )
+( pp.ph_vlength ignore long short 0 )
+( n.lisp_is_pau 0 1)
+( p.lisp_is_pau 0 1)
+( R:SylStructure.parent.parent.gpos
+0
+aux
+cc
+content
+det
+in
+md
+pps
+to
+wp
+punc
+)
+( R:SylStructure.parent.parent.R:Word.p.gpos
+0
+aux
+cc
+content
+det
+in
+md
+pps
+to
+wp
+punc
+)
+( R:SylStructure.parent.parent.R:Word.n.gpos
+0
+aux
+cc
+content
+det
+in
+md
+pps
+to
+wp
+punc
+)
+)
