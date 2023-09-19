@@ -107,7 +107,7 @@ single
 final
 mid
 )
-( pp.name ignore 0 "p" "ph" "m" "mz" "f" "v" "t" "th" "D" "T" "n" "nz" "l" "lz" "r" "rz" "s" "c" "ch" "j" "C" "J" "Jz" "k" "kh" "x" "G" "N" "Nz" "h" "i" "i:" "I" "I:" "Y" "Y:" "Yi" "oe" "oe:" "E" "E:" "u" "u:" "O" "O:" "a" "a:" "Oi" "ou" "ou:" "ai" "ai:" "au" "au:" "oei" "oeii" "ei" "eii" "pau")
+( pp.name ignore 0 "p" "ph" "m" "mz" "f" "v" "t" "th" "D" "T" "n" "nz" "l" "lz" "r" "rz" "s" "c" "ch" "j" "C" "J" "Jz" "k" "kh" "x" "G" "N" "Nz" "h" "i" "ii" "I" "II" "Y" "YY" "Yi" "oe" "oee" "E" "EE" "u" "uu" "O" "OO" "a" "aa" "Oi" "ou" "ouu" "ai" "aii" "au" "auu" "oei" "oeii" "ei" "eii" "pau")
 ( pp.ph_vc ignore consonant vowel diph silence 0 )
 ( pp.ph_cplace ignore bilabial labiodental dental alveolar palatal velar glottal 0 )
 ( pp.ph_ctype ignore plosive fricative nasal lateral trill 0 )
