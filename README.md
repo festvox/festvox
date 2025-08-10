@@ -34,6 +34,51 @@ This distribution includes
     Scripts for designing and selecting prompts to record for
        arbitrary languages
 
+
+ROADMAP FOR 3.0: GENERATIVE AI FOCUS
+----------------------------------
+
+Version 3.0 will represent a paradigm shift towards modern generative AI-based
+speech synthesis, while maintaining backward compatibility with traditional 
+voice building approaches. The focus will be on:
+
+Core Generative AI Models:
+    
+    Advanced Neural Architectures:
+        - Full VITS (Variational Inference with adversarial learning for TTS)
+        - Diffusion-based TTS models 
+        - Large Language Model integration for text analysis
+    
+    Modern Infrastructure:
+        - GPU-accelerated training and inference
+        - Distributed training support
+        - Cloud deployment ready architectures
+        - ONNX model export for cross-platform deployment
+        - WebAssembly support for browser-based synthesis
+    
+    Developer Experience:
+        - Python-first API with simplified voice building workflows
+        - Jupyter notebook tutorials and examples
+        - Pre-trained model zoo with easy fine-tuning
+        - Automatic hyperparameter optimization
+        - MLOps integration (experiment tracking, model versioning)
+ 
+
+The 3.0 release will maintain the robust voice building foundation of Festvox
+while embracing the latest advances in generative AI, making high-quality 
+voice synthesis accessible to a broader community of researchers and developers.
+
+New in 2.9
+
+    FALCON: Neural extension to festvox voice building suite
+    Support for neural TTS models including Tacotron, WaveNet, and WaveRNN
+    VITS-lite implementation for end-to-end neural synthesis
+    Modular neural architecture with hierarchical blocks (Layers -> Blocks -> Models)
+    Integration with PyTorch for modern deep learning workflows
+    Support for neural vocoders (WaveGlow, WaveRNN)
+    Phoneme-level and acoustic modeling with neural networks
+    Judith framework integration for automated experimentation
+
 New in 2.8
 
     https://github.com/festvox/festival/
