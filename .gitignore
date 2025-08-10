@@ -5,3 +5,50 @@ log_run
 log_*
 log*
 *exp/*
+
+# Build artifacts and configuration files
+config.log
+config.status
+config/config
+
+# Compiled binaries and executables
+src/diphones/make_diph_index
+src/ehmm/bin/
+src/eval/wave2html
+src/general/find_unknowns
+src/interslice/bin/
+src/lts/ults
+src/mllr/mllr
+src/promptselect/text2utts
+src/vc/src/analysis/analysis
+src/vc/src/cov2dia/cov2dia
+src/vc/src/dtw/dtw
+src/vc/src/extdim/extdim
+src/vc/src/extfrm/extfrm
+src/vc/src/f0map/f0map
+src/vc/src/f0stats/f0stats
+src/vc/src/gmm/gmm_jde
+src/vc/src/gmmmap/gmmmap
+src/vc/src/gmmpara/gmm_para
+src/vc/src/jdmat/jdmat
+src/vc/src/lib/libsp.a
+src/vc/src/lib/libsub.a
+src/vc/src/mlpg/delta
+src/vc/src/mlpg/mlpg
+src/vc/src/mlpg/mlpg_vit
+src/vc/src/synthesis/synthesis
+src/vc/src/utt2f0/utt2f0
+src/vc/src/vq/lbg
+src/vc/src/vqlbl/vqlbl
+
+# FALCON training artifacts
+src/falcon/wandb/
+src/falcon/utils/ljspeech/
+
+# General patterns for build artifacts
+*.a
+*.so
+*.dylib
+*/bin/
+**/bin/
+Makefile.bak

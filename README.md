@@ -53,15 +53,13 @@ Core Generative AI Models:
         - GPU-accelerated training and inference
         - Distributed training support
         - Cloud deployment ready architectures
-        - ONNX model export for cross-platform deployment
-        - WebAssembly support for browser-based synthesis
+        - ONNX model export for flite deployment
     
     Developer Experience:
         - Python-first API with simplified voice building workflows
         - Jupyter notebook tutorials and examples
         - Pre-trained model zoo with easy fine-tuning
         - Automatic hyperparameter optimization
-        - MLOps integration (experiment tracking, model versioning)
  
 
 The 3.0 release will maintain the robust voice building foundation of Festvox
