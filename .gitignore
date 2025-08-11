@@ -52,3 +52,5 @@ src/falcon/utils/ljspeech/
 */bin/
 **/bin/
 Makefile.bak
+
+flist.txt
