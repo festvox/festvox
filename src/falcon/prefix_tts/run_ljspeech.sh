@@ -8,8 +8,7 @@ set -e  # Exit on any error
 # Project configuration
 PROJECT_DIR="/home2/srallaba/projects/project_lightweighttts"
 DATA_DIR="$PROJECT_DIR/data"
-SCRIPTS_DIR="$PROJECT_DIR/scripts"
-SCRIPTS_DIR='/home2/srallaba/projects/project_lightweighttts/repos/festvox/src/falcon/prefix_tts'
+FALCON_DIR="$FESTVOXDIR/src/falcon"
 XCODEC2_DIR='/home2/srallaba/projects/project_lightweighttts/repos/X-Codec-2.0/'
 
 # Data paths
@@ -71,7 +70,7 @@ if [ -f "$PHONEMES_DIR/ljspeech_phonemes.jsonl" ] && [ -f "$PHONEMES_DIR/phoneme
     echo ""
 else
     run_step "Extract Phonemes" \
-        "$SCRIPTS_DIR/extract_phonemes_simple.sh '$LJSPEECH_DIR' '$PHONEMES_DIR' '$MAX_SAMPLES'"
+        "$FALCON_DIR/prefix_tts/extract_phonemes_simple.sh '$LJSPEECH_DIR' '$PHONEMES_DIR' '$MAX_SAMPLES'"
 fi
 
 # Check phoneme extraction results
@@ -131,7 +130,7 @@ if [ -f "$TRAINING_DIR/train.jsonl" ] && [ -f "$TRAINING_DIR/val.jsonl" ] && [ -
     echo ""
 else
     run_step "Prepare Training Dataset" \
-        "python3 $SCRIPTS_DIR/prepare_training_data.py \
+        "python3 $FALCON_DIR/prefix_tts/prepare_training_data.py \
             --phonemes_jsonl '$PHONEMES_DIR/ljspeech_phonemes.jsonl' \
             --codec_dir '$CODEC_DIR/vq_codes' \
             --phoneme_vocab '$PHONEMES_DIR/phoneme_vocab.txt' \
