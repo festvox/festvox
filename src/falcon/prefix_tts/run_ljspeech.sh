@@ -97,11 +97,11 @@ if [ -d "$CODEC_DIR/vq_codes" ] && [ $(find "$CODEC_DIR/vq_codes" -name "*.npy" 
     echo ""
 else
     echo 'fname,dur' > flist.txt
-    cat ${DATA_DIR}/ljspeech_prepared/ljspeech_prepared.jsonl | cut -d',' -f 1 | tr "\"" " " | cut -d':' -f 2 | cut -d'/' -f 9 | sed 's/$/\t1.0/' >> ${DATA_DIR}/flist.txt
+    cat ${DATA_DIR}/ljspeech_prepared/ljspeech_prepared.jsonl | cut -d',' -f 1 | tr "\"" " " | cut -d':' -f 2 | cut -d'/' -f 9 | sed 's/$/\t1.0/' >> flist.txt
     run_step "Extract audio tokens" \
     "python3 ${XCODEC2_DIR}/inference_save_code.py \
           --input-dir ${DATA_DIR}/LJSpeech-1.1/wavs \
-          --flist_file ${DATA_DIR}/flist.txt \
+          --flist_file flist.txt \
           --ckpt ${XCODEC2_DIR}/ckpt/epoch=4-step=1400000.ckpt \
           --output-dir $CODEC_DIR"
 fi
@@ -153,6 +153,37 @@ else
     exit 1
 fi
 
+# Step 4: Train the Prefix-LM TTS model
+MODEL_DIR="$DATA_DIR/model_checkpoints"
+if [ -f "$MODEL_DIR/prefix_lm_tts.pth" ]; then
+    echo "Model checkpoint already exists - skipping training step"
+    echo "  - Model saved at: $MODEL_DIR/prefix_lm_tts.pth"
+    echo ""
+else
+    run_step "Train Prefix-LM TTS Model" \
+        "python3 $FALCON_DIR/prefix_tts/train.py \
+            --train_jsonl '$TRAINING_DIR/train.jsonl' \
+            --val_jsonl '$TRAINING_DIR/val.jsonl' \
+            --vocab_json '$TRAINING_DIR/vocab.json' \
+            --d_model 512 \
+            --n_layers 8 \
+            --n_heads 8 \
+            --batch_size 8 \
+            --epochs 20 \
+            --lr 1e-4 \
+            --save_dir '$MODEL_DIR'"
+fi
+
+# Check training results
+if [ -f "$MODEL_DIR/prefix_lm_tts.pth" ]; then
+    echo "Model training completed successfully!"
+    echo "  - Model checkpoint: $MODEL_DIR/prefix_lm_tts.pth"
+    echo ""
+else
+    echo "Error: Model training failed - no checkpoint found"
+    exit 1
+fi
+
 echo "=============================================="
 echo "Pipeline completed successfully!"
 echo "=============================================="
@@ -164,10 +195,11 @@ echo "  - Training data: $TRAINING_DIR/train.jsonl"
 echo "  - Validation data: $TRAINING_DIR/val.jsonl"
 echo "  - Model vocabulary: $TRAINING_DIR/vocab.json"
 echo "  - Dataset statistics: $TRAINING_DIR/dataset_stats.json"
+echo "  - Trained model: $MODEL_DIR/prefix_lm_tts.pth"
 echo ""
 echo "Next steps to implement:"
-echo "  - Model architecture definition (Prefix-LM Transformer)"
-echo "  - Training script with PyTorch/HuggingFace"
-echo "  - Model evaluation and inference"
-echo "  - Model export and deployment"
+echo "  - Inference script for text-to-speech generation"
+echo "  - Model evaluation with audio quality metrics"
+echo "  - Audio codec decoding (tokens → waveform)"
+echo "  - End-to-end TTS pipeline integration"
 echo "=============================================="
