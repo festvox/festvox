@@ -6,7 +6,7 @@
 set -e  # Exit on any error
 
 # Project configuration
-PROJECT_DIR="/lambda/nfs/falcon-revamp/projects/project_prefixtts"
+PROJECT_DIR="/home2/srallaba/tools/festvox/src/falcon/prefix_tts"
 DATA_DIR="$PROJECT_DIR/data"
 SCRIPTS_DIR="$PROJECT_DIR/scripts"
 
