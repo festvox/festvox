@@ -31,15 +31,23 @@
 ##                                                                       ##
 ###########################################################################
 ##                                                                       ##
-##  Basic voice skeleton files                                           ##
+##  Basic voice skeleton files for Icelandic                             ##
 ##                                                                       ##
 ###########################################################################
-TOP=../..
-DIRNAME=src/vox_files
+TOP=../../..
+DIRNAME=src/vox_files/is
 BUILD_DIRS = 
-ALL_DIRS= us general uk prompts es indic is
+ALL_DIRS= 
 
-FILES = Makefile speaker.licence
+SCHEMEFILES = INST_is_VOX_phoneset.scm INST_is_VOX_tokenizer.scm \
+	      INST_is_VOX_tagger.scm INST_is_VOX_lexicon.scm \
+	      INST_is_VOX_phrasing.scm INST_is_VOX_intonation.scm \
+	      INST_is_VOX_duration.scm INST_is_VOX_f0model.scm \
+              INST_is_VOX_durdata.scm \
+	      INST_is_VOX_other.scm \
+	      INST_is_VOX_diphone.scm-diphone
+
+FILES = Makefile $(SCHEMEFILES)
 
 ALL = 
 
