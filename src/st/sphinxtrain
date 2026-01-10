@@ -320,6 +320,11 @@ then
          -ceplen 13 \
          -logbase 1.0001
 
+      # sphinx3_align echoes <s>/<\/s>, fix doubled markers in output
+      sed -i.bak 's/^<s> <s> /<s> /; s/ <\/s> <\/s> / <\/s> /' \
+         falignout/$FV_VOICENAME.alignoutput
+      rm -f falignout/$FV_VOICENAME.alignoutput.bak
+
       echo ""
       echo "Alignment output:"
       echo "  falignout/$FV_VOICENAME.alignoutput - selected pronunciations"
