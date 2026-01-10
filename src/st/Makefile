@@ -36,7 +36,7 @@
 ###########################################################################
 TOP=../..
 DIRNAME=src/st
-SCMFILES = build_st.scm
+SCMFILES = build_st.scm build_st_multipron.scm build_stress_map.scm align_with_stress.scm
 SCRIPTS = sphinx_lab sphinxtrain
 FILES = Makefile  $(SCMFILES) $(SCRIPTS)
 

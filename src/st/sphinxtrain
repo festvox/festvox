@@ -234,29 +234,35 @@ then
    echo "Training acoustic models for alignment"
    cd st
 
-   if [ "$USE_SPHINX3" = 1 ] && [ "$SPHINXTRAIN_PY" ]
-   then
-      # Modern training - CI HMM for forced alignment
-      if grep -q "CFG_FORCEDALIGN = 'no'" etc/sphinx_train.cfg 2>/dev/null; then
+   # Enable forced alignment mode in sphinx_train.cfg
+   if [ -f etc/sphinx_train.cfg ]; then
+      if grep -q "\$CFG_FORCEDALIGN = 'no'" etc/sphinx_train.cfg; then
          sed -i.bak "s/\$CFG_FORCEDALIGN = 'no';/\$CFG_FORCEDALIGN = 'yes';/" etc/sphinx_train.cfg
-         echo "Enabled forced alignment mode"
+         echo "  Enabled forced alignment mode"
       fi
-      $SPHINXTRAIN_PY -s 00.verify run
-      $SPHINXTRAIN_PY -s 10.falign_ci_hmm run
-   else
-      # Legacy training - full pipeline
-      ./scripts_pl/00.verify/verify_all.pl
-      ./scripts_pl/01.vector_quantize/slave.VQ.pl
-      ./scripts_pl/02.ci_schmm/slave_convg.pl
-      ./scripts_pl/03.makeuntiedmdef/make_untied_mdef.pl
-      ./scripts_pl/04.cd_schmm_untied/slave_convg.pl
-      ./scripts_pl/05.buildtrees/make_questions.pl
-      ./scripts_pl/05.buildtrees/slave.treebuilder.pl
-      ./scripts_pl/06.prunetree/slave.state-tie-er.pl
-      ./scripts_pl/07.cd-schmm/slave_convg.pl
-      ./scripts_pl/08.deleted-interpolation/deleted_interpolation.pl
-      ./scripts_pl/09.make_s2_models/make_s2_models.pl
    fi
+
+   # Find the training script - modern SphinxTrain uses scripts/10.falign_ci_hmm/
+   TRAIN_SCRIPT=""
+   if [ -f "$SPHINXTRAINDIR/scripts/10.falign_ci_hmm/slave_convg.pl" ]; then
+      TRAIN_SCRIPT="$SPHINXTRAINDIR/scripts/10.falign_ci_hmm/slave_convg.pl"
+   elif [ -f "$SPHINXTRAINDIR/scripts_pl/10.falign_ci_hmm/slave_convg.pl" ]; then
+      TRAIN_SCRIPT="$SPHINXTRAINDIR/scripts_pl/10.falign_ci_hmm/slave_convg.pl"
+   elif [ -f scripts_pl/02.ci_schmm/slave_convg.pl ]; then
+      # Legacy local scripts
+      TRAIN_SCRIPT="scripts_pl/02.ci_schmm/slave_convg.pl"
+   fi
+
+   if [ -z "$TRAIN_SCRIPT" ]; then
+      echo "Error: Cannot find SphinxTrain training script"
+      echo "  Checked: $SPHINXTRAINDIR/scripts/10.falign_ci_hmm/slave_convg.pl"
+      echo "  Checked: $SPHINXTRAINDIR/scripts_pl/10.falign_ci_hmm/slave_convg.pl"
+      cd ..
+      exit 1
+   fi
+
+   echo "  Running: perl $TRAIN_SCRIPT"
+   perl "$TRAIN_SCRIPT"
 
    cd ..
 fi

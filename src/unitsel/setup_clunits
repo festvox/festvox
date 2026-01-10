@@ -152,10 +152,13 @@ cp -p $FESTVOXDIR/src/general/prune_silence bin
 cp -p $FESTVOXDIR/src/general/prune_middle_silences bin
 cp -p $FESTVOXDIR/src/general/add_noise bin
 
-# We don't use sphinxtrain anymore for labeling
-#cp -p $FESTVOXDIR/src/st/sphinxtrain bin
-#cp -p $FESTVOXDIR/src/st/sphinx_lab bin
-#cp -p $FESTVOXDIR/src/st/build_st.scm festvox
+# SphinxTrain-based labeling (alternative to EHMM, supports multi-pronunciation)
+cp -p $FESTVOXDIR/src/st/sphinxtrain bin
+cp -p $FESTVOXDIR/src/st/sphinx_lab bin
+cp -p $FESTVOXDIR/src/st/build_st.scm festvox
+if [ -f $FESTVOXDIR/src/st/build_stress_map.scm ]; then
+    cp -p $FESTVOXDIR/src/st/build_stress_map.scm festvox
+fi
 
 if [ "$FESTVOXTEMPLATEDIR" = "" ]
 then
