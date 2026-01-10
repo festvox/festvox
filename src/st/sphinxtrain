@@ -271,6 +271,9 @@ fi
 if [ "$1" = "align" ]
 then
    cd st
+   
+   # Clear old alignment files
+   rm -rf falignout phseg wdseg 2>/dev/null
    mkdir -p falignout phseg wdseg
 
    if [ "$USE_SPHINX3" = 1 ]
@@ -348,6 +351,9 @@ if [ "$1" = "labs" ]
 then
    echo "Converting labels to FestVox format"
    silence=$(head -1 etc/mysilence)
+   
+   # Clear old files to ensure fresh generation
+   rm -f lab/*.lab wrd/*.wrd 2>/dev/null
    mkdir -p lab wrd
 
    if [ "$USE_SPHINX3" = 1 ] && [ -d st/phseg ]
