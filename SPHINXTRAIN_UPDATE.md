@@ -26,19 +26,11 @@ $FESTVOXDIR/src/clustergen/setup_cg cmu us slt_arctic
 cp -p ../cmu_us_slt_arctic/wav/*.wav wav/
 cp -p ../cmu_us_slt_arctic/etc/txt.done.data etc/
 
-# Build prompts and label with SphinxTrain
+# Build everything (use label_sphinx instead of default label)
 ./bin/do_build build_prompts
 ./bin/do_build label_sphinx
-
-# Build utterances and ClusterGen voice
 ./bin/do_build build_utts
-./bin/do_clustergen f0
-./bin/do_clustergen mcep
-./bin/do_clustergen voicing
-./bin/do_clustergen combine_coeffs_v
-./bin/do_clustergen generate_statenames
-./bin/do_clustergen cluster
-./bin/do_clustergen dur
+./bin/do_clustergen parallel build
 
 # Test
 festival festvox/cmu_us_slt_arctic_cg.scm
@@ -46,16 +38,24 @@ festival> (voice_cmu_us_slt_arctic_cg)
 festival> (SayText "Hello world.")
 ```
 
-## Using do_build
-
-The `do_build` script provides a simple interface:
+## do_build Commands
 
 | Command | Description |
 |---------|-------------|
+| `./bin/do_build` | Run full pipeline (uses EHMM labeling) |
 | `./bin/do_build build_prompts` | Generate Festival prompt utterances |
-| `./bin/do_build label_sphinx` | Run SphinxTrain alignment (full pipeline) |
-| `./bin/do_build label` | Run EHMM alignment (alternative) |
+| `./bin/do_build label_sphinx` | Run SphinxTrain alignment (replaces `label`) |
+| `./bin/do_build label` | Run EHMM alignment (default) |
 | `./bin/do_build build_utts` | Build utterances from alignments |
+| `./bin/do_clustergen parallel build` | Build ClusterGen voice (all features) |
+
+To use SphinxTrain instead of EHMM, replace `./bin/do_build` with:
+```bash
+./bin/do_build build_prompts
+./bin/do_build label_sphinx
+./bin/do_build build_utts
+./bin/do_clustergen parallel build
+```
 
 ## What Multi-Pronunciation Does
 
