@@ -52,7 +52,7 @@ BUILD_DIRS = src
 ALL_DIRS=config docbook $(BUILD_DIRS)
 CONFIG=configure configure.ac config.sub config.guess \
        missing install-sh mkinstalldirs
-OTHERS = README.md ACKNOWLEDGEMENTS COPYING
+OTHERS = README.md ACKNOWLEDGEMENTS COPYING SPHINXTRAIN_UPDATE.md
 OTHERDIRS = voices # challenges
 FILES = Makefile $(OTHERS) $(CONFIG) $(OTHERDIRS)
 
