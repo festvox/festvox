@@ -171,19 +171,27 @@ then
 fi
 
 # Create multi-pronunciation files for downstream steps
-# With build_st_multipron.scm, the dictionary is already in WORD(n) format,
-# so we just copy the files (for compatibility with steps expecting .multipron.dic)
+# Detects if dict already has WORD(n) format (from build_st_multipron.scm)
+# or needs sed conversion (from build_st.scm fallback)
 if [ "$1" = "multipron" ]
 then
    echo "Creating multi-pronunciation files for alignment"
    cd st
 
-   # Dictionary is already in WORD(n) format from build_st_multipron.scm
-   # Just copy to .multipron.dic for downstream compatibility
-   cp etc/$FV_VOICENAME.dic etc/$FV_VOICENAME.multipron.dic
-
-   # Transcription uses base word forms (aligner picks WORD(n) from dict)
-   cp etc/$FV_VOICENAME.transcription etc/$FV_VOICENAME.multipron.transcription
+   # Check if dictionary already has WORD(n) format
+   if grep -q '([0-9])' etc/$FV_VOICENAME.dic; then
+      echo "  Dictionary already in WORD(n) format, copying..."
+      cp etc/$FV_VOICENAME.dic etc/$FV_VOICENAME.multipron.dic
+      cp etc/$FV_VOICENAME.transcription etc/$FV_VOICENAME.multipron.transcription
+   else
+      echo "  Converting dictionary to WORD(n) format..."
+      # Convert dict: WORD2 -> WORD(2) format for SphinxTrain
+      sed -E 's/^([A-Z]+Q?)([0-9]+)  /\1(\2)  /' etc/$FV_VOICENAME.dic \
+         > etc/$FV_VOICENAME.multipron.dic
+      # Convert transcript: strip trailing digits from words
+      sed -E 's/([A-Z]+Q?)[0-9]+/\1/g' etc/$FV_VOICENAME.transcription \
+         > etc/$FV_VOICENAME.multipron.transcription
+   fi
 
    cd ..
 
