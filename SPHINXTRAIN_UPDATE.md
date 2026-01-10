@@ -77,14 +77,11 @@ Natural pauses are detected and marked with `<sil>`:
 ROBBERY <sil> BRIBERY FRAUD
 ```
 
-### Stress Mapping
+### Stress Recovery
 
-Syllable stress is recorded for each variant:
-
-```
-RECORD    (1 0)   # REcord (noun)
-RECORD(2) (0 1)   # reCORD (verb)
-```
+When the aligner selects a variant like `RECORD(2)`, stress can be recovered directly
+from the lexicon by calling `(nth 1 (lex.lookup_all "record"))` in Festival. No separate
+stress map file is needed - the lexicon entry contains the full syllable structure with stress.
 
 ## Individual SphinxTrain Steps
 
@@ -92,13 +89,18 @@ If you need more control, run steps individually:
 
 ```bash
 ./bin/sphinxtrain setup     # Initialize SphinxTrain directory
-./bin/sphinxtrain files     # Generate dict, phones, transcription
-./bin/sphinxtrain multipron # Convert to WORD(n) format
+./bin/sphinxtrain files     # Generate dict with ALL lexicon pronunciations
+./bin/sphinxtrain multipron # Copy files for downstream compatibility
 ./bin/sphinxtrain feats     # Extract MFCC features
 ./bin/sphinxtrain train     # Train CI acoustic models
 ./bin/sphinxtrain align     # Run forced alignment
 ./bin/sphinxtrain labs      # Convert to FestVox format
 ```
+
+**Note:** The `files` step uses `build_st_multipron.scm` which calls `lex.lookup_all` to get
+ALL pronunciations from the lexicon directly. The dictionary is generated in `WORD(n)` format
+(e.g., `READ`, `READ(2)`, `READ(3)`). The `multipron` step just copies the files for
+compatibility with downstream steps that expect `.multipron.dic`.
 
 ## Output Files
 
@@ -107,7 +109,9 @@ If you need more control, run steps individually:
 | `lab/*.lab` | Phone-level alignments |
 | `wrd/*.wrd` | Word-level alignments |
 | `st/falignout/*.alignoutput` | Selected pronunciations (WORD(n) format) |
-| `st/etc/*.stressmap` | Stress patterns for variants |
+| `st/etc/*.dic` | Dictionary with all lexicon pronunciations |
+
+Stress is recovered from the lexicon directly using `lex.lookup_all` - no separate stressmap file needed.
 
 ## Requirements
 
