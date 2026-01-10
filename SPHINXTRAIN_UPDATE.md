@@ -38,19 +38,25 @@ festival> (voice_cmu_us_slt_arctic_cg)
 festival> (SayText "Hello world.")
 ```
 
-## do_build Commands
+## do_build Pipeline
 
-| Command | Description |
-|---------|-------------|
-| `./bin/do_build` | Full pipeline with EHMM labeling |
-| `./bin/do_build build_prompts` | Generate prompt utterances |
-| `./bin/do_build label` | EHMM alignment (default) |
-| `./bin/do_build label_sphinx` | SphinxTrain alignment (multi-pronunciation) |
-| `./bin/do_build build_utts` | Build utterances from alignments |
-| `./bin/do_clustergen parallel build` | Build ClusterGen voice |
+Running `./bin/do_build` with no arguments builds the full voice:
 
-**Note:** `./bin/do_build` (no args) uses EHMM. For SphinxTrain multi-pronunciation,
-use `label_sphinx` instead of `label` as shown in Quick Start above.
+```bash
+./bin/do_build build_prompts   # Generate prompt utterances
+./bin/do_build label           # EHMM alignment (default)
+./bin/do_build build_utts      # Build utterances
+./bin/do_clustergen parallel build  # Build ClusterGen voice
+```
+
+To use SphinxTrain multi-pronunciation instead of EHMM, replace `label` with `label_sphinx`:
+
+```bash
+./bin/do_build build_prompts
+./bin/do_build label_sphinx    # <-- SphinxTrain instead of EHMM
+./bin/do_build build_utts
+./bin/do_clustergen parallel build
+```
 
 ## What Multi-Pronunciation Does
 
