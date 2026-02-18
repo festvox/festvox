@@ -137,7 +137,7 @@ static void find_meanstd(EST_Track &ss, EST_StrList &files)
 	    for (j=1; j<tt.num_channels(); j++)
 	    {
 		v = tt.a_no_check(i,j);
-		if (!finite(v))   // sigh, better safe that sorry
+		if (!isfinite(v))   // sigh, better safe that sorry
 		    v = 100;
 		if (fabs(v) > 100)
 		    v = 100;

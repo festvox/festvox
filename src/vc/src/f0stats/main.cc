@@ -133,7 +133,7 @@ int main(int argc, char *argv[])
     }
     av /= (double)num;
     for (k = 0, sd = 0.0; k < f0v->length; k++) {
-	if ((f0v->data[k] != 0.0 && finite(f0v->data[k]))
+	if ((f0v->data[k] != 0.0 && isfinite(f0v->data[k]))
 	    || cond.all_flag == XTRUE) {
 	    if (cond.log_flag == XTRUE) {
 		if (f0v->data[k] > 0.0)
