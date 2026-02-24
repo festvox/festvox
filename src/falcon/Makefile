@@ -37,7 +37,7 @@
 TOP=../..
 DIRNAME=src/falcon
 PYFILES = blocks.py hyperparameters.py layers.py models.py
-SUBDIRS = judith utils
+SUBDIRS = judith utils mcep_vits
 OTHERS = README.md
 
 FILES = Makefile $(PYFILES) $(SUBDIRS) $(OTHERS)
