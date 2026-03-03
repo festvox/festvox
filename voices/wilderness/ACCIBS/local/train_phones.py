@@ -57,6 +57,7 @@ vox_dir ='vox'
 global_step = 0
 global_epoch = 0
 use_cuda = torch.cuda.is_available()
+device = torch.device("cuda" if use_cuda else "cpu")
 if use_cuda:
     cudnn.benchmark = False
 use_multigpu = None
@@ -73,8 +74,7 @@ def train(model, train_loader, val_loader, optimizer,
           checkpoint_dir=None, checkpoint_interval=None, nepochs=None,
           clip_thresh=1.0):
     model.train()
-    if use_cuda:
-        model = model.cuda()
+    model = model.to(device)
     linear_dim = model.linear_dim
 
     criterion = nn.L1Loss()
@@ -101,8 +101,7 @@ def train(model, train_loader, val_loader, optimizer,
 
             # Feed data
             x, mel, y = Variable(x), Variable(mel), Variable(y)
-            if use_cuda:
-                x, mel, y = x.cuda(), mel.cuda(), y.cuda()
+            x, mel, y = x.to(device), mel.to(device), y.to(device)
 
             # Multi GPU Configuration
             if use_multigpu:
@@ -227,7 +226,7 @@ if __name__ == "__main__":
                      padding_idx=hparams.padding_idx,
                      use_memory_mask=hparams.use_memory_mask,
                      )
-    model = model.cuda()
+    model = model.to(device)
     #model = DataParallelFix(model)
 
     optimizer = optim.Adam(model.parameters(),
@@ -238,7 +237,7 @@ if __name__ == "__main__":
     # Load checkpoint
     if checkpoint_path:
         print("Load checkpoint from: {}".format(checkpoint_path))
-        checkpoint = torch.load(checkpoint_path)
+        checkpoint = torch.load(checkpoint_path, map_location=device)
         model.load_state_dict(checkpoint["state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer"])
         try:
