@@ -1,4 +1,0 @@
-{
- "batch_size": 4,
- "nepochs": 6000,
-}
