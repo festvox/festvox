@@ -390,8 +390,8 @@ def evaluate(hps, generator, eval_loader, writer_eval):
       for i, sent in enumerate(test_sentences):
         try:
             if hps.data.cleaned_text:
-                from text.cleaners import english_cleaners2
-                cleaned = english_cleaners2(sent)
+                from text.cleaners import flite_cleaners
+                cleaned = flite_cleaners(sent)
                 seq = cleaned_text_to_sequence(cleaned)
             else:
                 seq = text_to_sequence(sent, hps.data.text_cleaners)
