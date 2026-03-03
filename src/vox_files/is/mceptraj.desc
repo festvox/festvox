@@ -1,0 +1,163 @@
+(
+( occurid trajectory )
+( num_frames ignore int)
+( name 
+state names
+"0"
+)
+( R:HMMstate.p.name
+state names
+"0"
+)
+( R:HMMstate.n.name
+state names
+"0"
+)
+( R:segstate.parent.p.name
+phone names
+"0"
+)
+( R:segstate.parent.R:segstate.parent.p.ph_vc ignore consonant vowel diph silence 0 )
+( R:segstate.parent.R:segstate.parent.p.ph_cplace ignore bilabial labiodental dental alveolar palatal velar glottal 0 )
+( R:segstate.parent.R:segstate.parent.p.ph_ctype ignore plosive fricative nasal lateral trill 0 )
+( R:segstate.parent.R:segstate.parent.p.ph_cvox ignore voiced voiceless 0 )
+( R:segstate.parent.R:segstate.parent.p.ph_casp aspirated unaspirated 0 )
+( R:segstate.parent.R:segstate.parent.p.ph_vfrontness ignore front central back 0 )
+( R:segstate.parent.R:segstate.parent.p.ph_vcloseness ignore close nearclose closemid mid openmid nearopen open 0 )
+( R:segstate.parent.R:segstate.parent.p.ph_vroundness ignore unrounded rounded 0 )
+( R:segstate.parent.R:segstate.parent.p.ph_dfrontness2 ignore front central back 0 )
+( R:segstate.parent.R:segstate.parent.p.ph_dcloseness2 ignore close nearclose closemid mid openmid nearopen open 0 )
+( R:segstate.parent.R:segstate.parent.p.ph_droundness2 ignore unrounded rounded 0 )
+( R:segstate.parent.R:segstate.parent.p.ph_vlength ignore long short 0 )
+( R:segstate.parent.n.name ignore
+phone names
+"0"
+)
+( R:segstate.parent.R:segstate.parent.n.ph_vc ignore consonant vowel diph silence 0 )
+( R:segstate.parent.R:segstate.parent.n.ph_cplace ignore bilabial labiodental dental alveolar palatal velar glottal 0 )
+( R:segstate.parent.R:segstate.parent.n.ph_ctype ignore plosive fricative nasal lateral trill 0 )
+( R:segstate.parent.R:segstate.parent.n.ph_cvox ignore voiced voiceless 0 )
+( R:segstate.parent.R:segstate.parent.n.ph_casp aspirated unaspirated 0 )
+( R:segstate.parent.R:segstate.parent.n.ph_vfrontness ignore front central back 0 )
+( R:segstate.parent.R:segstate.parent.n.ph_vcloseness ignore close nearclose closemid mid openmid nearopen open 0 )
+( R:segstate.parent.R:segstate.parent.n.ph_vroundness ignore unrounded rounded 0 )
+( R:segstate.parent.R:segstate.parent.n.ph_dfrontness2 ignore front central back 0 )
+( R:segstate.parent.R:segstate.parent.n.ph_dcloseness2 ignore close nearclose closemid mid openmid nearopen open 0 )
+( R:segstate.parent.R:segstate.parent.n.ph_droundness2 ignore unrounded rounded 0 )
+( R:segstate.parent.R:segstate.parent.n.ph_vlength ignore long short 0 )
+( R:segstate.parent.segment_duration ignore float)
+( lisp_cg_duration float)
+( n.lisp_cg_duration float)
+( p.lisp_cg_duration float)
+( lisp_cg_state_pos b m e)
+( n.lisp_cg_state_pos 0 b m e)
+( p.lisp_cg_state_pos 0 b m e)
+( p.p.lisp_cg_state_pos 0 b m e)
+( n.n.lisp_cg_state_pos 0 b m e)
+( R:segstate.parent.R:SylStructure.parent.stress
+0
+1
+)
+( R:segstate.parent.seg_onsetcoda
+coda
+onset
+)
+( R:segstate.parent.n.seg_onsetcoda 
+0
+coda
+onset
+)
+( R:segstate.parent.p.seg_onsetcoda
+0
+coda
+onset
+)
+( R:segstate.parent.R:SylStructure.parent.accented
+0
+1
+)
+( R:segstate.parent.pos_in_syl float )
+( R:segstate.parent.syl_initial 
+0
+1
+)
+( R:segstate.parent.syl_final
+0
+1
+)
+( R:segstate.parent.R:SylStructure.parent.syl_break
+0
+1
+2
+3
+4
+)
+( R:segstate.parent.R:SylStructure.parent.R:Syllable.p.syl_break
+0
+1
+2
+3
+4
+)
+( R:segstate.parent.R:SylStructure.parent.position_type
+0
+initial
+single
+final
+mid
+)
+( R:segstate.parent.pp.name ignore
+phone names
+"0"
+)
+( R:segstate.parent.R:segstate.parent.pp.ph_vc ignore consonant vowel diph silence 0 )
+( R:segstate.parent.R:segstate.parent.pp.ph_cplace ignore bilabial labiodental dental alveolar palatal velar glottal 0 )
+( R:segstate.parent.R:segstate.parent.pp.ph_ctype ignore plosive fricative nasal lateral trill 0 )
+( R:segstate.parent.R:segstate.parent.pp.ph_cvox ignore voiced voiceless 0 )
+( R:segstate.parent.R:segstate.parent.pp.ph_casp aspirated unaspirated 0 )
+( R:segstate.parent.R:segstate.parent.pp.ph_vfrontness ignore front central back 0 )
+( R:segstate.parent.R:segstate.parent.pp.ph_vcloseness ignore close nearclose closemid mid openmid nearopen open 0 )
+( R:segstate.parent.R:segstate.parent.pp.ph_vroundness ignore unrounded rounded 0 )
+( R:segstate.parent.R:segstate.parent.pp.ph_dfrontness2 ignore front central back 0 )
+( R:segstate.parent.R:segstate.parent.pp.ph_dcloseness2 ignore close nearclose closemid mid openmid nearopen open 0 )
+( R:segstate.parent.R:segstate.parent.pp.ph_droundness2 ignore unrounded rounded 0 )
+( R:segstate.parent.R:segstate.parent.pp.ph_vlength ignore long short 0 )
+( R:segstate.parent.n.lisp_is_pau 0 1)
+( R:segstate.parent.p.lisp_is_pau 0 1)
+( R:segstate.parent.R:SylStructure.parent.parent.gpos
+0
+aux
+cc
+content
+det
+in
+md
+pps
+to
+wp
+)
+( R:segstate.parent.R:SylStructure.parent.parent.R:Word.p.gpos
+0
+aux
+cc
+content
+det
+in
+md
+pps
+to
+wp
+)
+( R:segstate.parent.R:SylStructure.parent.parent.R:Word.n.gpos
+0
+aux
+cc
+content
+det
+in
+md
+pps
+to
+wp
+)
+)
