@@ -1,76 +1,151 @@
-Falcon is a neural extension to festvox voice building suite. 
+# FALCON: Prefix-LM TTS Pipeline
 
-It is built inspired by [Ryuichi Yamamoto's tacotron repo](https://github.com/r9y9/tacotron_pytorch) and follows the style of [Kaldi](https://github.com/kaldi-asr/kaldi) and [Google Research](https://arxiv.org/ftp/arxiv/papers/1702/1702.01715.pdf)
+FALCON is a neural extension to the Festvox voice building suite, now featuring a modern **Prefix Language Model approach to Text-to-Speech synthesis**.
 
-Extends the native HRG structure in Festival to neural systems. The hirerachy is Layers -> Blocks -> Models
+## Overview
 
-For example,
+This implementation uses a prefix language modeling approach where:
+1. **Text phonemes** are encoded as input prefix tokens
+2. **Audio codec tokens** are generated autoregressively as continuation
+3. The model learns to predict discrete audio tokens given phonemic context
 
-Conv1d++ class is a layer that enables temporal convolutions during eval.<br>
-ResidualDilatedCausalConv1d is a module built on top of Conv1d++ <br>
-Wavenet is a model built on top of ResidualDilatedCausalConv1d
+## Architecture
 
-Sample [run.sh](https://github.com/festvox/festvox/blob/master/voices/arctic/rms/run.sh) can be found in any of the voices directories.
+```
+Text: "Hello world" 
+  ↓ (phoneme extraction)
+Phonemes: [h, ə, l, oʊ, w, ɜ˞, l, d]
+  ↓ (prefix-LM training)
+Sequence: <START> h ə l oʊ w ɜ˞ l d <AUDIO_START> 245 891 342 ... <AUDIO_END> <END>
+  ↓ (neural codec decoding)
+Audio: waveform.wav
+```
 
-For the first 18 months, I have decided to track the amount of blocks that are indigenous to us as opposed to those borrowed from the giants. I refer to these as acquisitions. This is inspired by Marissa Mayer's notion of [acquisitions](https://gizmodo.com/heres-what-happened-to-all-of-marissa-mayers-yahoo-acqu-1781980352) at Yahoo.
+## Pipeline Components
 
-# 20.01 January
-#### Acquisitions : 63% (14 blocks out of 22)
-#### Experiments
+### 1. Phoneme Extraction (`extract_phonemes_simple.sh`)
+- Converts text to phonemes using Flite's letter-to-sound rules
+- Outputs JSONL format: `{"text": "...", "phonemes": [...], "audio_path": "..."}`
+- Creates phoneme vocabulary for model training
 
-[Barebones](https://github.com/festvox/festvox/blob/master/voices/arctic/rms/local/train_phones.py): Our barebones implementation can be summarized simply as a clone of [Ryuichi Yamamoto's tacotron repo](https://github.com/r9y9/tacotron_pytorch) but at the level of phoneme sequences. [Checkout the samples](http://tts.speech.cs.cmu.edu/rsk/projects/falcon/exp/tts_phseq.html)
+### 2. Audio Codec Extraction (`X-Codec-2.0`)
+- Uses neural audio codec (X-Codec-2.0) to tokenize audio into discrete codes
+- Produces vector quantized (VQ) representations: `audio → tokens [245, 891, 342, ...]`
+- Saves compressed audio representations as `.npy` files
 
-[Final Frame Expt](https://github.com/festvox/festvox/blob/master/voices/arctic/rms/local/train_phones_finalframe.py): Prediction of frame at time t+1 is dependent on only the final predicted frame at time t. [Checkout the samples](http://tts.speech.cs.cmu.edu/rsk/projects/falcon/exp/final_frame.html)
+### 3. Training Data Preparation (`prepare_training_data.py`)
+- Combines phonemes and audio tokens into prefix-LM sequences
+- Format: `<START> phonemes... <AUDIO_START> audio_tokens... <AUDIO_END> <END>`
+- Creates train/validation splits with vocabulary mappings
 
-[LSTMsBlock Expt](https://github.com/festvox/festvox/blob/master/voices/arctic/rms/local/train_phones_lstmsblock.py) Replacing CBHGs in Encoder with 3 LSTMs based on [Tacotron 2](https://ai.googleblog.com/2017/12/tacotron-2-generating-human-like-speech.html). Checkout the samples: 
-     (1) [replacing CBHG by LSTMsBlock in Encoder only while PostNet still has CBHG](http://tts.speech.cs.cmu.edu/rsk/projects/falcon/exp/lstms_encoder/tts_phseq_lstmsencoder_rms.html) 
-      (2) [replacing CBHG by LSTMsBlock in both Encoder and PostNet](http://tts.speech.cs.cmu.edu/rsk/projects/falcon/exp/lstmsblock_encoderNpostnet/lstmsblockencoderNpostnet_rms.html)
+## Quick Start
 
-[no ssil Expt]() Removing short silences obtained from EHMM alignment. Checkout the [samples](http://tts.speech.cs.cmu.edu/rsk/projects/falcon/exp/no_ssil.html)
+### Prerequisites
+```bash
+# Set Flite directory
+export FLITEDIR=/path/to/flite
 
-# 20.02 February
-#### Acquisitions : 58% (14 blocks out of 24)
-#### Experiments
+# Ensure X-Codec-2.0 checkpoint is available
+ls /path/to/X-Codec-2.0/ckpt/epoch=4-step=1400000.ckpt
+```
 
-[Acoustic Model Baseline](https://github.com/festvox/festvox/blob/master/challenges/blizzard2020/v1/local/train_phones.py) Tokenize Mandarin, convert to pinyin, approximate phonemes using grapheme tools within festvox. [Checkout the samples](http://tts.speech.cs.cmu.edu/rsk/challenges/blizzard2020/exp/baseline.html)
+### Run Complete Pipeline
+```bash
+cd src/falcon/prefix_tts
+./run_ljspeech.sh
+```
 
-Vocoder: [Checkout the samples](http://tts.speech.cs.cmu.edu/rsk/challenges/blizzard2020/exp/vocoder/baseline.html)
+This will:
+1. Extract phonemes from LJSpeech dataset
+2. Generate audio codec tokens using GPU
+3. Prepare training dataset in prefix-LM format
 
-# 20.03 March
-#### Acquisitions : 58% (14 blocks out of 24)
-#### Experiments
+### Pipeline Output
+```
+data/
+├── phonemes_ljspeech/
+│   ├── ljspeech_phonemes.jsonl      # Phoneme sequences
+│   └── phoneme_vocab.txt            # Phoneme vocabulary
+├── ljspeech_tokens/
+│   └── vq_codes/                    # Audio codec tokens (.npy)
+└── training_data/
+    ├── train.jsonl                  # Training sequences
+    ├── val.jsonl                    # Validation sequences
+    ├── vocab.json                   # Complete vocabulary
+    └── dataset_stats.json           # Dataset statistics
+```
 
-[Vocoder](https://github.com/festvox/festvox/blob/master/challenges/blizzard2020/v1/local/train_quants.py): WaveLSTM with additional FC for fine [Checkout the samples](http://tts.speech.cs.cmu.edu/rsk/challenges/blizzard2020/exp/vocoder_wavernn/wavernn.html)
+## Key Features
 
-# 20.04 April
-#### Acquisitions : 50% (15 blocks out of 30)
-#### Experiments
+### Smart Resume Capability
+- Pipeline automatically skips completed steps
+- Resume from any point if process is interrupted
+- Efficient re-runs for development and testing
 
-[Vocoder](): WaveGlow 
+### GPU Optimization
+- Configurable GPU usage (`CUDA_VISIBLE_DEVICES=1`)
+- Efficient batch processing for codec extraction
+- Memory-optimized training data preparation
 
+### Flexible Configuration
+- Adjustable sample limits for testing (`MAX_SAMPLES=100`)
+- Configurable train/validation splits
+- Modular components for easy experimentation
 
-# 20.05 May
-#### Acquisitions : 50% (15 blocks out of 30)
-#### Integrating [Judith](http://www.cs.cmu.edu/~srallaba/ProjectAssistCore/) 
+## Technical Details
 
-[Judith, give me a little juice](https://youtu.be/irkrx-gvqig)
+### Sequence Format
+```python
+# Training sequence structure:
+sequence = [
+    2,              # <START>
+    phoneme_ids,    # [15, 23, 8, 45, ...]
+    4,              # <AUDIO_START>
+    audio_tokens,   # [1245, 891, 342, ...]
+    5,              # <AUDIO_END>  
+    3               # <END>
+]
+```
 
+### Vocabulary Structure
+- **Special tokens**: `<START>`, `<END>`, `<AUDIO_START>`, `<AUDIO_END>`, `<PAD>`, `<UNK>`
+- **Phoneme tokens**: Mapped from phoneme vocabulary (e.g., 'ae' → 6)
+- **Audio tokens**: Offset by phoneme vocab size (e.g., codec 245 → vocab_offset + 245)
 
-# 20.06 June
-#### Acquisitions : 50% (15 blocks out of 30)
-#### Integrating Judith. 
+### Model Requirements
+- **Input**: Prefix sequences (phonemes + special tokens)
+- **Output**: Audio token predictions
+- **Architecture**: Transformer-based language model with causal attention
+- **Training objective**: Next-token prediction with teacher forcing
 
-[Judith based Lit Review](https://www.youtube.com/watch?v=A_idoFssTjE&list=PLOP55xdQB5RGDGnwUbK9dUn6t-7KuFn_F&index=8)
+## Next Steps
 
-[Developer Cut](http://www.cs.cmu.edu/~srallaba/ProjectDeveloperCut/)
+1. **Model Architecture**: Implement Transformer-based Prefix-LM
+2. **Training Script**: PyTorch/HuggingFace training loop
+3. **Inference Engine**: Text → phonemes → audio tokens → waveform
+4. **Evaluation**: Objective metrics and subjective listening tests
 
-# 20.08 August
-#### Acquisitions : 50% (15 blocks out of 30)
-#### Presented my PhD proposal
-[Proposal Document](https://www.dropbox.com/s/jx5x8qnzflz00gj/proposal_srallaba_De-Entanglement_15July2020.pdf?dl=0)
+## Development Status
 
-# 20.10 October
-#### Acquisitions : 50% (15 blocks out of 30)
-#### Attended Interspeech 2020
-[Interspeech Insights](https://srallaba.medium.com/insights-from-interspeech-2k20-a-letter-to-prospective-busy-junior-pb-j-research-students-c430b9ac07c7)
+**Current Phase**: Data pipeline completion
+- ✅ Phoneme extraction with Flite
+- ✅ Audio codec integration (X-Codec-2.0)  
+- ✅ Training data preparation
+- 🔄 Model architecture design
+- ⏳ Training implementation
+- ⏳ Inference and evaluation
+
+## Repository Structure
+
+```
+src/falcon/prefix_tts/
+├── run_ljspeech.sh              # Main pipeline script
+├── extract_phonemes_simple.sh   # Phoneme extraction
+├── prepare_training_data.py     # Dataset preparation
+└── codec_extract.py             # Audio tokenization (alternative)
+```
+
+---
+
+*This represents a modern approach to neural TTS using language modeling techniques, building on Festvox's traditional strengths while incorporating state-of-the-art generative AI methods.*
 
