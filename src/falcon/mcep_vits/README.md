@@ -1,5 +1,10 @@
 # MCEP-VITS: Mel-Cepstral Decoder for VITS
 
+Based on [VITS](https://github.com/jaywalnut310/vits) by Jaehyeon Kim et al. (MIT License).
+The text encoder, posterior encoder, flow, discriminator, monotonic alignment search, and
+training framework are derived from the original VITS implementation. The decoder is replaced
+with a novel MCEP-based architecture (see below).
+
 MCEP-VITS replaces the standard convolutional upsampling decoder in VITS with a compact
 mel-cepstral (MCEP) magnitude predictor + minimum phase + learned phase residual, followed
 by a single fullband iSTFT. Instead of upsampling the latent representation through

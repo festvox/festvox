@@ -1,3 +1,7 @@
+# Monotonic alignment search — from VITS (MIT License)
+# Original: https://github.com/jaywalnut310/vits
+# Author: Jaehyeon Kim et al.
+
 cimport cython
 from cython.parallel import prange
 

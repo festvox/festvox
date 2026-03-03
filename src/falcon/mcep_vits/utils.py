@@ -1,3 +1,5 @@
+# From VITS (MIT License) — https://github.com/jaywalnut310/vits
+
 import os
 import glob
 import sys

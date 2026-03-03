@@ -1,3 +1,5 @@
+# From VITS (MIT License) — https://github.com/jaywalnut310/vits
+
 import torch
 from torch.nn import functional as F
 

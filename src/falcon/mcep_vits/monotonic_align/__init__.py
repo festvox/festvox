@@ -1,3 +1,7 @@
+# Monotonic alignment search — from VITS (MIT License)
+# Original: https://github.com/jaywalnut310/vits
+# Author: Jaehyeon Kim et al.
+
 import numpy as np
 import torch
 from .monotonic_align.core import maximum_path_c

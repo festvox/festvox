@@ -1,3 +1,6 @@
+# Derived from VITS (MIT License) — https://github.com/jaywalnut310/vits
+# Decoder replaced with MCEP-based architecture (mcep_decoder.py)
+
 import copy
 import math
 import torch
