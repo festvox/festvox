@@ -3,7 +3,7 @@
 ##                                                                       ##
 ##                  Language Technologies Institute                      ##
 ##                     Carnegie Mellon University                        ##
-##                         Copyright (c) 2002                            ##
+##                     Copyright (c) 2002-2026                           ##
 ##                        All Rights Reserved.                           ##
 ##                                                                       ##
 ##  Permission is hereby granted, free of charge, to use and distribute  ##
@@ -32,8 +32,8 @@
 ##                                                                       ##
 ###########################################################################
 ##                                                                       ##
-##  Run SphinxTrain on data to build acoustic models then label it       ##
-##  with forced alignment                                                ##
+##  Run SphinxTrain for forced alignment with multiple pronunciations    ##
+##  Uses sphinx3_align (modern) or sphinx2-batch (legacy fallback)       ##
 ##                                                                       ##
 ###########################################################################
 
@@ -46,36 +46,73 @@ then
    echo "environment variable ESTDIR is unset"
    echo "set it to your local speech tools directory e.g."
    echo '   bash$ export ESTDIR=/home/awb/projects/speech_tools/'
-   echo or
-   echo '   csh% setenv ESTDIR /home/awb/projects/speech_tools/'
    exit 1
 fi
 
 if [ ! "$SPHINXTRAINDIR" ]
 then
    echo "environment variable SPHINXTRAINDIR is unset"
-   echo "set it to your local SphinxTrain src directory e.g."
-   echo '   bash$ export SPHINXTRAINDIR=/home/awb/projects/SphinxTrain/'
-   echo or
-   echo '   csh% setenv SPHINXTRAINDIR /home/awb/projects/SphinxTrain/'
+   echo "set it to your SphinxTrain source directory e.g."
+   echo '   bash$ export SPHINXTRAINDIR=/home/awb/projects/sphinxtrain/'
    exit 1
 fi
 
-if [ ! "$SPHINX2DIR" ]
+# Detect SphinxTrain version and set up paths
+USE_SPHINX3=0
+
+# Check for sphinx3_align (modern SphinxTrain 5.x)
+if [ -x "$SPHINXTRAINDIR/build/sphinx3_align" ]
 then
-   echo "environment variable SPHINX2DIR is unset"
-   echo "set it to your local Sphinx2 is installed e.g."
-   echo '   bash$ export SPHINX2DIR=/home/awb/projects/sphinx2/'
-   echo or
-   echo '   csh% setenv SPHINX2DIR /home/awb/projects/sphinx2/'
-   echo 'such that $SPHINX2DIR/bin/sphinx2-batch exists'
+   SPHINX3_ALIGN="$SPHINXTRAINDIR/build/sphinx3_align"
+   USE_SPHINX3=1
+elif [ -x "$SPHINXTRAINDIR/bin/sphinx3_align" ]
+then
+   SPHINX3_ALIGN="$SPHINXTRAINDIR/bin/sphinx3_align"
+   USE_SPHINX3=1
+fi
+
+# Check for sphinx_fe
+if [ -x "$SPHINXTRAINDIR/build/sphinx_fe" ]
+then
+   SPHINX_FE="$SPHINXTRAINDIR/build/sphinx_fe"
+elif [ -x "$SPHINXTRAINDIR/bin/sphinx_fe" ]
+then
+   SPHINX_FE="$SPHINXTRAINDIR/bin/sphinx_fe"
+fi
+
+# Check for sphinxtrain python script (modern)
+if [ -x "$SPHINXTRAINDIR/scripts/sphinxtrain" ]
+then
+   SPHINXTRAIN_PY="python3 $SPHINXTRAINDIR/scripts/sphinxtrain"
+fi
+
+# Legacy: Check for Sphinx2 (fallback)
+if [ "$SPHINX2DIR" ] && [ -x "$SPHINX2DIR/bin/sphinx2-batch" ]
+then
+   USE_SPHINX2=1
+else
+   USE_SPHINX2=0
+fi
+
+if [ "$USE_SPHINX3" = 1 ]
+then
+   echo "Using modern SphinxTrain (sphinx3_align)"
+elif [ "$USE_SPHINX2" = 1 ]
+then
+   echo "Using legacy Sphinx2 (sphinx2-batch)"
+else
+   echo "Error: Cannot find sphinx3_align or sphinx2-batch"
+   echo "For modern SphinxTrain: cmake -S . -B build && cmake --build build"
+   echo "Or set SPHINX2DIR for legacy support"
    exit 1
 fi
 
+# Default pipeline: multi-pronunciation with silence insertion
 if [ $# = 0 ]
 then
    $0 setup
    $0 files
+   $0 multipron
    $0 feats
    $0 train
    $0 align
@@ -85,74 +122,347 @@ fi
 
 if [ "$1" = "setup" ]
 then
-  mkdir st
-  cd st
+   echo "SphinxTrain setup"
+   mkdir -p st
+   cd st
 
-  $SPHINXTRAINDIR/scripts_pl/setup_SphinxTrain $FV_VOICENAME
-  mkdir lab
+   if [ "$USE_SPHINX3" = 1 ] && [ "$SPHINXTRAIN_PY" ]
+   then
+      # Modern setup
+      $SPHINXTRAIN_PY -t $FV_VOICENAME setup
+   else
+      # Legacy setup
+      $SPHINXTRAINDIR/scripts_pl/setup_SphinxTrain.pl $FV_VOICENAME 2>/dev/null || \
+      $SPHINXTRAINDIR/scripts_pl/setup_SphinxTrain $FV_VOICENAME
+   fi
 
-  cd ..
+   mkdir -p lab wav
+   cd ..
 fi
 
-#  dic, fileids, phone, filler, transcription
+# Generate dictionary, phone list, transcription files
+# Uses build_st_multipron.scm which gets ALL pronunciations from lexicon via lex.lookup_all
+# Dictionary is generated in WORD(n) format directly (e.g., READ, READ(2), READ(3))
 if [ "$1" = "files" ]
 then
-   festival -b festvox/build_st.scm '(st_setup "etc/txt.done.data" "'$FV_VOICENAME'")'
+   echo "Generating SphinxTrain input files (multi-pronunciation)"
+   
+   # Copy build_st_multipron.scm if not present
+   if [ ! -f festvox/build_st_multipron.scm ]; then
+      if [ -f "$FESTVOXDIR/src/st/build_st_multipron.scm" ]; then
+         cp "$FESTVOXDIR/src/st/build_st_multipron.scm" festvox/
+      fi
+   fi
+   
+   # Use multi-pronunciation setup - generates WORD(n) format directly
+   if [ -f festvox/build_st_multipron.scm ]; then
+      festival -b festvox/build_st_multipron.scm \
+         '(st_multipron_setup "etc/txt.done.data" "'$FV_VOICENAME'")'
+   else
+      # Fallback to standard setup
+      echo "Warning: build_st_multipron.scm not found, using standard setup"
+      festival -b festvox/build_st.scm '(st_setup "etc/txt.done.data" "'$FV_VOICENAME'")'
+   fi
+
+   # Copy to expected locations
+   cp st/etc/$FV_VOICENAME.phone st/etc/${FV_VOICENAME}.phone 2>/dev/null
+   cp st/etc/$FV_VOICENAME.fileids st/etc/${FV_VOICENAME}_train.fileids 2>/dev/null
+   cp st/etc/$FV_VOICENAME.transcription st/etc/${FV_VOICENAME}_train.transcription 2>/dev/null
 fi
 
-# Wave 2 feats
+# Create multi-pronunciation files for downstream steps
+# Detects if dict already has WORD(n) format (from build_st_multipron.scm)
+# or needs sed conversion (from build_st.scm fallback)
+if [ "$1" = "multipron" ]
+then
+   echo "Creating multi-pronunciation files for alignment"
+   cd st
+
+   # Check if dictionary already has WORD(n) format
+   if grep -q '([0-9])' etc/$FV_VOICENAME.dic; then
+      echo "  Dictionary already in WORD(n) format, copying..."
+      cp etc/$FV_VOICENAME.dic etc/$FV_VOICENAME.multipron.dic
+      cp etc/$FV_VOICENAME.transcription etc/$FV_VOICENAME.multipron.transcription
+   else
+      echo "  Converting dictionary to WORD(n) format..."
+      # Convert dict: WORD2 -> WORD(2) format for SphinxTrain
+      sed -E 's/^([A-Z]+Q?)([0-9]+)  /\1(\2)  /' etc/$FV_VOICENAME.dic \
+         > etc/$FV_VOICENAME.multipron.dic
+      # Convert transcript: strip trailing digits from words
+      sed -E 's/([A-Z]+Q?)[0-9]+/\1/g' etc/$FV_VOICENAME.transcription \
+         > etc/$FV_VOICENAME.multipron.transcription
+   fi
+
+   cd ..
+
+   echo "Created:"
+   echo "  st/etc/$FV_VOICENAME.multipron.dic - WORD(n) format dictionary"
+   echo "  st/etc/$FV_VOICENAME.multipron.transcription - base word forms"
+   echo ""
+   echo "Note: Stress can be recovered from selected variant (e.g., RECORD(2))"
+   echo "      by calling (nth 1 (lex.lookup_all \"record\")) in Festival"
+fi
+
+# Extract features
 if [ "$1" = "feats" ]
 then
-   find wav -name \*.wav -print |
-   while read i
+   echo "Extracting features"
+
+   # Convert wav files to st/wav/ in NIST format (16kHz)
+   for wav in wav/*.wav
    do
-      $ESTDIR/bin/ch_wave -otype nist -F 16000 -o st/$i $i
+      base=$(basename $wav .wav)
+      if [ ! -f st/wav/$base.wav ]
+      then
+         $ESTDIR/bin/ch_wave -otype nist -F 16000 -o st/wav/$base.wav $wav
+      fi
    done
-   (cd st; ./bin/make_feats etc/$FV_VOICENAME.fileids)
+
+   cd st
+
+   if [ "$USE_SPHINX3" = 1 ] && [ "$SPHINX_FE" ]
+   then
+      # Modern feature extraction
+      mkdir -p feat logdir
+      $SPHINX_FE \
+         -c etc/${FV_VOICENAME}_train.fileids \
+         -di wav \
+         -ei wav \
+         -do feat \
+         -eo mfc \
+         -nist yes \
+         -samprate 16000 \
+         -nfilt 25 \
+         -lowerf 130 \
+         -upperf 6800 \
+         -nfft 512 \
+         -ncep 13 \
+         -transform dct
+   else
+      # Legacy feature extraction
+      ./bin/make_feats etc/$FV_VOICENAME.fileids
+   fi
+
+   cd ..
 fi
 
+# Train acoustic models
 if [ "$1" = "train" ]
 then
+   echo "Training acoustic models for alignment"
    cd st
-   ./scripts_pl/00.verify/verify_all.pl 
-   ./scripts_pl/01.vector_quantize/slave.VQ.pl
-   ./scripts_pl/02.ci_schmm/slave_convg.pl
-   ./scripts_pl/03.makeuntiedmdef/make_untied_mdef.pl
-   ./scripts_pl/04.cd_schmm_untied/slave_convg.pl
-   ./scripts_pl/05.buildtrees/make_questions.pl
-   ./scripts_pl/05.buildtrees/slave.treebuilder.pl
-   ./scripts_pl/06.prunetree/slave.state-tie-er.pl
-   ./scripts_pl/07.cd-schmm/slave_convg.pl
-   ./scripts_pl/08.deleted-interpolation/deleted_interpolation.pl
-   ./scripts_pl/09.make_s2_models/make_s2_models.pl
+
+   # Enable forced alignment mode in sphinx_train.cfg
+   if [ -f etc/sphinx_train.cfg ]; then
+      if grep -q "\$CFG_FORCEDALIGN = 'no'" etc/sphinx_train.cfg; then
+         sed -i.bak "s/\$CFG_FORCEDALIGN = 'no';/\$CFG_FORCEDALIGN = 'yes';/" etc/sphinx_train.cfg
+         echo "  Enabled forced alignment mode"
+      fi
+   fi
+
+   # Find the training script - modern SphinxTrain uses scripts/10.falign_ci_hmm/
+   TRAIN_SCRIPT=""
+   if [ -f "$SPHINXTRAINDIR/scripts/10.falign_ci_hmm/slave_convg.pl" ]; then
+      TRAIN_SCRIPT="$SPHINXTRAINDIR/scripts/10.falign_ci_hmm/slave_convg.pl"
+   elif [ -f "$SPHINXTRAINDIR/scripts_pl/10.falign_ci_hmm/slave_convg.pl" ]; then
+      TRAIN_SCRIPT="$SPHINXTRAINDIR/scripts_pl/10.falign_ci_hmm/slave_convg.pl"
+   elif [ -f scripts_pl/02.ci_schmm/slave_convg.pl ]; then
+      # Legacy local scripts
+      TRAIN_SCRIPT="scripts_pl/02.ci_schmm/slave_convg.pl"
+   fi
+
+   if [ -z "$TRAIN_SCRIPT" ]; then
+      echo "Error: Cannot find SphinxTrain training script"
+      echo "  Checked: $SPHINXTRAINDIR/scripts/10.falign_ci_hmm/slave_convg.pl"
+      echo "  Checked: $SPHINXTRAINDIR/scripts_pl/10.falign_ci_hmm/slave_convg.pl"
+      cd ..
+      exit 1
+   fi
+
+   echo "  Running: perl $TRAIN_SCRIPT"
+   perl "$TRAIN_SCRIPT"
+
    cd ..
 fi
 
 # Alignment
 if [ "$1" = "align" ]
 then
-   echo "*align_all*" >st/etc/$FV_VOICENAME.align
-   cat st/etc/$FV_VOICENAME.transcription |
-   sed 's/<sil>//g' |
-   awk '{for (i=2; i<NF-2; i++)
-           printf("%s ",$i);
-         printf("%s\n",$(NF-2))}' >>st/etc/$FV_VOICENAME.align
-   echo "<sil> SIL" >st/etc/$FV_VOICENAME.sil
-   ./bin/sphinx_lab 
+   cd st
+   
+   # Clear old alignment files
+   rm -rf falignout phseg wdseg 2>/dev/null
+   mkdir -p falignout phseg wdseg
+
+   if [ "$USE_SPHINX3" = 1 ]
+   then
+      echo "Running forced alignment with sphinx3_align (multi-pronunciation)"
+
+      # Use multi-pron files if they exist
+      if [ -f etc/$FV_VOICENAME.multipron.transcription ]; then
+         echo "  Using multi-pronunciation transcript"
+         cp etc/$FV_VOICENAME.multipron.transcription falignout/$FV_VOICENAME.aligninput
+      else
+         cp etc/$FV_VOICENAME.transcription falignout/$FV_VOICENAME.aligninput
+      fi
+
+      if [ -f etc/$FV_VOICENAME.multipron.dic ]; then
+         echo "  Using multi-pronunciation dictionary"
+         cp etc/$FV_VOICENAME.multipron.dic falignout/$FV_VOICENAME.falign.dict
+      else
+         cp etc/$FV_VOICENAME.dic falignout/$FV_VOICENAME.falign.dict
+      fi
+
+      # Filler dictionary
+      echo "<s> SIL" > falignout/$FV_VOICENAME.falign.fdict
+      echo "</s> SIL" >> falignout/$FV_VOICENAME.falign.fdict
+      echo "<sil> SIL" >> falignout/$FV_VOICENAME.falign.fdict
+
+      HMM_DIR=model_parameters/${FV_VOICENAME}.falign_ci_cont
+
+      $SPHINX3_ALIGN \
+         -hmm $HMM_DIR \
+         -dict falignout/$FV_VOICENAME.falign.dict \
+         -fdict falignout/$FV_VOICENAME.falign.fdict \
+         -ctl etc/${FV_VOICENAME}_train.fileids \
+         -insent falignout/$FV_VOICENAME.aligninput \
+         -outsent falignout/$FV_VOICENAME.alignoutput \
+         -cepdir feat \
+         -cepext .mfc \
+         -phsegdir phseg,CTL \
+         -wdsegdir wdseg,CTL \
+         -beam 1e-200 \
+         -agc none \
+         -cmn batch \
+         -feat 1s_c_d_dd \
+         -ceplen 13 \
+         -logbase 1.0001
+
+      # sphinx3_align echoes <s>/<\/s>, fix doubled markers in output
+      sed -i.bak 's/^<s> <s> /<s> /; s/ <\/s> <\/s> / <\/s> /' \
+         falignout/$FV_VOICENAME.alignoutput
+      rm -f falignout/$FV_VOICENAME.alignoutput.bak
+
+      echo ""
+      echo "Alignment output:"
+      echo "  falignout/$FV_VOICENAME.alignoutput - selected pronunciations"
+      echo "  phseg/ - phone-level alignments"
+      echo "  wdseg/ - word-level alignments"
+
+   else
+      echo "Running forced alignment with sphinx2-batch (legacy)"
+
+      # Legacy alignment setup
+      echo "*align_all*" >etc/$FV_VOICENAME.align
+      cat etc/$FV_VOICENAME.transcription |
+      sed 's/<sil>//g' |
+      awk '{for (i=2; i<NF-2; i++)
+              printf("%s ",$i);
+            printf("%s\n",$(NF-2))}' >>etc/$FV_VOICENAME.align
+      echo "<sil> SIL" >etc/$FV_VOICENAME.sil
+
+      cd ..
+      ./bin/sphinx_lab
+      cd st
+   fi
+
+   cd ..
 fi
 
-# Copy back lab files
+# Convert labels to FestVox format
 if [ "$1" = "labs" ]
 then
-   echo Convert Sphinx2 lab output to FestVox labs
-   silence=`head -1 etc/mysilence`
-   for i in st/lab/*.lab
-   do
-     cat $i | sed 's/;.*$//;s/(.*$//' | 
-              sed 's/SIL/'$silence'/;s/CAP//' |
-     awk '{if (NF == 3)
-             printf("%1.5f %s %s\n",0.012+$1,$2,$3);
-           else
-             print $0}' >lab/`basename $i`
-   done
+   echo "Converting labels to FestVox format"
+   silence=$(head -1 etc/mysilence)
+   
+   # Clear old files to ensure fresh generation
+   rm -f lab/*.lab wrd/*.wrd 2>/dev/null
+   mkdir -p lab wrd
+
+   if [ "$USE_SPHINX3" = 1 ] && [ -d st/phseg ]
+   then
+      # Convert phseg format to lab format
+      for phseg in st/phseg/*.phseg
+      do
+         base=$(basename $phseg .phseg)
+         echo "#" > lab/$base.lab
+         awk -v sil="$silence" '
+            BEGIN { frame_shift = 0.01 }
+            /^[ \t]*[0-9]/ {
+               gsub(/^[ \t]+/, "")
+               split($0, fields)
+               end = (fields[2] + 1) * frame_shift
+               phone = fields[4]
+               if (phone == "SIL") phone = sil
+               gsub(/^CAP/, "", phone)
+               printf("%1.5f 125 %s\n", end, phone)
+            }
+         ' $phseg >> lab/$base.lab
+      done
+
+      # Convert wdseg to wrd format
+      if [ -d st/wdseg ]; then
+         for wdseg in st/wdseg/*.wdseg
+         do
+            base=$(basename $wdseg .wdseg)
+            awk '
+               BEGIN { frame_shift = 0.01 }
+               /^[ \t]*[0-9]/ {
+                  gsub(/^[ \t]+/, "")
+                  split($0, fields)
+                  end = (fields[2] + 1) * frame_shift
+                  word = fields[4]
+                  if (word ~ /^<.*>$/) next
+                  gsub(/\([0-9]+\)$/, "", word)
+                  word = tolower(word)
+                  printf("%1.5f 125 %s\n", end, word)
+               }
+            ' $wdseg > wrd/$base.wrd
+         done
+         echo "Word boundaries written to wrd/ ($(ls wrd/*.wrd 2>/dev/null | wc -l | tr -d ' ') files)"
+      fi
+
+   else
+      # Legacy lab format conversion
+      for i in st/lab/*.lab
+      do
+         cat $i | sed 's/;.*$//;s/(.*$//' |
+            sed 's/SIL/'$silence'/;s/CAP//' |
+         awk '{if (NF == 3)
+                 printf("%1.5f %s %s\n",0.012+$1,$2,$3);
+               else
+                 print $0}' >lab/$(basename $i)
+      done
+   fi
+
+   echo "Labels written to lab/ ($(ls lab/*.lab 2>/dev/null | wc -l | tr -d ' ') files)"
+fi
+
+# Help
+if [ "$1" = "help" ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]
+then
+   echo "Usage: sphinxtrain [step]"
+   echo ""
+   echo "SphinxTrain-based forced alignment with multi-pronunciation support."
+   echo "Automatically uses sphinx3_align (modern) or sphinx2-batch (legacy)."
+   echo ""
+   echo "Default pipeline (run with no arguments):"
+   echo "  setup     - Initialize SphinxTrain directory"
+   echo "  files     - Generate dictionary, phone list, transcriptions"
+   echo "  multipron - Convert to WORD(n) format for multi-pronunciation"
+   echo "  feats     - Extract MFCC features"
+   echo "  train     - Train CI acoustic models"
+   echo "  align     - Align with multiple prons + silence insertion"
+   echo "  labs      - Convert labels to FestVox format"
+   echo ""
+   echo "Multi-pronunciation alignment allows SphinxTrain to:"
+   echo "  - Choose between alternate pronunciations acoustically"
+   echo "  - Insert optional silences between words"
+   echo "  - Correct stress based on selected pronunciation"
+   echo ""
+   echo "Output files:"
+   echo "  lab/*.lab - Phone-level alignments (FestVox format)"
+   echo "  wrd/*.wrd - Word-level alignments"
+   echo "  st/falignout/*.alignoutput - Selected pronunciations (WORD(n))"
+   echo "  st/etc/*.stressmap - Stress patterns for correction"
 fi
