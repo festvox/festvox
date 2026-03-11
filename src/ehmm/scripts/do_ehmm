@@ -244,7 +244,7 @@ then
     echo "EHMM standardize_statenames"
     mv etc/statenames etc/statenames.ehmm
     cat etc/statenames.ehmm |
-    sed 's/_[0-9][0-9]* /__&/g' | sed 's/___/ /g' |
+    sed 's/_[1-9][0-9]* /__&/g' | sed 's/___/ /g' |
     awk '{if (NF >= 4)
           {
              printf("%s %s_1 %s_2 ",$1,$2,$4);
@@ -256,7 +256,7 @@ then
              printf("%s %s_5\n",$1,$2);
          }' >etc/statenames
     cat etc/statenames.ehmm |
-    sed 's/_[0-9][0-9]* /__&/g' | sed 's/___/ /g' |
+    sed 's/_[1-9][0-9]* /__&/g' | sed 's/___/ /g' |
     awk 'BEGIN { printf("BEGIN { \n");}
          {if (NF >= 4)
           {
