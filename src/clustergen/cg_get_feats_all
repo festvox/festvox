@@ -1,8 +1,8 @@
-#!/bin/sh
+#!/bin/bash
 #####################################################-*-mode:shell-script-*-
 ##                                                                       ##
 ##                     Carnegie Mellon University                        ##
-##                      Copyright (c) 2005-2008                          ##
+##                      Copyright (c) 2026                               ##
 ##                        All Rights Reserved.                           ##
 ##                                                                       ##
 ##  Permission is hereby granted, free of charge, to use and distribute  ##
@@ -31,125 +31,77 @@
 ##                                                                       ##
 ###########################################################################
 ##                                                                       ##
-##  Extract all the feats in one go (much faster)                        ##
+##  Author: Pallas13 (pallasdasilvaguedes0@gmail) 2025                   ##
 ##                                                                       ##
-##  saved about 33 hours from a 39 hours voice build                     ##
-##     and didn't require all utts to be festival at once                ##
+###########################################################################
 ##                                                                       ##
-##  Redid this in Feb/Mar 2008 to make it use less disk space and time   ##
+## New version for script cg_get_feats_all for extract all the feats     ##
+## in clustergen voice. With parallel version using parallel command     ##
+## for faster process.                                                   ##
 ##                                                                       ##
 ###########################################################################
 
-LANG=C; export LANG
+if command -v parallel >&2; then
+    echo "Parallel command is available, using parallel version."
+    PARALLEL=1
+else
+    echo "Parallel command is not available, using single process."
+    PARALLEL=0
+fi
 
-DATAFILE=$1
+CPUS="$(nproc)"
+make_all_feats() {
+    DATABASE=$1
+    rm festival/coeffs/cg_all.{feats,mcep}
+    if (("$PARALLEL" == "1")); then
+        awk '{print $2}' "$DATABASE" | parallel -j"$CPUS" --bar --progress cat festival/coeffs/{}.feats >>festival/coeffs/cg_all.feats
+        awk '{print $2}' "$DATABASE" | parallel -j"$CPUS" --bar --progress cat festival/coeffs/{}.mcep >>festival/coeffs/cg_all.mcep
+    else
+        for coeffs in $(awk '{print $2}' "$DATABASE"); do
+            cat festival/coeffs/"$coeffs".feats >>festival/coeffs/cg_all.feats
+            cat festival/coeffs/"$coeffs".mcep >>festival/coeffs/cg_all.mcep
+        done
+    fi
+    cut --complement -f2 -d" " festival/coeffs/cg_all.feats | sort -g >festival/coeffs/cg_all_sorted.feats
+    cat festival/coeffs/cg_all.mcep | sort -g >festival/coeffs/cg_all_sorted.mcep
+}
 
-awk '{print $2}' $DATAFILE |
-while read i
-do
-#   echo Collecting feats $i >/dev/tty
-   cat festival/coeffs/$i.feats
-   if [ "$2" != "save" ]
-   then
-      rm -f festival/coeffs/$i.feats
-   fi
-done |
-awk '{printf("%s %d ",$1,NR-1);
-      for (i=3; i<=NF; i++)
-         printf("%s ",$i);
-      printf("\n");}' > festival/coeffs/cg_all.feats
-echo Sorting all feats
-sort -g festival/coeffs/cg_all.feats >festival/coeffs/cg_all_sorted.feats
-rm -f festival/coeffs/cg_all.feats
+make_units() {
+    cat festival/coeffs/cg_all_sorted.{feats,mcep} | cut --complement -f2 -d" " | cut -f1 -d" " | sort -u >festival/disttabs/unittypes
+}
 
-awk '{print $2}' $DATAFILE |
-while read i
-do
-#   echo Collecting mcep $i >/dev/tty
-   cat festival/coeffs/$i.mcep
-   if [ "$2" != "save" ]
-   then
-      rm -f festival/coeffs/$i.mcep
-   fi
-done | 
-awk '{printf("%s %d ",$1,NR-1);
-      for (i=2; i<=NF; i++)
-         printf("%s ",$i);
-      printf("\n");}' >festival/coeffs/cg_all.mcep
-echo Sorting all mceps
-sort festival/coeffs/cg_all.mcep >festival/coeffs/cg_all_sorted.mcep
-rm -f festival/coeffs/cg_all.mcep
+make_feats_by_units() {
+    UNIT=$1
+    SED="/^$UNIT/p"
+    TMP=tmp_"$UNIT"_$$
+    cat festival/coeffs/cg_all_sorted.feats | cut --complement -f2 -d" " | sed -n $SED | sort >festival/feats/"$UNIT".feats.unsorted
+    cat festival/coeffs/cg_all_sorted.mcep | sed -n $SED | sort >festival/feats/"$UNIT".mcep.unsorted
+    LINE_FEATS=$(echo "$(wc -l <festival/feats/"$UNIT".feats.unsorted)" - 1 | bc)
+    LINE_MCEP=$(echo "$(wc -l <festival/feats/"$UNIT".mcep.unsorted)" - 1 | bc)
 
-echo Sorting feats by unittype
-cat festival/coeffs/cg_all_sorted.feats |
-awk '{if ($1 != l)
-      {
-         if (NR > 1)
-            close(ofile);
-#         printf("Split feats by unit type %s\n",$1);
-         ofile = sprintf("festival/feats/%s.feats.unsorted",$1);
-         l = $1; 
-         n = 1;
-      }
-         for (i=2; i<=NF; i++)
-            printf("%s ",$i) > ofile;
-         printf("\n") > ofile;
-      }
-      END {close(ofile);}'
-rm -f festival/coeffs/cg_all_sorted.feats
+    seq 0 "$LINE_FEATS" >$TMP.header.feats
+    seq 0 "$LINE_MCEP" >$TMP.header.mcep
 
-echo Sorting mcep by unittype
-cat festival/coeffs/cg_all_sorted.mcep |
-awk '{if ($1 != l)
-      {
-         if (NR > 1)
-         {
-            close(ofile);
-         }
-#         printf("Split mcep by unit type %s\n",$1);
-         ofile = sprintf("festival/disttabs/%s.mcep.unsorted",$1);
-         print $1 > "festival/disttabs/unittypes"
-         l = $1; 
-         n = 1;
-      }
-         for (i=2; i<=NF; i++)
-            printf("%s ",$i) > ofile;
-         printf("\n") > ofile;
-         n = n + 1;
-      }
-      END {close(ofile); }'
-rm -f festival/coeffs/cg_all_sorted.mcep 
+    paste -d" " $TMP.header.feats festival/feats/"$UNIT".feats.unsorted >festival/feats/"$UNIT".feats
+    paste -d" " $TMP.header.mcep festival/feats/"$UNIT".mcep.unsorted | cut --complement -f1,2 -d" " | $ESTDIR/bin/ch_track -itype ascii -otype est_binary -s 0.005 -o festival/disttabs/"$UNIT".mcep
 
-echo Sorting samples and making f0_feats for each unittype
-cat festival/disttabs/unittypes |
-while read x
-do
+    $ESTDIR/bin/ch_track -c 0 festival/disttabs/"$UNIT".mcep -otype ascii -o $$.f0
+    cut -d " " -f 2- festival/feats/"$UNIT".feats >$$.mcep
+    paste -d " " $$.f0 $$.mcep >festival/feats/"$UNIT"_f0.feats
+    rm -f $$.f0 $$.mcep
 
-   sort -g festival/feats/$x.feats.unsorted |
-   awk '{printf("%d ",NR-1);
-         for (i=2; i<=NF; i++)
-            printf("%s ",$i);
-         printf("\n");}'>festival/feats/$x.feats
-   rm -f festival/feats/$x.feats.unsorted
+    rm $TMP.*
+}
 
-   sort -g festival/disttabs/$x.mcep.unsorted |
-   sed 's/^[^ ]*//' |
-   $ESTDIR/bin/ch_track -itype ascii -otype est_binary -s 0.005 -o festival/disttabs/$x.mcep
-   rm festival/disttabs/$x.mcep.unsorted
+export -f make_feats_by_units
 
-   # HNM fix -c 1 vs -c 0
-   $ESTDIR/bin/ch_track -c 0 festival/disttabs/$x.mcep -otype ascii -o $$.f0
-#   cut -d " " -f 2- festival/feats/$x.feats |
-#   paste -d " " xxx.f0 - >festival/feats/${x}_f0.feats
-   cut -d " " -f 2- festival/feats/$x.feats >$$.mcep
-   paste -d " " $$.f0 $$.mcep >festival/feats/${x}_f0.feats
-   rm -f $$.f0 $$.mcep
+make_all_feats $1
+make_units
 
-done
-
-echo END of sorting feats and mceps
-
-exit 0
-
-
-
+if (("$PARALLEL" == "1")); then
+    cat festival/disttabs/unittypes | parallel -j"$CPUS" --bar --progress make_feats_by_units {}
+else
+    for unit in $(cat festival/disttabs/unittypes); do
+        make_feats_by_units "$unit"
+    done
+fi
